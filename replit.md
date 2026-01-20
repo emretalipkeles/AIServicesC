@@ -238,6 +238,12 @@ Core entities:
 - **API Endpoints**: 
   - `GET/POST /api/delay-analysis/projects` - List and create projects
   - `GET/PUT/DELETE /api/delay-analysis/projects/:id` - Project CRUD operations
+  - `GET /api/delay-analysis/projects/:id/analyze/stream` - SSE endpoint for real-time analysis progress
+- **SSE Progress Reporting**: Real-time streaming of analysis progress using Server-Sent Events
+  - Progress stages: `loading_documents`, `extracting_events`, `loading_activities`, `matching_events`, `saving_events`, `complete`, `error`
+  - Domain interface: `IProgressReporter` with `report()`, `complete()`, `error()` methods
+  - Infrastructure: `SSEProgressReporter` implements Express SSE streaming
+  - Client: `runAnalysisWithProgress()` in `analysis-api.ts` using EventSource
 - **Architecture**: Full Clean Architecture + CQRS implementation
 - **Key Files**:
   - `server/src/domain/delay-analysis/entities/` - Domain entities with validation
