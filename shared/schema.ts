@@ -355,3 +355,24 @@ export type DelayEventCategory =
   | 'other';
 
 export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'needs_review';
+
+export const aiTokenUsage = pgTable("ai_token_usage", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  operation: text("operation").notNull(),
+  model: text("model").notNull(),
+  inputTokens: integer("input_tokens").notNull(),
+  outputTokens: integer("output_tokens").notNull(),
+  totalTokens: integer("total_tokens").notNull(),
+  estimatedCostUsd: text("estimated_cost_usd").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAITokenUsageSchema = createInsertSchema(aiTokenUsage).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAITokenUsage = z.infer<typeof insertAITokenUsageSchema>;
+export type AITokenUsageRecord = typeof aiTokenUsage.$inferSelect;
