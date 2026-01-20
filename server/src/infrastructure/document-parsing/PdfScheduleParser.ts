@@ -15,6 +15,13 @@ const MONTH_NAMES: Record<string, number> = {
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
 };
 
+const ALL_ACTIVITIES_MARKERS = [
+  'ALL ACTIVITIES',
+  'All Activities',
+  'ALL_ACTIVITIES',
+  'ALLACTIVITIES',
+];
+
 export class PdfScheduleParser implements IScheduleParser {
   private readonly supportedContentTypes = ['application/pdf'];
   private readonly supportedExtensions = ['.pdf'];
@@ -54,7 +61,8 @@ export class PdfScheduleParser implements IScheduleParser {
         percentage: 15,
       });
 
-      const filteredLines = this.filterActualDateLines(fullText, options);
+      const textToProcess = this.extractAllActivitiesSection(fullText);
+      const filteredLines = this.filterActualDateLines(textToProcess, options);
 
       if (filteredLines.length === 0) {
         progress.report({
@@ -250,5 +258,20 @@ Return ONLY the JSON array, no other text.`;
       chunks.push(array.slice(i, i + size));
     }
     return chunks;
+  }
+
+  private extractAllActivitiesSection(fullText: string): string {
+    const upperText = fullText.toUpperCase();
+    
+    for (const marker of ALL_ACTIVITIES_MARKERS) {
+      const upperMarker = marker.toUpperCase();
+      const markerIndex = upperText.lastIndexOf(upperMarker);
+      
+      if (markerIndex !== -1) {
+        return fullText.substring(markerIndex);
+      }
+    }
+    
+    return fullText;
   }
 }
