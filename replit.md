@@ -226,3 +226,24 @@ Core entities:
   - `server/src/infrastructure/ai/AIClientFactory.ts`: Factory routing to Bedrock or OpenAI
   - `server/src/infrastructure/ai/OpenAIResponsesClient.ts`: OpenAI SDK integration with streaming support
   - `server/src/infrastructure/ai/BedrockConverseClient.ts`: AWS Bedrock integration
+
+### Delay Analysis Feature
+- **Purpose**: AI-powered construction delay analysis for identifying contractor-caused delays from project documentation
+- **Use Case**: Analyze Inspector Daily Reports (IDRs with CODE_CIE tags), NCRs, and Field Memos to extract delay events and match them to CPM schedule activities
+- **Database Tables**:
+  - `delay_analysis_projects`: Project container with name, contract number, notice to proceed date
+  - `project_documents`: Uploaded documents (IDRs, NCRs, Field Memos, CPM schedules) with parsing status
+  - `schedule_activities`: Extracted CPM schedule activities with Activity ID, WBS, descriptions, dates
+  - `contractor_delay_events`: Extracted delay events with matched Activity ID, confidence scores, source references
+- **API Endpoints**: 
+  - `GET/POST /api/delay-analysis/projects` - List and create projects
+  - `GET/PUT/DELETE /api/delay-analysis/projects/:id` - Project CRUD operations
+- **Architecture**: Full Clean Architecture + CQRS implementation
+- **Key Files**:
+  - `server/src/domain/delay-analysis/entities/` - Domain entities with validation
+  - `server/src/domain/delay-analysis/repositories/` - Repository interfaces
+  - `server/src/application/delay-analysis/commands/` - CQRS command handlers
+  - `server/src/application/delay-analysis/queries/` - CQRS query handlers
+  - `server/src/infrastructure/database/repositories/delay-analysis/` - Drizzle ORM implementations
+  - `server/src/presentation/routes/delay-analysis-project.routes.ts` - API routes
+  - `server/src/presentation/controllers/DelayAnalysisProjectController.ts` - Controller
