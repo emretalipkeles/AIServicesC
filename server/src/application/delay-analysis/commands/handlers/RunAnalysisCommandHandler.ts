@@ -252,7 +252,7 @@ export class RunAnalysisCommandHandler {
 
     progress.complete(
       `Analysis complete: ${result.eventsExtracted} events extracted, ${result.eventsMatched} matched`,
-      result
+      { ...result, runId: options?.runId }
     );
 
     return result;

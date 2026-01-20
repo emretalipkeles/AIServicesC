@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import { Calendar, Upload, FileSpreadsheet, Trash2, FileText, Loader2 } from "lucide-react";
-import { useScheduleActivities, useDeleteAllActivities, uploadScheduleWithProgress, type ProgressEvent } from "@/lib/schedule-api";
+import { Calendar, Upload, FileSpreadsheet, Trash2, FileText, Loader2, DollarSign } from "lucide-react";
+import { useScheduleActivities, useDeleteAllActivities, uploadScheduleWithProgress, type ProgressEvent, type UploadScheduleResult } from "@/lib/schedule-api";
+import { fetchRunTokenUsage, type RunTokenUsageSummary } from "@/lib/analysis-api";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -41,6 +42,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
   const [targetYear, setTargetYear] = useState<number>(currentYear);
   const [isUploading, setIsUploading] = useState(false);
   const [progressState, setProgressState] = useState<ProgressEvent | null>(null);
+  const [lastUploadCost, setLastUploadCost] = useState<RunTokenUsageSummary | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -87,6 +89,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
 
   const handleUpload = async (file: File) => {
     setIsUploading(true);
+    setLastUploadCost(null);
     setProgressState({
       type: 'progress',
       stage: 'uploading',
@@ -125,6 +128,17 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
           description: result.warnings.slice(0, 3).join("; "),
           variant: "destructive",
         });
+      }
+
+      if (result.runId) {
+        try {
+          const usage = await fetchRunTokenUsage(result.runId);
+          if (usage) {
+            setLastUploadCost(usage);
+          }
+        } catch (costError) {
+          console.error('Failed to fetch token usage:', costError);
+        }
       }
     } catch (error) {
       toast({
@@ -221,6 +235,15 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
               </Select>
             </div>
           </div>
+
+          {lastUploadCost && (
+            <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800 flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" />
+              <span className="text-sm text-green-700 dark:text-green-300">
+                AI cost for this upload: <span className="font-semibold">${lastUploadCost.totalCostUsd.toFixed(4)}</span>
+              </span>
+            </div>
+          )}
 
           {isUploading && progressState ? (
             <div className="border rounded-lg p-6 space-y-4 bg-muted/30">

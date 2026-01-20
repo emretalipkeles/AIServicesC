@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import { Activity, Play, Download, Loader2 } from "lucide-react";
-import { useDelayEvents, getExportUrl, runAnalysisWithProgress, type AnalysisProgressEvent } from "@/lib/analysis-api";
+import { Activity, Play, Download, Loader2, DollarSign } from "lucide-react";
+import { useDelayEvents, getExportUrl, runAnalysisWithProgress, fetchRunTokenUsage, type AnalysisProgressEvent, type RunTokenUsageSummary } from "@/lib/analysis-api";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -20,9 +20,11 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
   const { data: events = [], isLoading, refetch } = useDelayEvents(projectId);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progressState, setProgressState] = useState<AnalysisProgressEvent | null>(null);
+  const [lastRunCost, setLastRunCost] = useState<RunTokenUsageSummary | null>(null);
 
   const handleRunAnalysis = async () => {
     setIsAnalyzing(true);
+    setLastRunCost(null);
     setProgressState({
       type: 'progress',
       stage: 'loading_documents',
@@ -50,6 +52,17 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
           description: result.warnings.slice(0, 2).join("; "),
           variant: "destructive",
         });
+      }
+
+      if (result.runId) {
+        try {
+          const usage = await fetchRunTokenUsage(result.runId);
+          if (usage) {
+            setLastRunCost(usage);
+          }
+        } catch (costError) {
+          console.error('Failed to fetch token usage:', costError);
+        }
       }
     } catch (error) {
       toast({
@@ -137,6 +150,15 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
               </span>
             </div>
             <Progress value={progressState.percentage || 0} className="h-2" />
+          </div>
+        )}
+
+        {lastRunCost && (
+          <div className="mb-6 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800 flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" />
+            <span className="text-sm text-green-700 dark:text-green-300">
+              AI cost for this run: <span className="font-semibold">${lastRunCost.totalCostUsd.toFixed(4)}</span>
+            </span>
           </div>
         )}
 

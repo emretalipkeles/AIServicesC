@@ -25,6 +25,26 @@ export interface AnalysisResult {
   eventsMatched: number;
   documentsProcessed: number;
   warnings?: string[];
+  runId?: string;
+}
+
+export interface RunTokenUsageSummary {
+  runId: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  totalCostUsd: number;
+  operationCount: number;
+}
+
+export async function fetchRunTokenUsage(runId: string): Promise<RunTokenUsageSummary | null> {
+  const response = await fetch(`/api/delay-analysis/runs/${runId}/token-usage`);
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error("Failed to fetch token usage");
+  }
+  const result = await response.json();
+  return result.data;
 }
 
 async function fetchDelayEvents(projectId: string): Promise<DelayEventDto[]> {

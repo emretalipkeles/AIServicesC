@@ -23,6 +23,7 @@ export interface UploadScheduleResult {
   totalRowsProcessed: number;
   scheduleUpdateMonth: string | null;
   warnings?: string[];
+  runId?: string;
 }
 
 export interface ProgressEvent {
