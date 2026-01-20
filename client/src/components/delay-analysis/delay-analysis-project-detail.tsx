@@ -11,6 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Save, FileText, Calendar, Upload, Table, Activity, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { DocumentUpload } from "./document-upload";
+import { ScheduleUpload } from "./schedule-upload";
+import { DelayEvents } from "./delay-events";
+import { AnalysisResults } from "./analysis-results";
 
 interface DelayAnalysisProjectDetailProps {
   projectId: string;
@@ -166,66 +169,15 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
           </TabsContent>
 
           <TabsContent value="schedule">
-            <Card>
-              <CardHeader>
-                <CardTitle>Schedule Activities</CardTitle>
-                <CardDescription>
-                  CPM schedule activities extracted from monthly schedule updates
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="border-2 border-dashed border-border rounded-lg p-12 text-center">
-                  <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-medium mb-2">Upload CPM Schedule</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Upload Excel or PDF schedule files to extract activities
-                  </p>
-                  <Button variant="outline" disabled>
-                    Coming Soon
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <ScheduleUpload projectId={projectId} />
           </TabsContent>
 
           <TabsContent value="delays">
-            <Card>
-              <CardHeader>
-                <CardTitle>Contractor Delay Events</CardTitle>
-                <CardDescription>
-                  CODE_CIE entries extracted from Inspector Daily Reports
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Activity className="w-12 h-12 text-muted-foreground mb-4" />
-                  <h3 className="font-medium mb-2">No delay events yet</h3>
-                  <p className="text-sm text-muted-foreground text-center">
-                    Upload IDRs with CODE_CIE tags to extract delay events
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <DelayEvents projectId={projectId} />
           </TabsContent>
 
           <TabsContent value="results">
-            <Card>
-              <CardHeader>
-                <CardTitle>Analysis Results</CardTitle>
-                <CardDescription>
-                  Delay events matched to CPM schedule activities with confidence scores
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Table className="w-12 h-12 text-muted-foreground mb-4" />
-                  <h3 className="font-medium mb-2">No results yet</h3>
-                  <p className="text-sm text-muted-foreground text-center">
-                    Run AI analysis after uploading documents and schedule
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <AnalysisResults projectId={projectId} />
           </TabsContent>
         </Tabs>
       )}
