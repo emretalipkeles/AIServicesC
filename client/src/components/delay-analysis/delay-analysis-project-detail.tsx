@@ -114,7 +114,7 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-muted/30 via-background to-background">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {isEditing ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

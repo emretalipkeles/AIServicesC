@@ -303,12 +303,12 @@ export function UploadZone({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       animate={{
-        scale: isDragOver ? 1.02 : 1,
+        scale: isDragOver ? 1.01 : 1,
         borderColor: isDragOver ? "hsl(var(--primary))" : "hsl(var(--border) / 0.5)",
       }}
       transition={{ duration: 0.2 }}
       className={cn(
-        "relative overflow-hidden rounded-xl border-2 border-dashed p-8",
+        "relative overflow-hidden rounded-xl border-2 border-dashed py-5 px-6",
         "bg-gradient-to-b from-muted/30 to-muted/10",
         "hover:border-primary/50 hover:from-muted/40 hover:to-muted/20",
         "transition-colors cursor-pointer group",
@@ -317,31 +317,32 @@ export function UploadZone({
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
       
-      <div className="relative z-10 flex flex-col items-center text-center">
+      <div className="relative z-10 flex items-center gap-4">
         <motion.div
-          animate={{ y: isDragOver ? -5 : 0 }}
-          className="flex items-center gap-3 mb-4"
+          animate={{ y: isDragOver ? -2 : 0 }}
+          className="flex items-center gap-2 flex-shrink-0"
         >
           {icons?.map((Icon, index) => (
             <div
               key={index}
               className={cn(
-                "flex items-center justify-center w-14 h-14 rounded-xl",
+                "flex items-center justify-center w-10 h-10 rounded-lg",
                 "bg-primary/10 text-primary",
-                "ring-2 ring-primary/20"
+                "ring-1 ring-primary/20"
               )}
             >
-              <Icon className="w-7 h-7" />
+              <Icon className="w-5 h-5" />
             </div>
           ))}
         </motion.div>
         
-        <h3 className="text-lg font-semibold mb-1">{title}</h3>
-        <p className="text-sm text-muted-foreground mb-4">{description}</p>
-        
-        {acceptedFormats && (
-          <p className="text-xs text-muted-foreground/70 mb-4">{acceptedFormats}</p>
-        )}
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <p className="text-xs text-muted-foreground">{description}</p>
+          {acceptedFormats && (
+            <p className="text-xs text-muted-foreground/60 mt-0.5">{acceptedFormats}</p>
+          )}
+        </div>
         
         <motion.button
           whileHover={{ scale: 1.03 }}
@@ -349,10 +350,10 @@ export function UploadZone({
           onClick={onBrowse}
           disabled={isUploading}
           className={cn(
-            "inline-flex items-center gap-2 px-5 py-2.5 rounded-lg",
-            "bg-primary text-primary-foreground font-medium",
-            "shadow-lg shadow-primary/25",
-            "hover:shadow-xl hover:shadow-primary/30",
+            "inline-flex items-center gap-2 px-4 py-2 rounded-lg flex-shrink-0",
+            "bg-primary text-primary-foreground text-sm font-medium",
+            "shadow-md shadow-primary/20",
+            "hover:shadow-lg hover:shadow-primary/25",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             "transition-shadow"
           )}
@@ -439,3 +440,25 @@ export function EnhancedTable({ children, className }: EnhancedTableProps) {
     </div>
   );
 }
+
+export const tableHeaderStyles = cn(
+  "sticky top-0 z-10",
+  "bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100",
+  "dark:from-zinc-800 dark:via-zinc-800/95 dark:to-zinc-800",
+  "border-b-2 border-primary/20 dark:border-primary/30",
+  "shadow-sm"
+);
+
+export const tableHeaderCellStyles = cn(
+  "text-left p-3 text-xs font-semibold uppercase tracking-wider",
+  "text-slate-600 dark:text-zinc-300"
+);
+
+export const selectTriggerStyles = cn(
+  "bg-background border-2 border-border/80",
+  "hover:border-primary/50 hover:bg-accent/30",
+  "focus:border-primary focus:ring-2 focus:ring-primary/20",
+  "shadow-sm transition-all duration-200",
+  "dark:bg-zinc-900 dark:border-zinc-600",
+  "dark:hover:border-primary/60 dark:hover:bg-zinc-800"
+);

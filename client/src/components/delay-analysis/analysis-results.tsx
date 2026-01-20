@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BarChart3, Download, CheckCircle, AlertCircle, Clock, TrendingUp } from "lucide-react";
 import { useDelayEvents, getExportUrl } from "@/lib/analysis-api";
-import { GlassCard, SectionHeader, StatCard } from "./ui/premium-components";
+import { GlassCard, SectionHeader, StatCard, tableHeaderStyles, tableHeaderCellStyles } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 
 interface AnalysisResultsProps {
@@ -97,18 +97,18 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                 </div>
               </div>
 
-              <ScrollArea className="h-[400px]">
+              <ScrollArea className="h-[500px]">
                 <div className="rounded-xl border border-border/50 overflow-hidden">
                   <table className="w-full">
-                    <thead>
-                      <tr className="bg-muted/30 border-b border-border/50">
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">WBS</th>
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Activity ID</th>
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider min-w-[150px]">Activity Description</th>
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider min-w-[200px]">Delay Event</th>
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Event Date</th>
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Duration</th>
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Confidence</th>
+                    <thead className={tableHeaderStyles}>
+                      <tr>
+                        <th className={tableHeaderCellStyles}>WBS</th>
+                        <th className={tableHeaderCellStyles}>Activity ID</th>
+                        <th className={cn(tableHeaderCellStyles, "min-w-[150px]")}>Activity Description</th>
+                        <th className={cn(tableHeaderCellStyles, "min-w-[200px]")}>Delay Event</th>
+                        <th className={tableHeaderCellStyles}>Event Date</th>
+                        <th className={tableHeaderCellStyles}>Duration</th>
+                        <th className={tableHeaderCellStyles}>Confidence</th>
                       </tr>
                     </thead>
                     <tbody>

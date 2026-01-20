@@ -10,7 +10,7 @@ import { fetchRunTokenUsage, type RunTokenUsageSummary } from "@/lib/analysis-ap
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { GlassCard, SectionHeader, UploadZone, ProgressIndicator, StatCard } from "./ui/premium-components";
+import { GlassCard, SectionHeader, UploadZone, ProgressIndicator, StatCard, tableHeaderStyles, tableHeaderCellStyles, selectTriggerStyles } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 
 interface ScheduleUploadProps {
@@ -210,7 +210,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                 onValueChange={(v) => setTargetMonth(parseInt(v))}
                 disabled={isUploading}
               >
-                <SelectTrigger className="bg-background/50 border-border/50">
+                <SelectTrigger className={selectTriggerStyles}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -229,7 +229,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                 onValueChange={(v) => setTargetYear(parseInt(v))}
                 disabled={isUploading}
               >
-                <SelectTrigger className="bg-background/50 border-border/50">
+                <SelectTrigger className={selectTriggerStyles}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -329,17 +329,17 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
               </p>
             </motion.div>
           ) : (
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[500px]">
               <div className="rounded-xl border border-border/50 overflow-hidden">
                 <table className="w-full">
-                  <thead>
-                    <tr className="bg-muted/30 border-b border-border/50">
-                      <th className="text-left p-3 text-sm font-medium text-muted-foreground">Activity ID</th>
-                      <th className="text-left p-3 text-sm font-medium text-muted-foreground">WBS</th>
-                      <th className="text-left p-3 text-sm font-medium text-muted-foreground min-w-[200px]">Description</th>
-                      <th className="text-left p-3 text-sm font-medium text-muted-foreground">Actual Start</th>
-                      <th className="text-left p-3 text-sm font-medium text-muted-foreground">Actual Finish</th>
-                      <th className="text-left p-3 text-sm font-medium text-muted-foreground">Critical</th>
+                  <thead className={tableHeaderStyles}>
+                    <tr>
+                      <th className={tableHeaderCellStyles}>Activity ID</th>
+                      <th className={tableHeaderCellStyles}>WBS</th>
+                      <th className={cn(tableHeaderCellStyles, "min-w-[200px]")}>Description</th>
+                      <th className={tableHeaderCellStyles}>Actual Start</th>
+                      <th className={tableHeaderCellStyles}>Actual Finish</th>
+                      <th className={tableHeaderCellStyles}>Critical</th>
                     </tr>
                   </thead>
                   <tbody>

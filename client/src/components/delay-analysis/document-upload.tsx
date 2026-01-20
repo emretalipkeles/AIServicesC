@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader2, File, FolderOpen } from "lucide-react";
 import { format } from "date-fns";
-import { GlassCard, SectionHeader, UploadZone, StatCard } from "./ui/premium-components";
+import { GlassCard, SectionHeader, UploadZone, StatCard, selectTriggerStyles } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 
 interface DocumentUploadProps {
@@ -153,7 +153,7 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
             <div className="flex-1">
               <label className="text-sm font-medium text-muted-foreground mb-2 block">Document Type</label>
               <Select value={selectedType} onValueChange={(v) => setSelectedType(v as ProjectDocumentType)}>
-                <SelectTrigger className="bg-background/50 border-border/50">
+                <SelectTrigger className={selectTriggerStyles}>
                   <SelectValue placeholder="Select document type" />
                 </SelectTrigger>
                 <SelectContent>
