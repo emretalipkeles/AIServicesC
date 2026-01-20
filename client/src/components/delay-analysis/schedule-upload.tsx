@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, FileSpreadsheet, Trash2, FileText, Loader2, DollarSign, CheckCircle, Clock, Search } from "lucide-react";
-import { useScheduleActivities, useDeleteAllActivities, uploadScheduleWithProgress, type ProgressEvent } from "@/lib/schedule-api";
-import { fetchRunTokenUsage, type RunTokenUsageSummary } from "@/lib/analysis-api";
+import { useScheduleActivities, useDeleteAllActivities, uploadScheduleWithProgress } from "@/lib/schedule-api";
+import { fetchRunTokenUsage } from "@/lib/analysis-api";
+import { useUploadState } from "@/contexts/upload-state-context";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -38,17 +39,26 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [targetMonth, setTargetMonth] = useState<number>(new Date().getMonth() + 1);
   const [targetYear, setTargetYear] = useState<number>(currentYear);
-  const [isUploading, setIsUploading] = useState(false);
-  const [progressState, setProgressState] = useState<ProgressEvent | null>(null);
-  const [lastUploadCost, setLastUploadCost] = useState<RunTokenUsageSummary | null>(null);
   const [filterText, setFilterText] = useState("");
   const uploadSectionRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const {
+    scheduleUpload,
+    startScheduleUpload,
+    updateScheduleProgress,
+    completeScheduleUpload,
+    failScheduleUpload,
+  } = useUploadState(projectId);
+
+  const isUploading = scheduleUpload.isUploading;
+  const progressState = scheduleUpload.progress;
+  const lastUploadCost = scheduleUpload.lastCost;
 
   const scrollToUpload = () => {
     uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-  const queryClient = useQueryClient();
 
   const { data: activities = [], isLoading } = useScheduleActivities(projectId);
   const deleteMutation = useDeleteAllActivities();
@@ -93,14 +103,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
   };
 
   const handleUpload = async (file: File) => {
-    setIsUploading(true);
-    setLastUploadCost(null);
-    setProgressState({
-      type: 'progress',
-      stage: 'uploading',
-      message: 'Starting upload...',
-      percentage: 0,
-    });
+    startScheduleUpload();
 
     try {
       const result = await uploadScheduleWithProgress(
@@ -109,7 +112,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
         targetMonth,
         targetYear,
         (event) => {
-          setProgressState(event);
+          updateScheduleProgress(event);
         }
       );
 
@@ -135,25 +138,26 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
         });
       }
 
+      let uploadCost = null;
       if (result.runId) {
         try {
-          const usage = await fetchRunTokenUsage(result.runId);
-          if (usage) {
-            setLastUploadCost(usage);
-          }
+          uploadCost = await fetchRunTokenUsage(result.runId);
         } catch (costError) {
           console.error('Failed to fetch token usage:', costError);
         }
       }
+      
+      completeScheduleUpload(uploadCost);
+      queryClient.invalidateQueries({ queryKey: ["schedule-activities", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload schedule";
+      failScheduleUpload(errorMessage);
       toast({
         title: "Upload failed",
-        description: error instanceof Error ? error.message : "Failed to upload schedule",
+        description: errorMessage,
         variant: "destructive",
       });
-    } finally {
-      setIsUploading(false);
-      setProgressState(null);
       queryClient.invalidateQueries({ queryKey: ["schedule-activities", projectId] });
       queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
     }

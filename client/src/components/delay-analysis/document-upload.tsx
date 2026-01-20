@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useUploadState } from "@/contexts/upload-state-context";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader2, File, FolderOpen } from "lucide-react";
 import { format } from "date-fns";
@@ -41,6 +42,13 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const uploadSectionRef = useRef<HTMLDivElement>(null);
 
+  const {
+    documentUpload,
+    startDocumentUpload,
+    completeDocumentUpload,
+    failDocumentUpload,
+  } = useUploadState(projectId);
+
   const scrollToUpload = () => {
     uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -70,12 +78,16 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
       return;
     }
 
+    startDocumentUpload(validFiles.length);
+
     try {
       const result = await uploadDocuments.mutateAsync({
         projectId,
         files: validFiles,
         documentType: selectedType,
       });
+
+      completeDocumentUpload();
 
       if (result.uploaded.length > 0) {
         toast({
@@ -92,13 +104,15 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
         });
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload documents";
+      failDocumentUpload(errorMessage);
       toast({
         title: "Upload failed",
-        description: error instanceof Error ? error.message : "Failed to upload documents",
+        description: errorMessage,
         variant: "destructive",
       });
     }
-  }, [projectId, selectedType, uploadDocuments, toast]);
+  }, [projectId, selectedType, uploadDocuments, toast, startDocumentUpload, completeDocumentUpload, failDocumentUpload]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -231,12 +245,25 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
               onChange={handleFileSelect}
             />
 
+            {documentUpload.isUploading && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-800 flex items-center gap-3"
+              >
+                <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
+                <span className="text-sm text-blue-700 dark:text-blue-300">
+                  Uploading {documentUpload.uploadingCount} document{documentUpload.uploadingCount !== 1 ? 's' : ''}...
+                </span>
+              </motion.div>
+            )}
+
             <UploadZone
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               isDragOver={isDragOver}
-              isUploading={uploadDocuments.isPending}
+              isUploading={documentUpload.isUploading || uploadDocuments.isPending}
               onBrowse={() => document.getElementById('file-upload')?.click()}
               title={isDragOver ? "Drop files here" : "Drag and drop files here"}
               description="Upload your project documents for AI analysis"
