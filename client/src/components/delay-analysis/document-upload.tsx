@@ -1,12 +1,15 @@
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useProjectDocuments, useUploadDocuments, useDeleteDocument, type ProjectDocumentDto, type ProjectDocumentType } from "@/lib/project-documents-api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader2 } from "lucide-react";
+import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader2, File, FolderOpen } from "lucide-react";
 import { format } from "date-fns";
+import { GlassCard, SectionHeader, UploadZone, StatCard } from "./ui/premium-components";
+import { cn } from "@/lib/utils";
 
 interface DocumentUploadProps {
   projectId: string;
@@ -21,21 +24,25 @@ const documentTypeLabels: Partial<Record<ProjectDocumentType, string>> = {
   other: "Other",
 };
 
-const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
-  pending: { icon: Clock, color: "text-yellow-500", label: "Pending" },
-  processing: { icon: Loader2, color: "text-blue-500", label: "Processing" },
-  completed: { icon: CheckCircle, color: "text-green-500", label: "Completed" },
-  failed: { icon: AlertCircle, color: "text-red-500", label: "Failed" },
+const statusConfig: Record<string, { icon: typeof Clock; color: string; bgColor: string; label: string }> = {
+  pending: { icon: Clock, color: "text-amber-600 dark:text-amber-400", bgColor: "bg-amber-500/10", label: "Pending" },
+  processing: { icon: Loader2, color: "text-blue-600 dark:text-blue-400", bgColor: "bg-blue-500/10", label: "Processing" },
+  completed: { icon: CheckCircle, color: "text-green-600 dark:text-green-400", bgColor: "bg-green-500/10", label: "Completed" },
+  failed: { icon: AlertCircle, color: "text-red-600 dark:text-red-400", bgColor: "bg-red-500/10", label: "Failed" },
 };
 
 export function DocumentUpload({ projectId }: DocumentUploadProps) {
-  const { data: documents, isLoading } = useProjectDocuments(projectId);
+  const { data: documents = [], isLoading } = useProjectDocuments(projectId);
   const uploadDocuments = useUploadDocuments();
   const deleteDocument = useDeleteDocument();
   const { toast } = useToast();
 
   const [selectedType, setSelectedType] = useState<ProjectDocumentType>("idr");
   const [isDragOver, setIsDragOver] = useState(false);
+
+  const completedDocs = documents.filter(d => d.status === 'completed').length;
+  const pendingDocs = documents.filter(d => d.status === 'pending' || d.status === 'processing').length;
+  const failedDocs = documents.filter(d => d.status === 'failed').length;
 
   const handleFileDrop = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -127,37 +134,37 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
   }, [projectId, deleteDocument, toast]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Project Documents</CardTitle>
-        <CardDescription>
-          Upload Inspector Daily Reports (IDRs), NCRs, and Field Memos for delay analysis
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <Select value={selectedType} onValueChange={(v) => setSelectedType(v as ProjectDocumentType)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select document type" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(documentTypeLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard label="Total Documents" value={documents.length} icon={FolderOpen} />
+        <StatCard label="Processed" value={completedDocs} icon={CheckCircle} color="success" />
+        <StatCard label="Pending" value={pendingDocs} icon={Clock} color="warning" />
+      </div>
 
-        <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            isDragOver ? 'border-primary bg-primary/5' : 'border-border'
-          }`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
+      <GlassCard>
+        <SectionHeader 
+          icon={Upload} 
+          title="Upload Documents" 
+          description="Add Inspector Daily Reports, NCRs, and Field Memos for analysis"
+          gradient="blue"
+        />
+        <div className="p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">Document Type</label>
+              <Select value={selectedType} onValueChange={(v) => setSelectedType(v as ProjectDocumentType)}>
+                <SelectTrigger className="bg-background/50 border-border/50">
+                  <SelectValue placeholder="Select document type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(documentTypeLabels).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <input
             type="file"
             id="file-upload"
@@ -166,86 +173,128 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
             accept=".pdf,.doc,.docx"
             onChange={handleFileSelect}
           />
-          <Upload className={`w-10 h-10 mx-auto mb-4 ${isDragOver ? 'text-primary' : 'text-muted-foreground'}`} />
-          <h3 className="font-medium mb-2">
-            {isDragOver ? "Drop files here" : "Drag and drop files here"}
-          </h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            PDF and Word documents accepted
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => document.getElementById('file-upload')?.click()}
-            disabled={uploadDocuments.isPending}
-          >
-            {uploadDocuments.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              "Browse Files"
-            )}
-          </Button>
-        </div>
 
-        {isLoading ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Loading documents...
-          </div>
-        ) : documents && documents.length > 0 ? (
-          <div className="space-y-2">
-            <h4 className="font-medium text-sm text-muted-foreground">
-              Uploaded Documents ({documents.length})
-            </h4>
-            <div className="divide-y divide-border rounded-lg border">
-              {documents.map((doc) => {
-                const status = statusConfig[doc.status] || statusConfig.pending;
-                const StatusIcon = status.icon;
-                
-                return (
-                  <div key={doc.id} className="flex items-center justify-between p-3 hover:bg-muted/50">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <FileText className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{doc.filename}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{documentTypeLabels[doc.documentType as ProjectDocumentType] || doc.documentType}</span>
-                          <span>•</span>
-                          <span>{format(new Date(doc.createdAt), "MMM d, yyyy")}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant={doc.status === 'completed' ? 'default' : doc.status === 'failed' ? 'destructive' : 'secondary'} className="gap-1">
-                        <StatusIcon className={`w-3 h-3 ${status.icon === Loader2 ? 'animate-spin' : ''}`} />
-                        {status.label}
-                      </Badge>
-                      {doc.errorMessage && (
-                        <span className="text-xs text-destructive max-w-[200px] truncate" title={doc.errorMessage}>
-                          {doc.errorMessage}
-                        </span>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleDelete(doc.id)}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+          <UploadZone
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            isDragOver={isDragOver}
+            isUploading={uploadDocuments.isPending}
+            onBrowse={() => document.getElementById('file-upload')?.click()}
+            title={isDragOver ? "Drop files here" : "Drag and drop files here"}
+            description="Upload your project documents for AI analysis"
+            icons={[FileText, File]}
+            acceptedFormats="PDF and Word documents (.pdf, .doc, .docx)"
+          />
+        </div>
+      </GlassCard>
+
+      <GlassCard delay={0.1}>
+        <SectionHeader 
+          icon={FolderOpen} 
+          title="Uploaded Documents" 
+          description={`${documents.length} document${documents.length !== 1 ? 's' : ''} in this project`}
+          gradient="teal"
+        />
+        <div className="p-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
+          ) : documents.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-12 text-center"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+                <FolderOpen className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="font-medium text-foreground mb-1">No documents yet</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Upload Inspector Daily Reports, NCRs, or Field Memos to begin delay analysis
+              </p>
+            </motion.div>
+          ) : (
+            <ScrollArea className="h-[400px] pr-4">
+              <div className="space-y-2">
+                <AnimatePresence>
+                  {documents.map((doc, index) => (
+                    <DocumentRow 
+                      key={doc.id} 
+                      doc={doc} 
+                      index={index}
+                      onDelete={() => handleDelete(doc.id)} 
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+interface DocumentRowProps {
+  doc: ProjectDocumentDto;
+  index: number;
+  onDelete: () => void;
+}
+
+function DocumentRow({ doc, index, onDelete }: DocumentRowProps) {
+  const status = statusConfig[doc.status] || statusConfig.pending;
+  const StatusIcon = status.icon;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ delay: index * 0.05 }}
+      className={cn(
+        "group flex items-center justify-between p-4 rounded-xl",
+        "bg-gradient-to-r from-muted/30 to-transparent",
+        "border border-border/30 hover:border-border/60",
+        "hover:shadow-md transition-all duration-200"
+      )}
+    >
+      <div className="flex items-center gap-4 min-w-0 flex-1">
+        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <FileText className="w-5 h-5 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium truncate text-foreground">{doc.filename}</p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+            <span>{documentTypeLabels[doc.documentType as ProjectDocumentType] || doc.documentType}</span>
+            <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+            <span>{format(new Date(doc.createdAt), "MMM d, yyyy")}</span>
           </div>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            No documents uploaded yet
-          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
+          status.bgColor, status.color
+        )}>
+          <StatusIcon className={cn("w-3 h-3", status.icon === Loader2 && "animate-spin")} />
+          {status.label}
+        </div>
+        {doc.errorMessage && (
+          <span className="text-xs text-destructive max-w-[150px] truncate" title={doc.errorMessage}>
+            {doc.errorMessage}
+          </span>
         )}
-      </CardContent>
-    </Card>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={onDelete}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+    </motion.div>
   );
 }

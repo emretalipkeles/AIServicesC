@@ -1,18 +1,17 @@
-import { useState, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
-import { Calendar, Upload, FileSpreadsheet, Trash2, FileText, Loader2, DollarSign } from "lucide-react";
-import { useScheduleActivities, useDeleteAllActivities, uploadScheduleWithProgress, type ProgressEvent, type UploadScheduleResult } from "@/lib/schedule-api";
+import { Calendar, FileSpreadsheet, Trash2, FileText, Loader2, DollarSign, CheckCircle, Clock, AlertTriangle } from "lucide-react";
+import { useScheduleActivities, useDeleteAllActivities, uploadScheduleWithProgress, type ProgressEvent } from "@/lib/schedule-api";
 import { fetchRunTokenUsage, type RunTokenUsageSummary } from "@/lib/analysis-api";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { GlassCard, SectionHeader, UploadZone, ProgressIndicator, StatCard } from "./ui/premium-components";
+import { cn } from "@/lib/utils";
 
 interface ScheduleUploadProps {
   projectId: string;
@@ -48,6 +47,8 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
 
   const { data: activities = [], isLoading } = useScheduleActivities(projectId);
   const deleteMutation = useDeleteAllActivities();
+
+  const criticalActivities = activities.filter(a => a.isCriticalPath === "yes").length;
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -187,23 +188,29 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload CPM Schedule</CardTitle>
-          <CardDescription>
-            Upload Excel or PDF files. Only activities with actual dates (marked with "A") in the selected month will be extracted.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard label="Total Activities" value={activities.length} icon={Calendar} />
+        <StatCard label="Critical Path" value={criticalActivities} icon={AlertTriangle} color="danger" />
+        <StatCard label="On Track" value={activities.length - criticalActivities} icon={CheckCircle} color="success" />
+      </div>
+
+      <GlassCard>
+        <SectionHeader 
+          icon={Calendar} 
+          title="Upload CPM Schedule" 
+          description="Extract activities with actual dates from Excel or PDF files"
+          gradient="purple"
+        />
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label>Target Month</Label>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">Target Month</label>
               <Select
                 value={targetMonth.toString()}
                 onValueChange={(v) => setTargetMonth(parseInt(v))}
                 disabled={isUploading}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-background/50 border-border/50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -216,13 +223,13 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
               </Select>
             </div>
             <div>
-              <Label>Target Year</Label>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">Target Year</label>
               <Select
                 value={targetYear.toString()}
                 onValueChange={(v) => setTargetYear(parseInt(v))}
                 disabled={isUploading}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-background/50 border-border/50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -237,148 +244,146 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
           </div>
 
           {lastUploadCost && (
-            <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800 flex items-center gap-2">
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-3 bg-green-50 dark:bg-green-950/30 rounded-xl border border-green-200 dark:border-green-800 flex items-center gap-2"
+            >
               <DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" />
               <span className="text-sm text-green-700 dark:text-green-300">
                 AI cost for this upload: <span className="font-semibold">${lastUploadCost.totalCostUsd.toFixed(4)}</span>
               </span>
-            </div>
+            </motion.div>
           )}
+
+          <input
+            type="file"
+            id="schedule-file-input"
+            className="hidden"
+            accept=".xlsx,.xls,.pdf"
+            onChange={handleFileSelect}
+          />
 
           {isUploading && progressState ? (
-            <div className="border rounded-lg p-6 space-y-4 bg-muted/30">
-              <div className="flex items-center gap-3">
-                <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                <span className="font-medium">{progressState.message}</span>
-              </div>
-              <Progress value={progressState.percentage || 0} className="h-2" />
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>{progressState.stage?.replace(/_/g, ' ')}</span>
-                <span>{progressState.percentage}%</span>
-              </div>
-              {progressState.details && (
-                <div className="text-sm text-muted-foreground">
-                  {progressState.details.batchNumber && progressState.details.totalBatches && (
-                    <span>Batch {progressState.details.batchNumber} of {progressState.details.totalBatches}</span>
-                  )}
-                  {progressState.details.current !== undefined && progressState.details.total !== undefined && !progressState.details.batchNumber && (
-                    <span>Processed {progressState.details.current} of {progressState.details.total}</span>
-                  )}
-                </div>
-              )}
-            </div>
+            <ProgressIndicator
+              stage={progressState.stage || ''}
+              message={progressState.message}
+              percentage={progressState.percentage || 0}
+              details={progressState.details}
+            />
           ) : (
-            <div
+            <UploadZone
+              onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                isDragOver 
-                  ? "border-primary bg-primary/5" 
-                  : "border-border hover:border-primary/50"
-              }`}
-            >
-              <div className="flex justify-center gap-2 mb-4">
-                <FileSpreadsheet className="w-10 h-10 text-muted-foreground" />
-                <FileText className="w-10 h-10 text-muted-foreground" />
-              </div>
-              <h3 className="font-medium mb-2">Upload CPM Schedule</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Drag and drop Excel (.xlsx, .xls) or PDF files
-              </p>
-              <div className="flex justify-center gap-2">
-                <Button
-                  variant="outline"
-                  disabled={isUploading}
-                  onClick={() => document.getElementById("schedule-file-input")?.click()}
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Select File
-                </Button>
-                <input
-                  id="schedule-file-input"
-                  type="file"
-                  accept=".xlsx,.xls,.pdf"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </div>
-            </div>
+              isDragOver={isDragOver}
+              isUploading={isUploading}
+              onBrowse={() => document.getElementById('schedule-file-input')?.click()}
+              title={isDragOver ? "Drop schedule here" : "Upload CPM Schedule"}
+              description="Drag and drop your schedule file"
+              icons={[FileSpreadsheet, FileText]}
+              acceptedFormats="Excel (.xlsx, .xls) or PDF files"
+            />
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </GlassCard>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Schedule Activities</CardTitle>
-            <CardDescription>
-              {activities.length} activities with actual dates loaded
-            </CardDescription>
-          </div>
-          {activities.length > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDeleteAll}
-              disabled={deleteMutation.isPending}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete All
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent>
+      <GlassCard delay={0.1}>
+        <SectionHeader 
+          icon={Clock} 
+          title="Schedule Activities" 
+          description={`${activities.length} activities with actual dates loaded`}
+          gradient="teal"
+          action={
+            activities.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteAll}
+                disabled={deleteMutation.isPending}
+                className="gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete All
+              </Button>
+            )
+          }
+        />
+        <div className="p-6">
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading activities...
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
           ) : activities.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No schedule activities uploaded yet</p>
-              <p className="text-sm mt-2">Upload a CPM schedule to extract activities with actual dates</p>
-            </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-12 text-center"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+                <Calendar className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="font-medium text-foreground mb-1">No schedule activities yet</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Upload a CPM schedule to extract activities with actual dates
+              </p>
+            </motion.div>
           ) : (
             <ScrollArea className="h-[400px]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Activity ID</TableHead>
-                    <TableHead>WBS</TableHead>
-                    <TableHead className="min-w-[200px]">Description</TableHead>
-                    <TableHead>Actual Start</TableHead>
-                    <TableHead>Actual Finish</TableHead>
-                    <TableHead>Critical</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activities.map((activity) => (
-                    <TableRow key={activity.id}>
-                      <TableCell className="font-mono text-sm">{activity.activityId}</TableCell>
-                      <TableCell className="font-mono text-sm">{activity.wbs || "-"}</TableCell>
-                      <TableCell className="max-w-[300px] truncate" title={activity.activityDescription}>
-                        {activity.activityDescription}
-                      </TableCell>
-                      <TableCell>{formatDate(activity.actualStartDate)}</TableCell>
-                      <TableCell>{formatDate(activity.actualFinishDate)}</TableCell>
-                      <TableCell>
-                        {activity.isCriticalPath === "yes" ? (
-                          <Badge variant="destructive">Critical</Badge>
-                        ) : activity.isCriticalPath === "no" ? (
-                          <Badge variant="secondary">No</Badge>
-                        ) : (
-                          <Badge variant="outline">Unknown</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="rounded-xl border border-border/50 overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-muted/30 border-b border-border/50">
+                      <th className="text-left p-3 text-sm font-medium text-muted-foreground">Activity ID</th>
+                      <th className="text-left p-3 text-sm font-medium text-muted-foreground">WBS</th>
+                      <th className="text-left p-3 text-sm font-medium text-muted-foreground min-w-[200px]">Description</th>
+                      <th className="text-left p-3 text-sm font-medium text-muted-foreground">Actual Start</th>
+                      <th className="text-left p-3 text-sm font-medium text-muted-foreground">Actual Finish</th>
+                      <th className="text-left p-3 text-sm font-medium text-muted-foreground">Critical</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <AnimatePresence>
+                      {activities.map((activity, index) => (
+                        <motion.tr
+                          key={activity.id}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: index * 0.02 }}
+                          className="border-b border-border/30 hover:bg-muted/20 transition-colors"
+                        >
+                          <td className="p-3 font-mono text-sm">{activity.activityId}</td>
+                          <td className="p-3 font-mono text-sm text-muted-foreground">{activity.wbs || "-"}</td>
+                          <td className="p-3 max-w-[300px] truncate" title={activity.activityDescription}>
+                            {activity.activityDescription}
+                          </td>
+                          <td className="p-3 text-sm">{formatDate(activity.actualStartDate)}</td>
+                          <td className="p-3 text-sm">{formatDate(activity.actualFinishDate)}</td>
+                          <td className="p-3">
+                            {activity.isCriticalPath === "yes" ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 ring-1 ring-red-500/20">
+                                Critical
+                              </span>
+                            ) : activity.isCriticalPath === "no" ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400">
+                                No
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                Unknown
+                              </span>
+                            )}
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </AnimatePresence>
+                  </tbody>
+                </table>
+              </div>
             </ScrollArea>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </GlassCard>
     </div>
   );
 }
