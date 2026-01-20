@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Download, CheckCircle, AlertCircle, Clock, TrendingUp } from "lucide-react";
 import { useDelayEvents, getExportUrl } from "@/lib/analysis-api";
-import { GlassCard, SectionHeader, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles } from "./ui/premium-components";
+import { useProjectDocuments } from "@/lib/project-documents-api";
+import { GlassCard, SectionHeader, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles, TruncatedTextWithTooltip } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 
 interface AnalysisResultsProps {
@@ -12,7 +13,16 @@ interface AnalysisResultsProps {
 
 export function AnalysisResults({ projectId }: AnalysisResultsProps) {
   const { data: events = [], isLoading } = useDelayEvents(projectId);
+  const { data: documents = [] } = useProjectDocuments(projectId);
   const [filterText, setFilterText] = useState("");
+
+  const documentNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    documents.forEach(doc => {
+      map.set(doc.id, doc.filename);
+    });
+    return map;
+  }, [documents]);
 
   const matchedEvents = events.filter(e => e.cpmActivityId !== null);
   const highConfidence = matchedEvents.filter(e => (e.matchConfidence ?? 0) >= 80);
@@ -106,16 +116,20 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
               />
 
               <div className="rounded-xl border border-border/50 overflow-auto max-h-[500px]">
-                <table className="w-full">
+                <table className="w-full text-sm">
                   <thead className={tableHeaderStyles}>
                     <tr>
-                      <th className={tableHeaderCellStyles}>WBS</th>
-                      <th className={tableHeaderCellStyles}>Activity ID</th>
-                      <th className={cn(tableHeaderCellStyles, "min-w-[150px]")}>Activity Description</th>
-                      <th className={cn(tableHeaderCellStyles, "min-w-[200px]")}>Delay Event</th>
-                      <th className={tableHeaderCellStyles}>Event Date</th>
-                      <th className={tableHeaderCellStyles}>Duration</th>
-                      <th className={tableHeaderCellStyles}>Confidence</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>WBS</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Activity ID</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs min-w-[120px]")}>Activity Desc.</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Category</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs min-w-[160px]")}>Delay Event</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs min-w-[100px]")}>Source Ref.</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Document</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs min-w-[120px]")}>Match Reason</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Date</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Dur.</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Conf.</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -124,11 +138,16 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                         .filter(event => {
                           if (!filterText) return true;
                           const search = filterText.toLowerCase();
+                          const docName = event.sourceDocumentId ? documentNameMap.get(event.sourceDocumentId) || "" : "";
                           return (
                             (event.wbs || "").toLowerCase().includes(search) ||
                             (event.cpmActivityId || "").toLowerCase().includes(search) ||
                             (event.cpmActivityDescription || "").toLowerCase().includes(search) ||
-                            event.eventDescription.toLowerCase().includes(search)
+                            event.eventDescription.toLowerCase().includes(search) ||
+                            (event.eventCategory || "").toLowerCase().includes(search) ||
+                            (event.sourceReference || "").toLowerCase().includes(search) ||
+                            (event.matchReasoning || "").toLowerCase().includes(search) ||
+                            docName.toLowerCase().includes(search)
                           );
                         })
                         .map((event, index) => (
@@ -139,23 +158,53 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                             transition={{ delay: index * 0.02 }}
                             className="border-b border-border/30 hover:bg-muted/20 transition-colors group"
                           >
-                            <td className="p-3 font-mono text-sm text-muted-foreground">{event.wbs || "-"}</td>
-                            <td className="p-3 font-mono text-sm text-primary font-medium">{event.cpmActivityId}</td>
-                            <td className="p-3 max-w-[150px] truncate text-sm" title={event.cpmActivityDescription || ""}>
-                              {event.cpmActivityDescription || "-"}
+                            <td className="p-2 font-mono text-xs text-muted-foreground">{event.wbs || "-"}</td>
+                            <td className="p-2 font-mono text-xs text-primary font-medium">{event.cpmActivityId}</td>
+                            <td className="p-2 max-w-[120px]">
+                              <TruncatedTextWithTooltip 
+                                text={event.cpmActivityDescription} 
+                                maxWidth="120px"
+                                className="text-xs"
+                              />
                             </td>
-                            <td className="p-3 max-w-[200px] text-sm">
-                              <span className="line-clamp-2" title={event.eventDescription}>
-                                {event.eventDescription}
-                              </span>
+                            <td className="p-2">
+                              {event.eventCategory ? (
+                                <span className="inline-flex px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary whitespace-nowrap">
+                                  {event.eventCategory.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                </span>
+                              ) : "-"}
                             </td>
-                            <td className="p-3 text-sm text-muted-foreground">{formatDate(event.eventStartDate)}</td>
-                            <td className="p-3 text-sm">
+                            <td className="p-2 max-w-[160px]">
+                              <TruncatedTextWithTooltip 
+                                text={event.eventDescription} 
+                                maxWidth="160px"
+                                className="text-xs"
+                              />
+                            </td>
+                            <td className="p-2 max-w-[100px]">
+                              <TruncatedTextWithTooltip 
+                                text={event.sourceReference} 
+                                maxWidth="100px"
+                                className="text-xs text-muted-foreground"
+                              />
+                            </td>
+                            <td className="p-2 text-xs text-muted-foreground max-w-[80px] truncate">
+                              {event.sourceDocumentId ? documentNameMap.get(event.sourceDocumentId) || "-" : "-"}
+                            </td>
+                            <td className="p-2 max-w-[120px]">
+                              <TruncatedTextWithTooltip 
+                                text={event.matchReasoning} 
+                                maxWidth="120px"
+                                className="text-xs text-muted-foreground"
+                              />
+                            </td>
+                            <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">{formatDate(event.eventStartDate)}</td>
+                            <td className="p-2 text-xs">
                               {event.impactDurationHours ? (
                                 <span className="font-medium">{event.impactDurationHours}h</span>
                               ) : "-"}
                             </td>
-                            <td className="p-3">
+                            <td className="p-2">
                               <ConfidenceBadge confidence={event.matchConfidence} />
                             </td>
                           </motion.tr>

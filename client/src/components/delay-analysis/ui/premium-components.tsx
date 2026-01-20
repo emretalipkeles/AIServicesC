@@ -642,3 +642,78 @@ export function TableFilter({ value, onChange, placeholder = "Search...", classN
     </div>
   );
 }
+
+interface TruncatedTextWithTooltipProps {
+  text: string | null | undefined;
+  maxWidth?: string;
+  className?: string;
+}
+
+export function TruncatedTextWithTooltip({ text, maxWidth = "200px", className }: TruncatedTextWithTooltipProps) {
+  const [isHovered, setIsHovered] = React.useState(false);
+  const [tooltipPosition, setTooltipPosition] = React.useState({ x: 0, y: 0 });
+  const textRef = React.useRef<HTMLSpanElement>(null);
+
+  if (!text) return <span className="text-muted-foreground">-</span>;
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    setTooltipPosition({ 
+      x: rect.left + rect.width / 2, 
+      y: rect.top - 8 
+    });
+    setIsHovered(true);
+  };
+
+  return (
+    <div className="relative">
+      <span
+        ref={textRef}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{ maxWidth }}
+        className={cn(
+          "block truncate cursor-default",
+          className
+        )}
+      >
+        {text}
+      </span>
+      {isHovered && (
+        <div 
+          className="fixed z-[100] pointer-events-none"
+          style={{ 
+            left: `${tooltipPosition.x}px`, 
+            top: `${tooltipPosition.y}px`,
+            transform: 'translate(-50%, -100%)'
+          }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className={cn(
+              "max-w-sm px-3 py-2 rounded-lg shadow-xl",
+              "bg-zinc-900 dark:bg-zinc-800 text-white",
+              "border border-zinc-700/50",
+              "text-sm leading-relaxed",
+              "backdrop-blur-xl"
+            )}
+          >
+            <div className="relative">
+              {text}
+              <div 
+                className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0"
+                style={{
+                  borderLeft: '6px solid transparent',
+                  borderRight: '6px solid transparent',
+                  borderTop: '6px solid rgb(39 39 42)',
+                }}
+              />
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+}
