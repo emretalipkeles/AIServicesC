@@ -159,7 +159,7 @@ Core entities:
 ## External Dependencies
 
 ### Database
-- **PostgreSQL**: Required for production (connection via `DATABASE_URL` environment variable)
+- **PostgreSQL**: Required for production (connection via `AWS_DATABASE_URL` environment variable pointing to AWS RDS)
 - **connect-pg-simple**: Session storage for Express sessions
 
 ### UI Libraries
