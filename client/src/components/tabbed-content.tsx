@@ -78,7 +78,7 @@ export function TabbedContent() {
       <header className="flex items-center justify-between px-6 h-12 border-b border-border theme-transition flex-shrink-0">
         <div className="flex items-center h-full">
           <div className="flex items-center gap-3 mr-8">
-            <span className="font-bold text-lg text-primary">Data First</span>
+            <span className="font-bold text-lg text-primary"></span>
           </div>
           <nav className="relative flex items-center h-full">
             {allTabs.map((tab) => {
