@@ -91,12 +91,34 @@ export class AIActivityMatcher implements IActivityMatcher {
     activities: ScheduleActivity[]
   ): MatchResult | null {
     try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      // Handle "null" response from AI
+      if (response.trim().toLowerCase() === 'null') {
+        return null;
+      }
+
+      // Strip markdown code blocks if present
+      let cleanResponse = response;
+      const codeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        cleanResponse = codeBlockMatch[1].trim();
+      }
+
+      // Extract JSON object from response
+      const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         return null;
       }
 
-      const parsed = JSON.parse(jsonMatch[0]);
+      let parsed: any;
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch {
+        // Try to clean common JSON issues (trailing commas, etc)
+        const cleanedJson = jsonMatch[0]
+          .replace(/,\s*}/g, '}')
+          .replace(/,\s*]/g, ']');
+        parsed = JSON.parse(cleanedJson);
+      }
       
       if (!parsed || parsed === null) {
         return null;
@@ -127,6 +149,7 @@ export class AIActivityMatcher implements IActivityMatcher {
       };
     } catch (error) {
       console.error('Error parsing match response:', error);
+      console.error('Raw response:', response.substring(0, 500));
       return null;
     }
   }

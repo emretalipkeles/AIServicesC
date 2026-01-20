@@ -83,3 +83,57 @@ export function useRunAnalysis() {
 export function getExportUrl(projectId: string): string {
   return `/api/delay-analysis/projects/${projectId}/export`;
 }
+
+export interface AnalysisProgressEvent {
+  type: 'progress' | 'complete' | 'error';
+  stage?: string;
+  message: string;
+  percentage?: number;
+  details?: {
+    current?: number;
+    total?: number;
+  };
+  result?: AnalysisResult;
+}
+
+export function runAnalysisWithProgress(
+  projectId: string,
+  options: { extractFromDocuments?: boolean; matchToActivities?: boolean } = {},
+  onProgress: (event: AnalysisProgressEvent) => void
+): Promise<AnalysisResult> {
+  return new Promise((resolve, reject) => {
+    const params = new URLSearchParams();
+    if (options.extractFromDocuments === false) {
+      params.set('extractFromDocuments', 'false');
+    }
+    if (options.matchToActivities === false) {
+      params.set('matchToActivities', 'false');
+    }
+
+    const url = `/api/delay-analysis/projects/${projectId}/analyze/stream?${params.toString()}`;
+    const eventSource = new EventSource(url);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as AnalysisProgressEvent;
+        onProgress(data);
+
+        if (data.type === 'complete') {
+          eventSource.close();
+          resolve(data.result || { eventsExtracted: 0, eventsMatched: 0, documentsProcessed: 0 });
+        } else if (data.type === 'error') {
+          eventSource.close();
+          reject(new Error(data.message));
+        }
+      } catch (err) {
+        console.error('Error parsing SSE message:', err, event.data);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('SSE connection error:', error);
+      eventSource.close();
+      reject(new Error('Connection to analysis stream failed'));
+    };
+  });
+}

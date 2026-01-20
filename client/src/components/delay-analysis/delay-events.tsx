@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Activity, Play, Download, AlertTriangle } from "lucide-react";
-import { useDelayEvents, useRunAnalysis, getExportUrl } from "@/lib/analysis-api";
+import { Progress } from "@/components/ui/progress";
+import { Activity, Play, Download, Loader2 } from "lucide-react";
+import { useDelayEvents, getExportUrl, runAnalysisWithProgress, type AnalysisProgressEvent } from "@/lib/analysis-api";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface DelayEventsProps {
   projectId: string;
@@ -13,15 +16,28 @@ interface DelayEventsProps {
 
 export function DelayEvents({ projectId }: DelayEventsProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: events = [], isLoading, refetch } = useDelayEvents(projectId);
-  const runAnalysisMutation = useRunAnalysis();
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [progressState, setProgressState] = useState<AnalysisProgressEvent | null>(null);
 
   const handleRunAnalysis = async () => {
+    setIsAnalyzing(true);
+    setProgressState({
+      type: 'progress',
+      stage: 'loading_documents',
+      message: 'Starting analysis...',
+      percentage: 0,
+    });
+
     try {
-      const result = await runAnalysisMutation.mutateAsync({
+      const result = await runAnalysisWithProgress(
         projectId,
-        options: { extractFromDocuments: true, matchToActivities: true },
-      });
+        { extractFromDocuments: true, matchToActivities: true },
+        (event) => {
+          setProgressState(event);
+        }
+      );
 
       toast({
         title: "Analysis complete",
@@ -35,14 +51,16 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
           variant: "destructive",
         });
       }
-
-      refetch();
     } catch (error) {
       toast({
         title: "Analysis failed",
         description: error instanceof Error ? error.message : "Failed to run analysis",
         variant: "destructive",
       });
+    } finally {
+      setIsAnalyzing(false);
+      setProgressState(null);
+      queryClient.invalidateQueries({ queryKey: ["delay-events", projectId] });
     }
   };
 
@@ -79,13 +97,22 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
         <div className="flex gap-2">
           <Button
             onClick={handleRunAnalysis}
-            disabled={runAnalysisMutation.isPending}
+            disabled={isAnalyzing}
           >
-            <Play className="w-4 h-4 mr-2" />
-            {runAnalysisMutation.isPending ? "Analyzing..." : "Run AI Analysis"}
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 mr-2" />
+                Run AI Analysis
+              </>
+            )}
           </Button>
           {events.length > 0 && (
-            <Button variant="outline" onClick={handleExport}>
+            <Button variant="outline" onClick={handleExport} disabled={isAnalyzing}>
               <Download className="w-4 h-4 mr-2" />
               Export CSV
             </Button>
@@ -93,6 +120,26 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
         </div>
       </CardHeader>
       <CardContent>
+        {progressState && (
+          <div className="mb-6 p-4 bg-muted/50 rounded-lg border">
+            <div className="flex items-center gap-3 mb-3">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <div className="flex-1">
+                <p className="font-medium text-sm">{progressState.message}</p>
+                {progressState.details?.current && progressState.details?.total && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Step {progressState.details.current} of {progressState.details.total}
+                  </p>
+                )}
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {progressState.percentage || 0}%
+              </span>
+            </div>
+            <Progress value={progressState.percentage || 0} className="h-2" />
+          </div>
+        )}
+
         {isLoading ? (
           <div className="text-center py-8 text-muted-foreground">
             Loading events...
@@ -104,7 +151,7 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
             <p className="text-sm text-muted-foreground text-center mb-4">
               Upload IDRs with CODE_CIE tags and run AI analysis to extract delay events
             </p>
-            <Button onClick={handleRunAnalysis} disabled={runAnalysisMutation.isPending}>
+            <Button onClick={handleRunAnalysis} disabled={isAnalyzing}>
               <Play className="w-4 h-4 mr-2" />
               Run AI Analysis
             </Button>

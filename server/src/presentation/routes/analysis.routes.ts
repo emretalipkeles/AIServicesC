@@ -59,8 +59,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
     container.repositories.projectDocument,
     container.repositories.scheduleActivity,
     container.repositories.contractorDelayEvent,
-    container.services.delayEventExtractor,
-    container.services.activityMatcher
+    container.services.delayEventExtractor!,
+    container.services.activityMatcher!
   );
 
   const controller = new AnalysisController(runAnalysisHandler, listEventsHandler);
@@ -68,5 +68,10 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
   app.post(
     '/api/delay-analysis/projects/:projectId/analyze',
     (req, res) => controller.runAnalysis(req, res)
+  );
+
+  app.get(
+    '/api/delay-analysis/projects/:projectId/analyze/stream',
+    (req, res) => controller.runAnalysisStream(req, res)
   );
 }

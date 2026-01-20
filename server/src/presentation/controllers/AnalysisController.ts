@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import type { RunAnalysisCommandHandler } from '../../application/delay-analysis/commands/handlers/RunAnalysisCommandHandler';
 import type { ListDelayEventsQueryHandler } from '../../application/delay-analysis/queries/handlers/ListDelayEventsQueryHandler';
+import { SSEProgressReporter } from '../../infrastructure/document-parsing/SSEProgressReporter';
 import {
   runAnalysisParamsSchema,
   runAnalysisBodySchema,
@@ -55,6 +56,56 @@ export class AnalysisController {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to run analysis',
       });
+    }
+  }
+
+  async runAnalysisStream(req: Request, res: Response): Promise<void> {
+    if (!this.runAnalysisHandler) {
+      res.status(503).json({
+        success: false,
+        error: 'AI analysis services are not configured',
+      });
+      return;
+    }
+
+    try {
+      const params = runAnalysisParamsSchema.parse(req.params);
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+
+      const progressReporter = new SSEProgressReporter(res);
+
+      const extractFromDocuments = req.query.extractFromDocuments !== 'false';
+      const matchToActivities = req.query.matchToActivities !== 'false';
+
+      await this.runAnalysisHandler.execute(
+        {
+          projectId: params.projectId,
+          tenantId: DEFAULT_TENANT_ID,
+          extractFromDocuments,
+          matchToActivities,
+        },
+        { progressReporter }
+      );
+    } catch (error) {
+      if (error instanceof Error && error.name === 'ZodError') {
+        const errorData = JSON.stringify({ type: 'error', message: 'Invalid request parameters' });
+        res.write(`data: ${errorData}\n\n`);
+        res.end();
+        return;
+      }
+
+      console.error('Error in analysis stream:', error);
+      const errorData = JSON.stringify({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to run analysis',
+      });
+      res.write(`data: ${errorData}\n\n`);
+      res.end();
     }
   }
 

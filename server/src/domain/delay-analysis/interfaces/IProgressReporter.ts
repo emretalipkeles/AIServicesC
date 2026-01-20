@@ -7,7 +7,13 @@ export type ProgressStage =
   | 'ai_processing'
   | 'saving_activities'
   | 'complete'
-  | 'error';
+  | 'error'
+  // Analysis-specific stages
+  | 'loading_documents'
+  | 'extracting_events'
+  | 'loading_activities'
+  | 'matching_events'
+  | 'saving_events';
 
 export interface ProgressEvent {
   stage: ProgressStage;
