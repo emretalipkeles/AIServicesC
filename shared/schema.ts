@@ -235,3 +235,123 @@ export const insertFeedbackSchema = createInsertSchema(feedback).omit({
 
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 export type Feedback = typeof feedback.$inferSelect;
+
+export const delayAnalysisProjects = pgTable("delay_analysis_projects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  name: text("name").notNull(),
+  description: text("description"),
+  contractNumber: text("contract_number"),
+  noticeToProceeedDate: timestamp("notice_to_proceed_date"),
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDelayAnalysisProjectSchema = createInsertSchema(delayAnalysisProjects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDelayAnalysisProject = z.infer<typeof insertDelayAnalysisProjectSchema>;
+export type DelayAnalysisProject = typeof delayAnalysisProjects.$inferSelect;
+
+export const projectDocuments = pgTable("project_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  filename: text("filename").notNull(),
+  contentType: text("content_type").notNull(),
+  documentType: text("document_type").notNull(),
+  rawContent: text("raw_content"),
+  reportDate: timestamp("report_date"),
+  status: text("status").notNull().default("pending"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProjectDocumentSchema = createInsertSchema(projectDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertProjectDocument = z.infer<typeof insertProjectDocumentSchema>;
+export type ProjectDocument = typeof projectDocuments.$inferSelect;
+
+export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'other';
+
+export const scheduleActivities = pgTable("schedule_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  sourceDocumentId: varchar("source_document_id").references(() => projectDocuments.id, { onDelete: "set null" }),
+  activityId: text("activity_id").notNull(),
+  wbs: text("wbs"),
+  activityDescription: text("activity_description").notNull(),
+  plannedStartDate: timestamp("planned_start_date"),
+  plannedFinishDate: timestamp("planned_finish_date"),
+  actualStartDate: timestamp("actual_start_date"),
+  actualFinishDate: timestamp("actual_finish_date"),
+  scheduleUpdateMonth: text("schedule_update_month"),
+  isCriticalPath: text("is_critical_path").default("unknown"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertScheduleActivitySchema = createInsertSchema(scheduleActivities).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertScheduleActivity = z.infer<typeof insertScheduleActivitySchema>;
+export type ScheduleActivity = typeof scheduleActivities.$inferSelect;
+
+export const contractorDelayEvents = pgTable("contractor_delay_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  sourceDocumentId: varchar("source_document_id").references(() => projectDocuments.id, { onDelete: "set null" }),
+  matchedActivityId: varchar("matched_activity_id").references(() => scheduleActivities.id, { onDelete: "set null" }),
+  wbs: text("wbs"),
+  cpmActivityId: text("cpm_activity_id"),
+  cpmActivityDescription: text("cpm_activity_description"),
+  eventDescription: text("event_description").notNull(),
+  eventCategory: text("event_category"),
+  eventStartDate: timestamp("event_start_date"),
+  eventFinishDate: timestamp("event_finish_date"),
+  impactDurationHours: integer("impact_duration_hours"),
+  sourceReference: text("source_reference"),
+  extractedFromCode: text("extracted_from_code"),
+  matchConfidence: integer("match_confidence"),
+  matchReasoning: text("match_reasoning"),
+  verificationStatus: text("verification_status").notNull().default("pending"),
+  verifiedBy: text("verified_by"),
+  verifiedAt: timestamp("verified_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertContractorDelayEventSchema = createInsertSchema(contractorDelayEvents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertContractorDelayEvent = z.infer<typeof insertContractorDelayEventSchema>;
+export type ContractorDelayEvent = typeof contractorDelayEvents.$inferSelect;
+
+export type DelayEventCategory = 
+  | 'planning_mobilization'
+  | 'labor_related'
+  | 'materials_equipment'
+  | 'subcontractor_coordination'
+  | 'quality_rework'
+  | 'site_management_safety'
+  | 'utility_infrastructure'
+  | 'other';
+
+export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'needs_review';
