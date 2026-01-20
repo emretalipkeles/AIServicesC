@@ -4,28 +4,45 @@ import type { IAIClient } from '../../domain/interfaces/IAIClient';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 import { ModelId } from '../../domain/value-objects/ModelId';
 
-const MATCHING_PROMPT = `You are an expert construction schedule analyst. Match the following delay event to the most relevant CPM schedule activity.
+const MATCHING_PROMPT = `You are an expert construction schedule analyst specializing in delay claims for heavy civil and transit projects. Your task is to match a contractor-caused delay event to the most relevant CPM schedule activity.
 
-Delay Event:
+## Delay Event to Match:
 {eventDescription}
 
-Event Date: {eventDate}
+## Event Date: {eventDate}
 
-Available Schedule Activities (Activity ID | WBS | Description | Start Date | Finish Date):
+## Available CPM Schedule Activities:
+Format: Activity ID | WBS | Description | Planned Start | Planned Finish
 {activitiesList}
 
-Instructions:
-1. Analyze the delay event description and identify keywords related to work type, location, or discipline
-2. Find the schedule activity that most closely relates to the delayed work
-3. Consider the event date and whether the activity was active during that time
-4. Return the best match with a confidence score (0-100)
+## Matching Instructions:
+1. Identify the TYPE of work in the delay event (excavation, piling, utilities, concrete, electrical, etc.)
+2. Identify any LOCATION references (station numbers, street names, structure names)
+3. Find the activity that matches BOTH the work type AND location/timeframe
+4. Consider if the event date falls within or near the activity's planned dates
 
-Return a JSON object with:
-- activityId: The ID of the best matching activity
-- confidence: Score from 0-100 (100 = perfect match)
-- reasoning: Brief explanation of why this activity was matched
+## Confidence Scoring Criteria (BE PRECISE):
+- **90-100%**: EXACT match - delay event explicitly names the same work AND location as the activity (e.g., "excavator broke at Station 15 trenching" matches "Utility Trenching Sta 14-16")
+- **75-89%**: STRONG match - same work type with overlapping location OR same location with related work type
+- **60-74%**: MODERATE match - same general work category (e.g., both are utility work) but different specific tasks or unclear location
+- **45-59%**: WEAK match - loosely related work type OR timing-based match only
+- **30-44%**: POOR match - only tangential connection, included because nothing better exists
+- **Below 30**: NO match - return null
 
-If no reasonable match exists (confidence would be below 30), return null.
+## Critical Rules:
+- DO NOT default to middle-range scores. Evaluate each match carefully.
+- A perfect keyword match in description should score 85+
+- If the delay event mentions specific equipment/work and an activity describes that exact work, score 80+
+- If matching based primarily on date overlap without strong content match, score below 60
+
+## Response Format (JSON only, no markdown):
+{
+  "activityId": "the exact Activity ID from the list",
+  "confidence": <number 30-100>,
+  "reasoning": "Specific explanation citing keywords/location/dates that led to this match"
+}
+
+If no activity scores above 30%, respond with: null
 `;
 
 export class AIActivityMatcher implements IActivityMatcher {
@@ -51,6 +68,12 @@ export class AIActivityMatcher implements IActivityMatcher {
       .replace('{activitiesList}', activitiesList);
 
     try {
+      console.log('[AIActivityMatcher] Matching event:', {
+        eventDescription: eventDescription.substring(0, 100) + '...',
+        eventDate: eventDate?.toISOString().split('T')[0] || 'Unknown',
+        activitiesCount: activities.length,
+      });
+
       const response = await this.aiClient.chat({
         model: ModelId.gpt52(),
         messages: [AIMessage.user(prompt)],
@@ -58,9 +81,19 @@ export class AIActivityMatcher implements IActivityMatcher {
         temperature: 0.1,
       });
 
-      return this.parseMatchResponse(response.content, activities);
+      console.log('[AIActivityMatcher] Raw AI response:', response.content);
+
+      const result = this.parseMatchResponse(response.content, activities);
+      
+      console.log('[AIActivityMatcher] Parsed result:', result ? {
+        activityId: result.cpmActivityId,
+        confidence: result.confidence,
+        reasoning: result.reasoning?.substring(0, 100) + '...',
+      } : 'null (no match)');
+
+      return result;
     } catch (error) {
-      console.error('Error matching activity:', error);
+      console.error('[AIActivityMatcher] Error matching activity:', error);
       return null;
     }
   }
