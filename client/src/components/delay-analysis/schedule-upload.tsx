@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar, FileSpreadsheet, Trash2, FileText, Loader2, DollarSign, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 import { useScheduleActivities, useDeleteAllActivities, uploadScheduleWithProgress, type ProgressEvent } from "@/lib/schedule-api";
 import { fetchRunTokenUsage, type RunTokenUsageSummary } from "@/lib/analysis-api";
@@ -329,19 +328,18 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
               </p>
             </motion.div>
           ) : (
-            <ScrollArea className="h-[500px]">
-              <div className="rounded-xl border border-border/50 overflow-hidden">
-                <table className="w-full">
-                  <thead className={tableHeaderStyles}>
-                    <tr>
-                      <th className={tableHeaderCellStyles}>Activity ID</th>
-                      <th className={tableHeaderCellStyles}>WBS</th>
-                      <th className={cn(tableHeaderCellStyles, "min-w-[200px]")}>Description</th>
-                      <th className={tableHeaderCellStyles}>Actual Start</th>
-                      <th className={tableHeaderCellStyles}>Actual Finish</th>
-                      <th className={tableHeaderCellStyles}>Critical</th>
-                    </tr>
-                  </thead>
+            <div className="rounded-xl border border-border/50 overflow-auto max-h-[500px]">
+              <table className="w-full">
+                <thead className={tableHeaderStyles}>
+                  <tr>
+                    <th className={tableHeaderCellStyles}>Activity ID</th>
+                    <th className={tableHeaderCellStyles}>WBS</th>
+                    <th className={cn(tableHeaderCellStyles, "min-w-[200px]")}>Description</th>
+                    <th className={tableHeaderCellStyles}>Actual Start</th>
+                    <th className={tableHeaderCellStyles}>Actual Finish</th>
+                    <th className={tableHeaderCellStyles}>Critical</th>
+                  </tr>
+                </thead>
                   <tbody>
                     <AnimatePresence>
                       {activities.map((activity, index) => (
@@ -377,10 +375,9 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                         </motion.tr>
                       ))}
                     </AnimatePresence>
-                  </tbody>
-                </table>
-              </div>
-            </ScrollArea>
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </GlassCard>
