@@ -24,7 +24,7 @@ const settingsCategories: SettingsCategory[] = [
   {
     id: "ai",
     label: "AI & Agents",
-    description: "Configure Phix AI and knowledge bases",
+    description: "Configure AI Assistant and knowledge bases",
     icon: Bot,
     color: "from-primary to-primary/70",
     items: [

@@ -35,7 +35,7 @@ export function AgentSelector({ selectedAgentId, onAgentSelect }: AgentSelectorP
           data-testid="button-agent-selector"
         >
           <Bot className={`w-3.5 h-3.5 ${selectedAgent ? 'text-primary' : ''}`} />
-          <span>{selectedAgent?.name || "Phix AI"}</span>
+          <span>{selectedAgent?.name || "AI Assistant"}</span>
           <ChevronDown className="w-3 h-3" />
         </Button>
       </PopoverTrigger>
@@ -60,7 +60,7 @@ export function AgentSelector({ selectedAgentId, onAgentSelect }: AgentSelectorP
                 <Bot className="w-4 h-4 text-muted-foreground" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium">Phix AI</p>
+                <p className="font-medium">AI Assistant</p>
                 <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                   Intelligent orchestrator - automatically selects the best agents for your query
                 </p>

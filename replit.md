@@ -2,7 +2,7 @@
 
 ## Overview
 
-Data First V3 (formerly Phix AI) is an intelligent orchestrator platform for Prophix implementation teams working with FP&A Plus. The application features a split-screen interface with an AI chat panel on the left and a tabbed content area on the right.
+Data First V3 (formerly AI Assistant) is an intelligent orchestrator platform for Prophix implementation teams working with FP&A Plus. The application features a split-screen interface with an AI chat panel on the left and a tabbed content area on the right.
 
 The platform dynamically discovers agents from the database, uses LLM-based planning for execution strategies, and synthesizes unified responses with real-time SSE streaming.
 

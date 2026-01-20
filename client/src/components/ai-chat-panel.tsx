@@ -50,7 +50,7 @@ export function AIChatPanel() {
     {
       id: "1",
       role: "assistant",
-      content: "Welcome! I'm Phix AI, here to help you get FP&A Plus up and running smoothly. What do you need?",
+      content: "Welcome! I'm AI Assistant, here to help you get FP&A Plus up and running smoothly. What do you need?",
       timestamp: new Date(),
     },
   ]);
@@ -137,7 +137,7 @@ export function AIChatPanel() {
         role: "assistant",
         content: "",
         timestamp: new Date(),
-        agentName: selectedAgent?.name || "Phix AI",
+        agentName: selectedAgent?.name || "AI Assistant",
         isStreaming: true,
         statusMessage: isOrchestrated ? "Discovering agents..." : undefined,
       };
@@ -224,7 +224,7 @@ export function AIChatPanel() {
                       setMessages((prev) => 
                         prev.map((msg) =>
                           msg.id === assistantMessageId
-                            ? { ...msg, statusMessage: "Synthesizing response...", agentName: "Phix AI" }
+                            ? { ...msg, statusMessage: "Synthesizing response...", agentName: "AI Assistant" }
                             : msg
                         )
                       );
@@ -368,7 +368,7 @@ export function AIChatPanel() {
         role: "assistant",
         content: "I can only accept ZIP files containing PRET packages. Please select a valid .zip file.",
         timestamp: new Date(),
-        agentName: "Phix AI",
+        agentName: "AI Assistant",
       };
       setMessages((prev) => [...prev, errorMessage]);
       return;
@@ -380,7 +380,7 @@ export function AIChatPanel() {
         role: "assistant",
         content: "The file is too large. Maximum file size is 100MB.",
         timestamp: new Date(),
-        agentName: "Phix AI",
+        agentName: "AI Assistant",
       };
       setMessages((prev) => [...prev, errorMessage]);
       return;
@@ -400,7 +400,7 @@ export function AIChatPanel() {
       role: "assistant",
       content: "",
       timestamp: new Date(),
-      agentName: "Phix AI",
+      agentName: "AI Assistant",
       isStreaming: true,
       statusMessage: "Uploading and validating package...",
     };
@@ -718,7 +718,7 @@ export function AIChatPanel() {
             <Sparkles className="w-3.5 h-3.5 text-primary" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-sidebar-foreground leading-tight" data-testid="text-chat-title">Phix AI</h2>
+            <h2 className="text-sm font-semibold text-sidebar-foreground leading-tight" data-testid="text-chat-title">AI Assistant</h2>
             <p className="text-xs text-muted-foreground leading-tight" data-testid="text-chat-subtitle">Powered by Prophix</p>
           </div>
         </div>
@@ -757,7 +757,7 @@ export function AIChatPanel() {
                 <div className={`flex-1 min-w-0 overflow-hidden ${isUser ? 'flex flex-col items-end' : ''}`}>
                   <div className={`flex items-center gap-1.5 mb-0.5 ${isUser ? 'flex-row-reverse' : ''}`}>
                     <span className="text-[11px] font-medium text-sidebar-foreground" data-testid={`text-message-role-${message.id}`}>
-                      {isUser ? "You" : (message.agentName || "Phix AI")}
+                      {isUser ? "You" : (message.agentName || "AI Assistant")}
                     </span>
                     {message.isStreaming && !message.content ? (
                       <span className="text-[10px] text-muted-foreground" data-testid={`text-message-thinking-${message.id}`}>
@@ -900,7 +900,7 @@ export function AIChatPanel() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <span className="text-[11px] font-medium text-sidebar-foreground">
-                    {selectedAgent?.name || "Phix AI"}
+                    {selectedAgent?.name || "AI Assistant"}
                   </span>
                   <span className="text-[10px] text-muted-foreground">thinking...</span>
                 </div>
@@ -932,7 +932,7 @@ export function AIChatPanel() {
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             onKeyDown={handleKeyDown}
-            placeholder={selectedAgent ? `Message ${selectedAgent.name}...` : "Message Phix AI..."}
+            placeholder={selectedAgent ? `Message ${selectedAgent.name}...` : "Message AI Assistant..."}
             className="ai-input w-full px-4 py-3 text-[13px] bg-transparent resize-none focus:outline-none text-sidebar-foreground placeholder:text-muted-foreground"
             style={{ minHeight: "80px", maxHeight: "200px" }}
             rows={2}

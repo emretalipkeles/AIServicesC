@@ -4,7 +4,7 @@ import type { IAIClient } from '../../domain/interfaces/IAIClient';
 import { ModelId } from '../../domain/value-objects/ModelId';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 
-const SUMMARIZATION_PROMPT = `You are a conversation summarizer for Phix AI. Your task is to create a concise but complete summary of a conversation history.
+const SUMMARIZATION_PROMPT = `You are a conversation summarizer for AI Assistant. Your task is to create a concise but complete summary of a conversation history.
 
 CRITICAL REQUIREMENTS:
 1. Preserve ALL agent interactions - which agents were called, what they did, and their outcomes

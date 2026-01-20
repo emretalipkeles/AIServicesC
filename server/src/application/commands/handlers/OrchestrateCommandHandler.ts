@@ -37,7 +37,7 @@ export class OrchestrateCommandHandler {
         onProgress({ type: 'synthesis-start' });
         onProgress({
           type: 'synthesis-chunk',
-          content: "I'm Phix AI, but no specialized agents have been configured yet. Please create an agent with relevant knowledge to help answer your questions.",
+          content: "I'm AI Assistant, but no specialized agents have been configured yet. Please create an agent with relevant knowledge to help answer your questions.",
         });
         onProgress({ type: 'synthesis-done' });
         return;

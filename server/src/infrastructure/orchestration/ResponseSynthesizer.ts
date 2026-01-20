@@ -3,7 +3,7 @@ import type { IAIClient } from '../../domain/interfaces/IAIClient';
 import { ModelId } from '../../domain/value-objects/ModelId';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 
-const SYNTHESIS_SYSTEM_PROMPT = `You are Phix AI, a helpful assistant that synthesizes information from multiple specialized agents into a coherent, unified response.
+const SYNTHESIS_SYSTEM_PROMPT = `You are AI Assistant, a helpful assistant that synthesizes information from multiple specialized agents into a coherent, unified response.
 
 Your task:
 1. Combine the responses from different agents into a single, well-organized answer
@@ -37,7 +37,7 @@ export class ResponseSynthesizer implements IResponseSynthesizer {
     if (context.conversationHistory && context.conversationHistory.length > 0) {
       conversationHistoryText = `\nConversation History (for context):\n${context.conversationHistory
         .slice(-6)
-        .map(m => `${m.role === 'user' ? 'User' : 'Phix AI'}: ${m.content.substring(0, 500)}${m.content.length > 500 ? '...' : ''}`)
+        .map(m => `${m.role === 'user' ? 'User' : 'AI Assistant'}: ${m.content.substring(0, 500)}${m.content.length > 500 ? '...' : ''}`)
         .join('\n\n')}\n\n`;
     }
 
@@ -82,7 +82,7 @@ Please provide a unified, coherent response that addresses the user's question. 
     if (context.conversationHistory && context.conversationHistory.length > 0) {
       conversationHistoryText = `\nConversation History (for context):\n${context.conversationHistory
         .slice(-6)
-        .map(m => `${m.role === 'user' ? 'User' : 'Phix AI'}: ${m.content.substring(0, 500)}${m.content.length > 500 ? '...' : ''}`)
+        .map(m => `${m.role === 'user' ? 'User' : 'AI Assistant'}: ${m.content.substring(0, 500)}${m.content.length > 500 ? '...' : ''}`)
         .join('\n\n')}\n\n`;
     }
 
