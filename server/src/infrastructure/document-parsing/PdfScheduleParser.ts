@@ -256,24 +256,27 @@ Return ONLY the JSON array, no other text.`;
   }
 
   private extractAllActivitiesSection(fullText: string): string {
-    const allActivitiesPattern = /ALL\s*ACTIVITIES/gi;
-    const matches: number[] = [];
+    const sectionDividerPattern = /ALL\s*ACTIVITIES(?!\s*\n\s*Layout:)/gi;
+    let sectionDividerIndex = -1;
     let match: RegExpExecArray | null;
     
-    while ((match = allActivitiesPattern.exec(fullText)) !== null) {
-      matches.push(match.index);
+    while ((match = sectionDividerPattern.exec(fullText)) !== null) {
+      const textAfterMatch = fullText.substring(match.index, match.index + 100);
+      if (!textAfterMatch.includes('Layout:') && !textAfterMatch.includes('filter:')) {
+        sectionDividerIndex = match.index;
+        console.log(`[PdfScheduleParser] Found section divider "ALL ACTIVITIES" at index ${match.index}`);
+        break;
+      }
     }
     
-    if (matches.length > 0) {
-      const lastMatchIndex = matches[matches.length - 1];
-      console.log(`[PdfScheduleParser] Found "ALL ACTIVITIES" at ${matches.length} location(s), using last one at index ${lastMatchIndex}`);
-      const extracted = fullText.substring(lastMatchIndex);
+    if (sectionDividerIndex !== -1) {
+      const extracted = fullText.substring(sectionDividerIndex);
       console.log(`[PdfScheduleParser] Extracted section length: ${extracted.length} chars (from ${fullText.length} total)`);
       console.log(`[PdfScheduleParser] First 500 chars of extracted section:\n${extracted.substring(0, 500)}`);
       return extracted;
     }
     
-    console.log(`[PdfScheduleParser] "ALL ACTIVITIES" marker not found, processing full text (${fullText.length} chars)`);
+    console.log(`[PdfScheduleParser] Section divider not found, processing full text (${fullText.length} chars)`);
     return fullText;
   }
 }
