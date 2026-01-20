@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Activity, Play, Download, Loader2, DollarSign, CheckCircle, AlertCircle, Clock, Zap } from "lucide-react";
-import { useDelayEvents, getExportUrl, runAnalysisWithProgress, fetchRunTokenUsage, type AnalysisProgressEvent, type RunTokenUsageSummary } from "@/lib/analysis-api";
+import { useDelayEvents, getExportUrl, runAnalysisWithProgress, fetchRunTokenUsage } from "@/lib/analysis-api";
+import { useUploadState } from "@/contexts/upload-state-context";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { GlassCard, SectionHeader, ProgressIndicator, StatCard, TableFilter } from "./ui/premium-components";
@@ -18,31 +19,29 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: events = [], isLoading } = useDelayEvents(projectId);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [progressState, setProgressState] = useState<AnalysisProgressEvent | null>(null);
-  const [lastRunCost, setLastRunCost] = useState<RunTokenUsageSummary | null>(null);
   const [filterText, setFilterText] = useState("");
+  
+  const {
+    analysis,
+    startAnalysis,
+    updateAnalysisProgress,
+    completeAnalysis,
+    failAnalysis,
+  } = useUploadState(projectId);
 
   const matchedEvents = events.filter(e => e.cpmActivityId !== null);
   const highConfidence = matchedEvents.filter(e => (e.matchConfidence ?? 0) >= 80);
   const pendingEvents = events.filter(e => e.verificationStatus === 'pending');
 
   const handleRunAnalysis = async () => {
-    setIsAnalyzing(true);
-    setLastRunCost(null);
-    setProgressState({
-      type: 'progress',
-      stage: 'loading_documents',
-      message: 'Starting analysis...',
-      percentage: 0,
-    });
+    startAnalysis();
 
     try {
       const result = await runAnalysisWithProgress(
         projectId,
         { extractFromDocuments: true, matchToActivities: true },
         (event) => {
-          setProgressState(event);
+          updateAnalysisProgress(event);
         }
       );
 
@@ -59,25 +58,24 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
         });
       }
 
+      let cost = null;
       if (result.runId) {
         try {
-          const usage = await fetchRunTokenUsage(result.runId);
-          if (usage) {
-            setLastRunCost(usage);
-          }
+          cost = await fetchRunTokenUsage(result.runId);
         } catch (costError) {
           console.error('Failed to fetch token usage:', costError);
         }
       }
+      
+      completeAnalysis(cost);
+      queryClient.invalidateQueries({ queryKey: ["delay-events", projectId] });
     } catch (error) {
+      failAnalysis(error instanceof Error ? error.message : "Failed to run analysis");
       toast({
         title: "Analysis failed",
         description: error instanceof Error ? error.message : "Failed to run analysis",
         variant: "destructive",
       });
-    } finally {
-      setIsAnalyzing(false);
-      setProgressState(null);
       queryClient.invalidateQueries({ queryKey: ["delay-events", projectId] });
     }
   };
@@ -116,10 +114,10 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                 <Button
                   onClick={handleRunAnalysis}
-                  disabled={isAnalyzing}
+                  disabled={analysis.isAnalyzing}
                   className="gap-2 bg-gradient-to-r from-primary to-primary/80 shadow-lg shadow-primary/25"
                 >
-                  {isAnalyzing ? (
+                  {analysis.isAnalyzing ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Analyzing...
@@ -133,7 +131,7 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
                 </Button>
               </motion.div>
               {events.length > 0 && (
-                <Button variant="outline" onClick={handleExport} disabled={isAnalyzing} className="gap-2">
+                <Button variant="outline" onClick={handleExport} disabled={analysis.isAnalyzing} className="gap-2">
                   <Download className="w-4 h-4" />
                   Export CSV
                 </Button>
@@ -142,18 +140,18 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
           }
         />
         <div className="p-6">
-          {progressState && (
+          {analysis.progress && (
             <div className="mb-6">
               <ProgressIndicator
-                stage={progressState.stage || ''}
-                message={progressState.message}
-                percentage={progressState.percentage || 0}
-                details={progressState.details}
+                stage={analysis.progress.stage || ''}
+                message={analysis.progress.message}
+                percentage={analysis.progress.percentage || 0}
+                details={analysis.progress.details}
               />
             </div>
           )}
 
-          {lastRunCost && (
+          {analysis.lastCost && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -161,7 +159,7 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
             >
               <DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" />
               <span className="text-sm text-green-700 dark:text-green-300">
-                AI cost for this run: <span className="font-semibold">${lastRunCost.totalCostUsd.toFixed(4)}</span>
+                AI cost for this run: <span className="font-semibold">${analysis.lastCost.totalCostUsd.toFixed(4)}</span>
               </span>
             </motion.div>
           )}
@@ -184,7 +182,7 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
                 Upload IDRs with CODE_CIE tags and run AI analysis to extract delay events
               </p>
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Button onClick={handleRunAnalysis} disabled={isAnalyzing} className="gap-2">
+                <Button onClick={handleRunAnalysis} disabled={analysis.isAnalyzing} className="gap-2">
                   <Play className="w-4 h-4" />
                   Run AI Analysis
                 </Button>

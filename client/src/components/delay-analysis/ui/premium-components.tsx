@@ -230,7 +230,7 @@ export function HeroHeader({ title, subtitle, badge, onBack, actions, stats }: H
 }
 
 interface UploadIndicator {
-  type: 'schedule' | 'document';
+  type: 'schedule' | 'document' | 'analysis';
   percentage?: number;
   isIndeterminate?: boolean;
   count?: number;
@@ -296,7 +296,7 @@ export function PremiumTabs({ tabs, value, onChange, uploadIndicators }: Premium
 }
 
 interface CompactUploadIndicatorProps {
-  type: 'schedule' | 'document';
+  type: 'schedule' | 'document' | 'analysis';
   percentage?: number;
   isIndeterminate?: boolean;
   count?: number;
@@ -311,10 +311,12 @@ function CompactUploadIndicator({ type, percentage, isIndeterminate, count }: Co
   const colors = {
     schedule: { stroke: '#a855f7', bg: 'rgba(168, 85, 247, 0.2)', text: 'text-purple-500' },
     document: { stroke: '#3b82f6', bg: 'rgba(59, 130, 246, 0.2)', text: 'text-blue-500' },
+    analysis: { stroke: '#f59e0b', bg: 'rgba(245, 158, 11, 0.2)', text: 'text-amber-500' },
   };
   
   const color = colors[type];
-  const displayLabel = type === 'schedule' ? 'Schedule' : 'Document';
+  const displayLabels = { schedule: 'Schedule', document: 'Document', analysis: 'Analysis' };
+  const displayLabel = displayLabels[type];
   
   if (isIndeterminate) {
     return (

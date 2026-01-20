@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useCallback, ReactNode } from "react";
 import { type ProgressEvent } from "@/lib/schedule-api";
-import { type RunTokenUsageSummary } from "@/lib/analysis-api";
+import { type RunTokenUsageSummary, type AnalysisProgressEvent } from "@/lib/analysis-api";
 
 export interface ScheduleUploadState {
   isUploading: boolean;
@@ -15,9 +15,17 @@ export interface DocumentUploadState {
   error: string | null;
 }
 
+export interface AnalysisState {
+  isAnalyzing: boolean;
+  progress: AnalysisProgressEvent | null;
+  lastCost: RunTokenUsageSummary | null;
+  error: string | null;
+}
+
 export interface ProjectUploadState {
   schedule: ScheduleUploadState;
   documents: DocumentUploadState;
+  analysis: AnalysisState;
 }
 
 type UploadStateMap = Record<string, ProjectUploadState>;
@@ -31,7 +39,12 @@ type UploadAction =
   | { type: "DOCUMENT_UPLOAD_START"; projectId: string; count: number }
   | { type: "DOCUMENT_UPLOAD_SUCCESS"; projectId: string }
   | { type: "DOCUMENT_UPLOAD_ERROR"; projectId: string; error: string }
-  | { type: "DOCUMENT_UPLOAD_RESET"; projectId: string };
+  | { type: "DOCUMENT_UPLOAD_RESET"; projectId: string }
+  | { type: "ANALYSIS_START"; projectId: string }
+  | { type: "ANALYSIS_PROGRESS"; projectId: string; progress: AnalysisProgressEvent }
+  | { type: "ANALYSIS_SUCCESS"; projectId: string; cost: RunTokenUsageSummary | null }
+  | { type: "ANALYSIS_ERROR"; projectId: string; error: string }
+  | { type: "ANALYSIS_RESET"; projectId: string };
 
 const initialProjectState: ProjectUploadState = {
   schedule: {
@@ -43,6 +56,12 @@ const initialProjectState: ProjectUploadState = {
   documents: {
     isUploading: false,
     uploadingCount: 0,
+    error: null,
+  },
+  analysis: {
+    isAnalyzing: false,
+    progress: null,
+    lastCost: null,
     error: null,
   },
 };
@@ -167,6 +186,69 @@ function uploadReducer(state: UploadStateMap, action: UploadAction): UploadState
         },
       };
 
+    case "ANALYSIS_START":
+      return {
+        ...state,
+        [projectId]: {
+          ...projectState,
+          analysis: {
+            isAnalyzing: true,
+            progress: { type: "progress", stage: "loading_documents", message: "Starting analysis...", percentage: 0 },
+            lastCost: null,
+            error: null,
+          },
+        },
+      };
+
+    case "ANALYSIS_PROGRESS":
+      return {
+        ...state,
+        [projectId]: {
+          ...projectState,
+          analysis: {
+            ...projectState.analysis,
+            progress: action.progress,
+          },
+        },
+      };
+
+    case "ANALYSIS_SUCCESS":
+      return {
+        ...state,
+        [projectId]: {
+          ...projectState,
+          analysis: {
+            isAnalyzing: false,
+            progress: null,
+            lastCost: action.cost,
+            error: null,
+          },
+        },
+      };
+
+    case "ANALYSIS_ERROR":
+      return {
+        ...state,
+        [projectId]: {
+          ...projectState,
+          analysis: {
+            isAnalyzing: false,
+            progress: null,
+            lastCost: null,
+            error: action.error,
+          },
+        },
+      };
+
+    case "ANALYSIS_RESET":
+      return {
+        ...state,
+        [projectId]: {
+          ...projectState,
+          analysis: initialProjectState.analysis,
+        },
+      };
+
     default:
       return state;
   }
@@ -181,6 +263,10 @@ interface UploadStateContextValue {
   startDocumentUpload: (projectId: string, count: number) => void;
   completeDocumentUpload: (projectId: string) => void;
   failDocumentUpload: (projectId: string, error: string) => void;
+  startAnalysis: (projectId: string) => void;
+  updateAnalysisProgress: (projectId: string, progress: AnalysisProgressEvent) => void;
+  completeAnalysis: (projectId: string, cost: RunTokenUsageSummary | null) => void;
+  failAnalysis: (projectId: string, error: string) => void;
 }
 
 const UploadStateContext = createContext<UploadStateContextValue | null>(null);
@@ -225,6 +311,22 @@ export function UploadStateProvider({ children }: UploadStateProviderProps) {
     dispatch({ type: "DOCUMENT_UPLOAD_ERROR", projectId, error });
   }, []);
 
+  const startAnalysis = useCallback((projectId: string) => {
+    dispatch({ type: "ANALYSIS_START", projectId });
+  }, []);
+
+  const updateAnalysisProgress = useCallback((projectId: string, progress: AnalysisProgressEvent) => {
+    dispatch({ type: "ANALYSIS_PROGRESS", projectId, progress });
+  }, []);
+
+  const completeAnalysis = useCallback((projectId: string, cost: RunTokenUsageSummary | null) => {
+    dispatch({ type: "ANALYSIS_SUCCESS", projectId, cost });
+  }, []);
+
+  const failAnalysis = useCallback((projectId: string, error: string) => {
+    dispatch({ type: "ANALYSIS_ERROR", projectId, error });
+  }, []);
+
   const value: UploadStateContextValue = {
     getProjectUploadState,
     startScheduleUpload,
@@ -234,6 +336,10 @@ export function UploadStateProvider({ children }: UploadStateProviderProps) {
     startDocumentUpload,
     completeDocumentUpload,
     failDocumentUpload,
+    startAnalysis,
+    updateAnalysisProgress,
+    completeAnalysis,
+    failAnalysis,
   };
 
   return (
@@ -254,6 +360,7 @@ export function useUploadState(projectId: string) {
   return {
     scheduleUpload: projectState.schedule,
     documentUpload: projectState.documents,
+    analysis: projectState.analysis,
     startScheduleUpload: () => context.startScheduleUpload(projectId),
     updateScheduleProgress: (progress: ProgressEvent) => context.updateScheduleProgress(projectId, progress),
     completeScheduleUpload: (cost: RunTokenUsageSummary | null) => context.completeScheduleUpload(projectId, cost),
@@ -261,5 +368,9 @@ export function useUploadState(projectId: string) {
     startDocumentUpload: (count: number) => context.startDocumentUpload(projectId, count),
     completeDocumentUpload: () => context.completeDocumentUpload(projectId),
     failDocumentUpload: (error: string) => context.failDocumentUpload(projectId, error),
+    startAnalysis: () => context.startAnalysis(projectId),
+    updateAnalysisProgress: (progress: AnalysisProgressEvent) => context.updateAnalysisProgress(projectId, progress),
+    completeAnalysis: (cost: RunTokenUsageSummary | null) => context.completeAnalysis(projectId, cost),
+    failAnalysis: (error: string) => context.failAnalysis(projectId, error),
   };
 }

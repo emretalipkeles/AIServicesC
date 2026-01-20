@@ -39,7 +39,7 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
   const { data: delayEvents = [] } = useDelayEvents(projectId);
   const updateProject = useUpdateProject();
   const { toast } = useToast();
-  const { scheduleUpload, documentUpload } = useUploadState(projectId);
+  const { scheduleUpload, documentUpload, analysis } = useUploadState(projectId);
   
   const [isEditing, setIsEditing] = useState(false);
   const [editedProject, setEditedProject] = useState<Partial<DelayAnalysisProject>>({});
@@ -210,6 +210,9 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
                       : []),
                     ...(documentUpload.isUploading
                       ? [{ type: 'document' as const, isIndeterminate: true, count: documentUpload.uploadingCount }]
+                      : []),
+                    ...(analysis.isAnalyzing && analysis.progress
+                      ? [{ type: 'analysis' as const, percentage: analysis.progress.percentage || 0 }]
                       : []),
                   ]}
                 />
