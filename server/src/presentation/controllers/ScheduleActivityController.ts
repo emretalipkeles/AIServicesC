@@ -26,7 +26,7 @@ export class ScheduleActivityController {
       if (!req.file) {
         res.status(400).json({ 
           success: false, 
-          error: 'No file uploaded. Please upload an Excel file (.xlsx or .xls)' 
+          error: 'No file uploaded. Please upload an Excel (.xlsx, .xls) or PDF file.' 
         });
         return;
       }
@@ -39,7 +39,8 @@ export class ScheduleActivityController {
           contentType: req.file.mimetype,
           buffer: req.file.buffer,
         },
-        scheduleUpdateMonth: body.scheduleUpdateMonth,
+        targetMonth: body.targetMonth,
+        targetYear: body.targetYear,
       });
 
       res.status(201).json({
@@ -47,6 +48,8 @@ export class ScheduleActivityController {
         data: {
           documentId: result.documentId,
           activitiesImported: result.activitiesImported,
+          activitiesUpdated: result.activitiesUpdated,
+          activitiesSkipped: result.activitiesSkipped,
           totalRowsProcessed: result.totalRowsProcessed,
           scheduleUpdateMonth: result.scheduleUpdateMonth,
           warnings: result.errors.length > 0 ? result.errors : undefined,

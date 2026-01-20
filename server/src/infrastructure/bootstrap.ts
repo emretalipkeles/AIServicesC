@@ -94,8 +94,10 @@ import { AIPretResponseNarrator } from "./pret/narrators/AIPretResponseNarrator"
 import type { IIntentClassifier, IResponseNarrator } from "../domain/pret";
 import { DocumentParserFactory } from "./document-parsing/DocumentParserFactory";
 import type { IDocumentParserFactory } from "../domain/delay-analysis/interfaces/IDocumentParserFactory";
-import { ExcelScheduleParser } from "./document-parsing/ExcelScheduleParser";
-import type { IExcelParser } from "../domain/delay-analysis/interfaces/IExcelParser";
+import { ExcelScheduleParserV2 } from "./document-parsing/ExcelScheduleParserV2";
+import { PdfScheduleParser } from "./document-parsing/PdfScheduleParser";
+import { ScheduleParserFactory } from "./document-parsing/ScheduleParserFactory";
+import type { IScheduleParserFactory } from "../domain/delay-analysis/interfaces/IScheduleParserFactory";
 import { AIDelayEventExtractor } from "./delay-analysis/AIDelayEventExtractor";
 import { AIActivityMatcher } from "./delay-analysis/AIActivityMatcher";
 import type { IDelayEventExtractor } from "../domain/delay-analysis/interfaces/IDelayEventExtractor";
@@ -160,7 +162,7 @@ export interface AppContainer {
     pretCommandRegistry: IPretCommandRegistry;
     pretCommandExecutor: PretCommandExecutor | null;
     documentParserFactory: IDocumentParserFactory;
-    excelParser: IExcelParser;
+    scheduleParserFactory: IScheduleParserFactory;
     delayEventExtractor: IDelayEventExtractor | null;
     activityMatcher: IActivityMatcher | null;
   };
@@ -188,10 +190,10 @@ export function createAppContainer(): AppContainer {
   const scheduleActivityRepository = new DrizzleScheduleActivityRepository();
   const contractorDelayEventRepository = new DrizzleContractorDelayEventRepository();
   const documentParserFactory = new DocumentParserFactory();
-  const excelParser = new ExcelScheduleParser();
 
   let delayEventExtractor: IDelayEventExtractor | null = null;
   let activityMatcher: IActivityMatcher | null = null;
+  let scheduleParserFactory: IScheduleParserFactory;
 
   let pretPackageStorage: IPretPackageStorage | null = null;
   try {
@@ -269,6 +271,13 @@ export function createAppContainer(): AppContainer {
     responseNarrator = new AIPretResponseNarrator(aiClient);
     delayEventExtractor = new AIDelayEventExtractor(aiClient);
     activityMatcher = new AIActivityMatcher(aiClient);
+    
+    const excelParser = new ExcelScheduleParserV2();
+    const pdfParser = new PdfScheduleParser(aiClient);
+    scheduleParserFactory = new ScheduleParserFactory([excelParser, pdfParser]);
+  } else {
+    const excelParser = new ExcelScheduleParserV2();
+    scheduleParserFactory = new ScheduleParserFactory([excelParser]);
   }
   
   const pretCommandExecutor = intentClassifier 
@@ -459,7 +468,7 @@ export function createAppContainer(): AppContainer {
       pretCommandRegistry,
       pretCommandExecutor,
       documentParserFactory,
-      excelParser,
+      scheduleParserFactory,
       delayEventExtractor,
       activityMatcher,
     },

@@ -1,12 +1,12 @@
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar, Upload, FileSpreadsheet, Trash2, AlertCircle, CheckCircle } from "lucide-react";
+import { Calendar, Upload, FileSpreadsheet, Trash2, FileText } from "lucide-react";
 import { useScheduleActivities, useUploadSchedule, useDeleteAllActivities } from "@/lib/schedule-api";
 import { useToast } from "@/hooks/use-toast";
 
@@ -14,9 +14,28 @@ interface ScheduleUploadProps {
   projectId: string;
 }
 
+const MONTHS = [
+  { value: 1, label: "January" },
+  { value: 2, label: "February" },
+  { value: 3, label: "March" },
+  { value: 4, label: "April" },
+  { value: 5, label: "May" },
+  { value: 6, label: "June" },
+  { value: 7, label: "July" },
+  { value: 8, label: "August" },
+  { value: 9, label: "September" },
+  { value: 10, label: "October" },
+  { value: 11, label: "November" },
+  { value: 12, label: "December" },
+];
+
+const currentYear = new Date().getFullYear();
+const YEARS = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
+
 export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [scheduleMonth, setScheduleMonth] = useState("");
+  const [targetMonth, setTargetMonth] = useState<number>(new Date().getMonth() + 1);
+  const [targetYear, setTargetYear] = useState<number>(currentYear);
   const { toast } = useToast();
 
   const { data: activities = [], isLoading } = useScheduleActivities(projectId);
@@ -38,20 +57,20 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
     setIsDragOver(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const excelFile = files.find(f => 
-      f.name.endsWith('.xlsx') || f.name.endsWith('.xls')
+    const validFile = files.find(f => 
+      f.name.endsWith('.xlsx') || f.name.endsWith('.xls') || f.name.endsWith('.pdf')
     );
 
-    if (excelFile) {
-      handleUpload(excelFile);
+    if (validFile) {
+      handleUpload(validFile);
     } else {
       toast({
         title: "Invalid file type",
-        description: "Please upload an Excel file (.xlsx or .xls)",
+        description: "Please upload an Excel (.xlsx, .xls) or PDF file",
         variant: "destructive",
       });
     }
-  }, [scheduleMonth]);
+  }, [targetMonth, targetYear]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,17 +85,27 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
       const result = await uploadMutation.mutateAsync({
         projectId,
         file,
-        scheduleUpdateMonth: scheduleMonth || undefined,
+        targetMonth,
+        targetYear,
       });
 
+      const monthName = MONTHS.find(m => m.value === targetMonth)?.label || "";
+      
+      let description = `For ${monthName} ${targetYear}: `;
+      const parts = [];
+      if (result.activitiesImported > 0) parts.push(`${result.activitiesImported} new`);
+      if (result.activitiesUpdated > 0) parts.push(`${result.activitiesUpdated} updated`);
+      if (result.activitiesSkipped > 0) parts.push(`${result.activitiesSkipped} unchanged`);
+      description += parts.join(", ") || "No activities with actual dates found";
+
       toast({
-        title: "Schedule uploaded successfully",
-        description: `Imported ${result.activitiesImported} activities from ${result.totalRowsProcessed} rows`,
+        title: "Schedule processed",
+        description,
       });
 
       if (result.warnings && result.warnings.length > 0) {
         toast({
-          title: "Upload completed with warnings",
+          title: "Processing completed with warnings",
           description: result.warnings.slice(0, 3).join("; "),
           variant: "destructive",
         });
@@ -121,19 +150,46 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
         <CardHeader>
           <CardTitle>Upload CPM Schedule</CardTitle>
           <CardDescription>
-            Upload Excel files containing schedule activities to extract Activity IDs, WBS, and dates
+            Upload Excel or PDF files. Only activities with actual dates (marked with "A") in the selected month will be extracted.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="scheduleMonth">Schedule Update Month (optional)</Label>
-              <Input
-                id="scheduleMonth"
-                placeholder="e.g., 2024-01 or January 2024"
-                value={scheduleMonth}
-                onChange={(e) => setScheduleMonth(e.target.value)}
-              />
+              <Label>Target Month</Label>
+              <Select
+                value={targetMonth.toString()}
+                onValueChange={(v) => setTargetMonth(parseInt(v))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((month) => (
+                    <SelectItem key={month.value} value={month.value.toString()}>
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Target Year</Label>
+              <Select
+                value={targetYear.toString()}
+                onValueChange={(v) => setTargetYear(parseInt(v))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {YEARS.map((year) => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -147,10 +203,13 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                 : "border-border hover:border-primary/50"
             }`}
           >
-            <FileSpreadsheet className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <div className="flex justify-center gap-2 mb-4">
+              <FileSpreadsheet className="w-10 h-10 text-muted-foreground" />
+              <FileText className="w-10 h-10 text-muted-foreground" />
+            </div>
             <h3 className="font-medium mb-2">Upload CPM Schedule</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Drag and drop Excel files (.xlsx, .xls), or click to browse
+              Drag and drop Excel (.xlsx, .xls) or PDF files
             </p>
             <div className="flex justify-center gap-2">
               <Button
@@ -159,12 +218,12 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                 onClick={() => document.getElementById("schedule-file-input")?.click()}
               >
                 <Upload className="w-4 h-4 mr-2" />
-                {uploadMutation.isPending ? "Uploading..." : "Select File"}
+                {uploadMutation.isPending ? "Processing..." : "Select File"}
               </Button>
               <input
                 id="schedule-file-input"
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.pdf"
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -178,7 +237,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
           <div>
             <CardTitle>Schedule Activities</CardTitle>
             <CardDescription>
-              {activities.length} activities loaded from uploaded schedules
+              {activities.length} activities with actual dates loaded
             </CardDescription>
           </div>
           {activities.length > 0 && (
@@ -202,7 +261,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
             <div className="text-center py-8 text-muted-foreground">
               <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>No schedule activities uploaded yet</p>
-              <p className="text-sm mt-2">Upload a CPM schedule Excel file to get started</p>
+              <p className="text-sm mt-2">Upload a CPM schedule to extract activities with actual dates</p>
             </div>
           ) : (
             <ScrollArea className="h-[400px]">
@@ -212,8 +271,8 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                     <TableHead>Activity ID</TableHead>
                     <TableHead>WBS</TableHead>
                     <TableHead className="min-w-[200px]">Description</TableHead>
-                    <TableHead>Planned Start</TableHead>
-                    <TableHead>Planned Finish</TableHead>
+                    <TableHead>Actual Start</TableHead>
+                    <TableHead>Actual Finish</TableHead>
                     <TableHead>Critical</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -225,8 +284,8 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                       <TableCell className="max-w-[300px] truncate" title={activity.activityDescription}>
                         {activity.activityDescription}
                       </TableCell>
-                      <TableCell>{formatDate(activity.plannedStartDate)}</TableCell>
-                      <TableCell>{formatDate(activity.plannedFinishDate)}</TableCell>
+                      <TableCell>{formatDate(activity.actualStartDate)}</TableCell>
+                      <TableCell>{formatDate(activity.actualFinishDate)}</TableCell>
                       <TableCell>
                         {activity.isCriticalPath === "yes" ? (
                           <Badge variant="destructive">Critical</Badge>

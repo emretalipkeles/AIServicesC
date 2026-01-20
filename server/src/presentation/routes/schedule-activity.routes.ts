@@ -14,11 +14,15 @@ const upload = multer({
     const allowedTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-excel',
+      'application/pdf',
     ];
-    if (allowedTypes.includes(file.mimetype)) {
+    const allowedExtensions = ['.xlsx', '.xls', '.pdf'];
+    const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+    
+    if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Only Excel files (.xlsx, .xls) are allowed'));
+      cb(new Error('Only Excel (.xlsx, .xls) or PDF files are allowed'));
     }
   },
 });
@@ -28,7 +32,7 @@ export function registerScheduleActivityRoutes(app: Express, container: AppConta
     container.repositories.delayAnalysisProject,
     container.repositories.projectDocument,
     container.repositories.scheduleActivity,
-    container.services.excelParser
+    container.services.scheduleParserFactory
   );
 
   const listActivitiesHandler = new ListScheduleActivitiesQueryHandler(

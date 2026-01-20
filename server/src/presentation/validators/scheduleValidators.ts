@@ -5,7 +5,8 @@ export const uploadScheduleParamsSchema = z.object({
 });
 
 export const uploadScheduleBodySchema = z.object({
-  scheduleUpdateMonth: z.string().optional(),
+  targetMonth: z.coerce.number().min(1).max(12),
+  targetYear: z.coerce.number().min(2000).max(2100),
 });
 
 export const listScheduleActivitiesParamsSchema = z.object({

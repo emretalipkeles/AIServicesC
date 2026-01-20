@@ -18,6 +18,8 @@ export interface ScheduleActivityDto {
 export interface UploadScheduleResult {
   documentId: string;
   activitiesImported: number;
+  activitiesUpdated: number;
+  activitiesSkipped: number;
   totalRowsProcessed: number;
   scheduleUpdateMonth: string | null;
   warnings?: string[];
@@ -32,12 +34,16 @@ async function fetchScheduleActivities(projectId: string): Promise<ScheduleActiv
   return result.data;
 }
 
-async function uploadSchedule(projectId: string, file: File, scheduleUpdateMonth?: string): Promise<UploadScheduleResult> {
+async function uploadSchedule(
+  projectId: string, 
+  file: File, 
+  targetMonth: number,
+  targetYear: number
+): Promise<UploadScheduleResult> {
   const formData = new FormData();
   formData.append("file", file);
-  if (scheduleUpdateMonth) {
-    formData.append("scheduleUpdateMonth", scheduleUpdateMonth);
-  }
+  formData.append("targetMonth", targetMonth.toString());
+  formData.append("targetYear", targetYear.toString());
 
   const response = await fetch(`/api/delay-analysis/projects/${projectId}/schedule`, {
     method: "POST",
@@ -75,11 +81,12 @@ export function useUploadSchedule() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, file, scheduleUpdateMonth }: { 
+    mutationFn: ({ projectId, file, targetMonth, targetYear }: { 
       projectId: string; 
       file: File; 
-      scheduleUpdateMonth?: string;
-    }) => uploadSchedule(projectId, file, scheduleUpdateMonth),
+      targetMonth: number;
+      targetYear: number;
+    }) => uploadSchedule(projectId, file, targetMonth, targetYear),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["schedule-activities", variables.projectId] });
       queryClient.invalidateQueries({ queryKey: ["project-documents", variables.projectId] });
