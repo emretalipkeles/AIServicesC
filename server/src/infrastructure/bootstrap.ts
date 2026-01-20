@@ -2,6 +2,7 @@ import { InMemoryCommandBus } from "./messaging/InMemoryCommandBus";
 import { InMemoryQueryBus } from "./messaging/InMemoryQueryBus";
 import { bedrockClientProvider } from "./ai/AIClientProvider";
 import { aiClientFactory } from "./ai/AIClientFactory";
+import { ModelId } from "../domain/value-objects/ModelId";
 import { DrizzleAgentRepository } from "./database/repositories/DrizzleAgentRepository";
 import { DrizzleDocumentRepository } from "./database/repositories/DrizzleDocumentRepository";
 import { DrizzleChunkRepository } from "./database/repositories/DrizzleChunkRepository";
@@ -165,7 +166,11 @@ export function createAppContainer(): AppContainer {
   const extractionService = new AIDocumentExtractionService(bedrockClientProvider);
   const understandingService = new DocumentUnderstandingService(bedrockClientProvider, sessionRepository);
 
-  const aiClient = bedrockClientProvider.getClient();
+  // Try OpenAI first (gpt-5.2), then fall back to Bedrock
+  let aiClient = aiClientFactory.getClientForModel(ModelId.gpt52());
+  if (!aiClient) {
+    aiClient = bedrockClientProvider.getClient();
+  }
   
   let pretToolRegistry: IPretToolRegistry | null = null;
   let pretOrchestrator: PretOrchestrator | null = null;
