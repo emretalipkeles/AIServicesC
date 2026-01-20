@@ -1,0 +1,327 @@
+# TimeDimension Resource Schema
+# This schema defines the structure and validation rules for Time dimension resources
+# Updated to align with TimeMember.cs and TimeDimensionSpec.cs models
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://schemas.prophix.com/model.fpna.prophix.com/v1/TimeDimension"
+title: TimeDimension
+description: Time dimension with fiscal and calendar properties for time-based reporting
+
+type: object
+required:
+  - apiVersion
+  - kind
+  - metadata
+  - spec
+
+properties:
+  apiVersion:
+    type: string
+    const: model.fpna.prophix.com/v1
+    description: API version identifier
+
+  kind:
+    type: string
+    const: TimeDimension
+    description: Resource kind - specifically TimeDimension
+
+  metadata:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 100
+        pattern: "^[^/\\\\*|?\"()\\[\\]{}<>=+!$%&':;,`.@]*$"
+        description: Dimension display name
+      description:
+        type: string
+        description: Dimension description
+      labels:
+        type: object
+        patternProperties:
+          "^[a-zA-Z][a-zA-Z0-9_-]*$":
+            type: string
+        additionalProperties: false
+
+  spec:
+    type: object
+    required:
+      - name
+      - members
+    properties:
+      name:
+        type: string
+        description: "Dimension name (from DimensionSpecBase)"
+
+      customProperties:
+        type: array
+        maxItems: 200
+        description: Custom member properties (ID >= 200, aligned with MemberPropertyDefinition.cs)
+        items:
+          type: object
+          required:
+            - name
+            - valueType
+          properties:
+            name:
+              type: string
+              description: "Property name"
+            valueType:
+              type: string
+              enum: ["Text", "Integer", "Decimal", "Date", "Boolean", "MemberOfDimension"]
+              default: "Text"
+            # Additional MemberPropertyDefinition properties...
+
+      members:
+        type: array
+        minItems: 1
+        description: Time member definitions (aligned with TimeMember.cs)
+        items:
+          type: object
+          required:
+            - key
+            - name
+          properties:
+            # Core properties (IDs 0-2)
+            key:
+              type: string
+              minLength: 1
+              maxLength: 40
+              pattern: "^[^'\"\\\\(){}\\[\\]@_][^'\"\\\\(){}\\[\\]@]*$"
+              description: "Member unique key"
+            name:
+              type: string
+              minLength: 1
+              maxLength: 256
+              pattern: "^[^\\[\\]@]*$"
+              description: "Member display name"
+            parent:
+              type: string
+              maxLength: 40
+              pattern: "^[^'\"\\\\(){}\\[\\]@_][^'\"\\\\(){}\\[\\]@]*$"
+              description: "Parent member key"
+
+            # Time Period Bounds (most important for time dimensions)
+            startPeriod:
+              type: string
+              description: "Time period start date (Constants.LOOKUPID_TIMESTARTPERIOD)"
+            endPeriod:
+              type: string
+              description: "Time period end date (Constants.LOOKUPID_TIMEENDPERIOD)"
+
+            # Fiscal Year
+            fiscalYearKey:
+              type: string
+              description: "Fiscal year key (Constants.LOOKUPID_TIMEYEARKEY)"
+            fiscalYearName:
+              type: string
+              description: "Fiscal year name (Constants.LOOKUPID_TIMEYEARNAME)"
+
+            # Fiscal Half Year
+            fiscalHalfYearKey:
+              type: string
+              description: "Fiscal half year key (Constants.LOOKUPID_TIMEHALFYEARKEY)"
+            fiscalHalfYearName:
+              type: string
+              description: "Fiscal half year name (Constants.LOOKUPID_TIMEHALFYEARNAME)"
+
+            # Fiscal Quarter
+            fiscalQuarterKey:
+              type: string
+              description: "Fiscal quarter key (Constants.LOOKUPID_TIMEQUARTERKEY)"
+            fiscalQuarterName:
+              type: string
+              description: "Fiscal quarter name (Constants.LOOKUPID_TIMEQUARTERNAME)"
+            fiscalQuarterNumber:
+              type: integer
+              description: "Fiscal quarter number (Constants.LOOKUPID_TIMEFISCALQUARTERNUMBER)"
+            fiscalQuarterNumberName:
+              type: string
+              description: "Fiscal quarter number name (Constants.LOOKUPID_TIMEFISCALQUARTERNUMBERNAME)"
+
+            # Fiscal Month
+            fiscalMonthKey:
+              type: string
+              description: "Fiscal month key (Constants.LOOKUPID_TIMEMONTHKEY)"
+            fiscalMonthName:
+              type: string
+              description: "Fiscal month name (Constants.LOOKUPID_TIMEMONTHNAME)"
+            fiscalMonthNumber:
+              type: integer
+              description: "Fiscal month number (Constants.LOOKUPID_TIMEFISCALMONTHNUMBER)"
+            fiscalMonthNumberName:
+              type: string
+              description: "Fiscal month number name (Constants.LOOKUPID_TIMEFISCALMONTHNUMBERNAME)"
+            monthAbbreviation:
+              type: string
+              description: "Month abbreviation (Constants.LOOKUPID_TIMEMONTHABBREVIATION)"
+            monthAbbreviationWithYear:
+              type: string
+              description: "Month abbreviation with year (Constants.LOOKUPID_TIMEFISCALMONTHABBREVWITHYEAR)"
+            monthWithYear:
+              type: string
+              description: "Month with year (Constants.LOOKUPID_TIMEMONTHWITHYEAR)"
+
+            # Fiscal Half Month
+            fiscalHalfMonthKey:
+              type: string
+              description: "Fiscal half month key (Constants.LOOKUPID_TIMEHALFMONTHKEY)"
+            fiscalHalfMonthName:
+              type: string
+              description: "Fiscal half month name (Constants.LOOKUPID_TIMEHALFMONTHNAME)"
+            fiscalHalfMonthNumber:
+              type: integer
+              description: "Fiscal half month number (Constants.LOOKUPID_TIMEFISCALHALFMONTHNUMBER)"
+            fiscalHalfMonthNumberName:
+              type: string
+              description: "Fiscal half month number name (Constants.LOOKUPID_TIMEFISCALHALFMONTHNUMBERNAME)"
+
+            # Fiscal Period
+            fiscalPeriodKey:
+              type: string
+              description: "Fiscal period key (Constants.LOOKUPID_TIMEPERIODKEY)"
+            fiscalPeriodName:
+              type: string
+              description: "Fiscal period name (Constants.LOOKUPID_TIMEPERIODNAME)"
+            fiscalPeriodNumber:
+              type: integer
+              description: "Fiscal period number (Constants.LOOKUPID_TIMEFISCALPERIODNUMBER)"
+            fiscalPeriodNumberName:
+              type: string
+              description: "Fiscal period number name (Constants.LOOKUPID_TIMEFISCALPERIODNUMBERNAME)"
+            periodAbbreviation:
+              type: string
+              description: "Period abbreviation (Constants.LOOKUPID_TIMEPERIODABBREVIATION)"
+            periodWithYear:
+              type: string
+              description: "Period with year (Constants.LOOKUPID_TIMEPERIODWITHYEAR)"
+
+            # Fiscal BiWeekly
+            fiscalBiWeeklyKey:
+              type: string
+              description: "Fiscal bi-weekly key (Constants.LOOKUPID_TIMEBIWEEKLYKEY)"
+            fiscalBiWeeklyName:
+              type: string
+              description: "Fiscal bi-weekly name (Constants.LOOKUPID_TIMEBIWEEKLYNAME)"
+            fiscalBiWeeklyNumber:
+              type: integer
+              description: "Fiscal bi-weekly number (Constants.LOOKUPID_TIMEFISCALBIWEEKLYNUMBER)"
+            fiscalBiWeeklyNumberName:
+              type: string
+              description: "Fiscal bi-weekly number name (Constants.LOOKUPID_TIMEFISCALBIWEEKLYNUMBERNAME)"
+
+            # Fiscal Week
+            fiscalWeekKey:
+              type: string
+              description: "Fiscal week key (Constants.LOOKUPID_TIMEWEEKKEY)"
+            fiscalWeekName:
+              type: string
+              description: "Fiscal week name (Constants.LOOKUPID_TIMEWEEKNAME)"
+            fiscalWeekNumber:
+              type: integer
+              description: "Fiscal week number (Constants.LOOKUPID_TIMEFISCALWEEKNUMBER)"
+            fiscalWeekNumberName:
+              type: string
+              description: "Fiscal week number name (Constants.LOOKUPID_TIMEFISCALWEEKNUMBERNAME)"
+            weekWithYear:
+              type: string
+              description: "Week with year (Constants.LOOKUPID_TIMEWEEKWITHYEAR)"
+
+            # Fiscal Day
+            fiscalDayKey:
+              type: string
+              description: "Fiscal day key (Constants.LOOKUPID_TIMEDAYKEY)"
+            fiscalDayName:
+              type: string
+              description: "Fiscal day name (Constants.LOOKUPID_TIMEDAYNAME)"
+
+            # Calendar Properties
+            calendarYearKey:
+              type: string
+              description: "Calendar year key (Constants.LOOKUPID_TIMECALENDARYEARKEY)"
+            calendarQuarterKey:
+              type: string
+              description: "Calendar quarter key (Constants.LOOKUPID_TIMECALENDARQUARTERKEY)"
+            calendarQuarterKeyName:
+              type: string
+              description: "Calendar quarter key name (Constants.LOOKUPID_TIMECALENDARQUARTERKEYNAME)"
+            calendarQuarterNumber:
+              type: integer
+              description: "Calendar quarter number (Constants.LOOKUPID_TIMECALENDARQUARTERNUMBER)"
+            calendarQuarterNumberName:
+              type: string
+              description: "Calendar quarter number name (Constants.LOOKUPID_TIMECALENDARQUARTERNUMBERNAME)"
+            calendarMonthKey:
+              type: string
+              description: "Calendar month key (Constants.LOOKUPID_TIMECALENDARMONTHKEY)"
+            calendarMonthKeyName:
+              type: string
+              description: "Calendar month key name (Constants.LOOKUPID_TIMECALENDARMONTHKEYNAME)"
+            calendarMonthNumber:
+              type: integer
+              description: "Calendar month number (Constants.LOOKUPID_TIMECALENDARMONTHNUMBER)"
+            calendarMonthNumberName:
+              type: string
+              description: "Calendar month number name (Constants.LOOKUPID_TIMECALENDARMONTHNUMBERNAME)"
+
+      # Additional spec-level properties (from DimensionSpecBase and TimeDimensionSpec)
+      hierarchies:
+        type: array
+        description: "Hierarchies within this dimension"
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+              description: "Hierarchy name (e.g., Fiscal, Calendar)"
+            type:
+              type: string
+              enum: ["ParentChild", "Level"]
+              default: "ParentChild"
+            # Additional hierarchy properties...
+
+      orderBy:
+        type: string
+        description: "Default ordering method"
+
+      defaultMember:
+        type: string
+        description: "Default member for the dimension"
+
+      linked:
+        type: object
+        description: "Linked cube dimension reference (from TimeDimensionSpec)"
+        properties:
+          cube:
+            type: string
+            description: "Cube name"
+          dimension:
+            type: string
+            description: "Dimension name"
+
+      timeStructure:
+        type: object
+        description: "Time structure properties (from TimeDimensionProperties)"
+        properties:
+          type:
+            type: string
+            enum:
+              - Calendar12Months
+              - Periods13
+              - PeriodsNonCalendar12
+            description: Time structure type
+          fiscalYearStart:
+            type: string
+            pattern: "^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+            description: Fiscal year start date in MM-DD format
+          yearRange:
+            type: array
+            items:
+              type: integer
+            minItems: 2
+            maxItems: 2
+            description: Year range [startYear, endYear]
+          # Additional time structure properties...

@@ -1,0 +1,356 @@
+# AccountDimension Resource Schema
+# This schema defines the structure and validation rules for Account dimension resources
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://schemas.prophix.com/model.fpna.prophix.com/v1/AccountDimension"
+title: AccountDimension
+description: Account dimension for financial reporting with account-specific properties
+
+type: object
+required:
+  - apiVersion
+  - kind
+  - metadata
+  - spec
+
+properties:
+  apiVersion:
+    type: string
+    const: model.fpna.prophix.com/v1
+    description: API version identifier
+
+  kind:
+    type: string
+    const: AccountDimension
+    description: Resource kind - specifically AccountDimension
+
+  metadata:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 100
+        pattern: "^[^/\\\\*|?\"()\\[\\]{}<>=+!$%&':;,`.@]*$"
+        description: Dimension display name
+      description:
+        type: string
+        description: Dimension description
+      labels:
+        type: object
+        patternProperties:
+          "^[a-zA-Z][a-zA-Z0-9_-]*$":
+            type: string
+        additionalProperties: false
+
+  spec:
+    type: object
+    required:
+      - name
+      - members
+    properties:
+      name:
+        type: string
+        description: "Dimension name (from DimensionSpecBase)"
+
+      customProperties:
+        type: array
+        maxItems: 200
+        description: Custom member properties (ID >= 200, aligned with MemberPropertyDefinition.cs)
+        items:
+          type: object
+          required:
+            - name
+            - valueType
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 40
+              description: "Property name (e.g., Key, Name, AccountType)"
+            valueType:
+              type: string
+              enum:
+                - Text
+                - Integer
+                - Decimal
+                - Date
+                - Boolean
+                - MemberOfDimension
+              default: "Text"
+              description: "Value type"
+            columnDefinition:
+              type: string
+              description: "Column definition type (e.g., Key, ParentKey, Name)"
+            isNameColumn:
+              type: boolean
+              description: "Whether this property serves as the name column"
+            description:
+              type: string
+              description: "Property description"
+            level:
+              type: string
+              description: "Associated level name (for level-based hierarchies)"
+            lookupCubeDimensionString:
+              type: string
+              description: "Lookup cube dimension string reference"
+            defaultValue:
+              type: string
+              description: "Default value for this property"
+            hierarchyName:
+              type: string
+              description: "Associated hierarchy name"
+            cmpName:
+              type: string
+              description: "CMP (Custom Member Property) name"
+            orderBy:
+              type: string
+              description: "Default ordering method"
+            nameDefaultValue:
+              type: string
+              description: "Default value for name property"
+            size:
+              type: integer
+              minimum: 1
+              maximum: 3995
+              description: "Property size (for text properties)"
+            label:
+              type: string
+              maxLength: 100
+              description: "Human-readable display label (for custom properties)"
+            reference:
+              type: string
+              pattern: "^\\[[^\\]]+\\]\\.\\[[^\\]]+\\]$"
+              description: "Reference for MemberOfDimension type (format: [CubeName].[DimensionName])"
+
+      members:
+        type: array
+        minItems: 1
+        description: Account member definitions
+        items:
+          type: object
+          required:
+            - key
+            - name
+          properties:
+            # Core properties (IDs 0-2)
+            key:
+              type: string
+              minLength: 1
+              maxLength: 40
+              pattern: "^[^'\"\\\\(){}\\[\\]@_][^'\"\\\\(){}\\[\\]@]*$"
+              description: "Member unique key (ID: 0)"
+            name:
+              type: string
+              minLength: 1
+              maxLength: 256
+              pattern: "^[^\\[\\]@]*$"
+              description: "Member display name (ID: 1)"
+            parent:
+              type: string
+              maxLength: 40
+              pattern: "^[^'\"\\\\(){}\\[\\]@_][^'\"\\\\(){}\\[\\]@]*$"
+              description: "Parent member key (ID: 2)"
+
+            # Account-specific properties (IDs 3-15, aligned with AccountMember.cs model)
+            rollUp:
+              type: string
+              enum: ["+", "-", "~"]
+              default: "+"
+              description: "Rollup operator (ID: 3, Constants.LOOKUPID_ACCOUNTUNARYOPERATOR)"
+            accountNote:
+              type: string
+              maxLength: 255
+              description: "Account notes (ID: 4, Constants.LOOKUPID_ACCOUNTNOTE)"
+            accountType:
+              type: string
+              enum:
+                - Expense
+                - Revenue
+                - Asset
+                - Liability
+                - Statistical
+              description: "Account type - stored as integer in PxCPM (ID: 5, Constants.LOOKUPID_ACCOUNTTYPE)"
+            calculationMethod:
+              type: string
+              maxLength: 2000
+              description: "Calculation method description (ID: 6, Constants.LOOKUPID_ACCOUNTCALCULATIONMETHOD)"
+            debitCredit:
+              type: string
+              enum:
+                - Debit
+                - Credit
+              description: "Debit/credit indicator - stored as integer in PxCPM (ID: 7, Constants.LOOKUPID_ACCOUNTDEBITCREDIT)"
+            lineItemRequired:
+              type: boolean
+              description: "Line item requirement flag (ID: 8, Constants.LOOKUPID_ACCOUNTLINEITEMREQUIRED)"
+            nonLeafInput:
+              type: boolean
+              description: "Non-leaf input permission flag (ID: 9, Constants.LOOKUPID_ACCOUNTNONLEAFINPUT)"
+            numericFormat:
+              type: string
+              maxLength: 50
+              default: "#,###"
+              description: "Number format string (ID: 10, Constants.LOOKUPID_ACCOUNTNUMERICFORMAT)"
+            preventDataEntry:
+              type: boolean
+              description: "Prevent data entry flag (ID: 11, Constants.LOOKUPID_ACCOUNTPREVENTDATAENTRY)"
+            timeConversionMethod:
+              type: string
+              enum:
+                - Sum
+                - Average
+                - First
+                - Last
+                - Opening
+                - Closing
+              default: Sum
+              description: "Time conversion method - stored as integer in PxCPM (ID: 12, Constants.LOOKUPID_ACCOUNTTCMETHOD)"
+            timeConversionMdx:
+              type: string
+              maxLength: 2000
+              description: "Time conversion formula in MDX format (ID: 13, Constants.LOOKUPID_ACCOUNTTCFORMULAMDX)"
+            proceduralCalc:
+              type: string
+              maxLength: 255
+              description: "Procedural calculation settings (ID: 14, Constants.LOOKUPID_ACCOUNTPROCEDURALCALC)"
+            currencyConversionMethod:
+              type: string
+              enum:
+                - Current
+                - Historical
+              description: "Currency conversion method - stored as integer in PxCPM (ID: 15, Constants.LOOKUPID_ACCOUNTCURRENCYCONVERSIONMETHOD)"
+
+            # Custom properties
+            customProperties:
+              type: object
+              description: Custom property values matching customProperties definitions
+
+            # Calculations (aligned with Calculation.cs model)
+            calculations:
+              type: array
+              description: "Account calculations array (from AccountMember.cs)"
+              items:
+                type: object
+                required:
+                  - type
+                properties:
+                  type:
+                    type: string
+                    enum:
+                      - Input
+                      - StandardFormula
+                      - ProceduralCalculation
+                      - LeafFormula
+                      - NonLeafFormula
+                      - AggregateChildren
+                      - LookupCube
+                      - TimeConversionFormula
+                    description: "Calculation type"
+                  value:
+                    type: string
+                    description: "Formula content"
+                  language:
+                    type: string
+                    enum:
+                      - Mdx
+                      - Prophix
+                    description: "Formula language"
+                  operation:
+                    type: string
+                    enum:
+                      - Sum
+                      - Average
+                      - Min
+                      - Max
+                      - Count
+                    description: "Aggregation operation"
+                  preventDataEntry:
+                    type: boolean
+                    description: "Prevent data entry flag"
+                  requireLineItemSchedule:
+                    type: boolean
+                    description: "Require line item schedule flag"
+                  ruleSetId:
+                    type: string
+                    description: "Associated rule set ID"
+                  ruleSet:
+                    type: string
+                    description: "Rule set name"
+                  useSQL:
+                    type: object
+                    description: "SQL usage flags by rule set"
+                    additionalProperties:
+                      type: boolean
+                  triggers:
+                    type: string
+                    description: "Calculation triggers"
+
+      # Additional spec-level properties (from DimensionSpecBase and AccountDimensionSpec)
+      hierarchies:
+        type: array
+        description: "Hierarchies within this dimension (from DimensionSpecBase)"
+        items:
+          type: object
+          required:
+            - name
+            - type
+          properties:
+            name:
+              type: string
+              description: "Hierarchy name (e.g., Default, Calendar, Fiscal)"
+            type:
+              type: string
+              enum: ["ParentChild", "Level"]
+              default: "ParentChild"
+              description: "Hierarchy type"
+            levels:
+              type: array
+              description: "Levels within this hierarchy (for Level-based hierarchies)"
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: "Level name"
+                  memberPropertyName:
+                    type: string
+                    description: "Member property name that defines this level"
+            description:
+              type: string
+              description: "Optional hierarchy description"
+            isDefault:
+              type: boolean
+              description: "Whether this is the default hierarchy"
+
+      orderBy:
+        type: string
+        description: "Default ordering method (from DimensionSpecBase)"
+
+      defaultMember:
+        type: string
+        description: "Default member for the dimension (from DimensionSpecBase)"
+
+      ruleSets:
+        type: array
+        description: "Rule sets for the dimension (from AccountDimensionSpec)"
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+              description: "Rule set name"
+            # Add other RuleSet properties as needed
+
+      linked:
+        type: object
+        description: "Linked cube dimension reference (from AccountDimensionSpec)"
+        properties:
+          cube:
+            type: string
+            description: "Cube name"
+          dimension:
+            type: string
+            description: "Dimension name"
