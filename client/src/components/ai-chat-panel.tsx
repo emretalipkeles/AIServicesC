@@ -719,7 +719,7 @@ export function AIChatPanel() {
           </div>
           <div>
             <h2 className="text-sm font-semibold text-sidebar-foreground leading-tight" data-testid="text-chat-title">AI Assistant</h2>
-            <p className="text-xs text-muted-foreground leading-tight" data-testid="text-chat-subtitle">Powered by Prophix</p>
+            <p className="text-xs text-muted-foreground leading-tight" data-testid="text-chat-subtitle"></p>
           </div>
         </div>
         <Button variant="ghost" size="icon" data-testid="button-chat-options">

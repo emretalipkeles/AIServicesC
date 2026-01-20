@@ -111,7 +111,7 @@ export function SettingsMenu({ onNavigate }: SettingsMenuProps) {
             </div>
             <div>
               <h2 className="font-semibold text-foreground" data-testid="text-settings-title">Settings</h2>
-              <p className="text-sm text-muted-foreground">Customize your Prophix Customer Journey experience</p>
+              <p className="text-sm text-muted-foreground">Customize your experience</p>
             </div>
           </div>
         </div>
