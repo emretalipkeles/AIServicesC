@@ -27,8 +27,8 @@ interface DelayAnalysisProjectDetailProps {
 }
 
 const tabs = [
-  { value: "documents", label: "Documents", icon: Upload },
   { value: "schedule", label: "Schedule", icon: Calendar },
+  { value: "documents", label: "Documents", icon: Upload },
   { value: "delays", label: "Delay Events", icon: Activity },
   { value: "results", label: "Results", icon: BarChart3 },
 ];
@@ -43,7 +43,7 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
   
   const [isEditing, setIsEditing] = useState(false);
   const [editedProject, setEditedProject] = useState<Partial<DelayAnalysisProject>>({});
-  const [activeTab, setActiveTab] = useState("documents");
+  const [activeTab, setActiveTab] = useState("schedule");
 
   const handleSave = async () => {
     try {
