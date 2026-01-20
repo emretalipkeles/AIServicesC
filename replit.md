@@ -215,11 +215,12 @@ Core entities:
 ### AI Infrastructure
 - **Multi-Provider Support**: AIClientFactory routes to AWS Bedrock or OpenAI based on model provider
 - **Supported Models**:
-  - `claude-sonnet-4-5`: AWS Bedrock Claude Sonnet (default)
+  - `claude-sonnet-4-5`: AWS Bedrock Claude Sonnet
   - `claude-opus-4-5`: AWS Bedrock Claude Opus
-  - `gpt-5.2`: OpenAI Responses API with medium reasoning effort
+  - `gpt-5.2`: OpenAI Responses API with medium reasoning effort (default for orchestration)
   - `gpt-5.2-high`: OpenAI Responses API with high reasoning effort
 - **Model Selection**: Agents specify their model in the database; AgentExecutor dynamically selects the appropriate AI client
+- **Default Configuration**: Main orchestrator uses OpenAI (gpt-5.2) via `OPEN_AI_KEY` environment variable
 - **Key Files**:
   - `server/src/domain/value-objects/ModelId.ts`: Value object with provider detection and reasoning effort mapping
   - `server/src/infrastructure/ai/AIClientFactory.ts`: Factory routing to Bedrock or OpenAI
