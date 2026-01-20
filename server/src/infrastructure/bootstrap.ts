@@ -116,6 +116,9 @@ import type { IDelayAnalysisProjectRepository } from "../domain/delay-analysis/r
 import type { IProjectDocumentRepository } from "../domain/delay-analysis/repositories/IProjectDocumentRepository";
 import type { IScheduleActivityRepository } from "../domain/delay-analysis/repositories/IScheduleActivityRepository";
 import type { IContractorDelayEventRepository } from "../domain/delay-analysis/repositories/IContractorDelayEventRepository";
+import type { IAITokenUsageRepository } from "../domain/delay-analysis/repositories/IAITokenUsageRepository";
+import { DrizzleAITokenUsageRepository } from "./database/repositories/delay-analysis/DrizzleAITokenUsageRepository";
+import { RecordTokenUsageCommandHandler } from "../application/delay-analysis/commands/handlers/RecordTokenUsageCommandHandler";
 
 export interface AppContainer {
   commandBus: ICommandBus;
@@ -137,6 +140,7 @@ export interface AppContainer {
     projectDocument: IProjectDocumentRepository;
     scheduleActivity: IScheduleActivityRepository;
     contractorDelayEvent: IContractorDelayEventRepository;
+    aiTokenUsage: IAITokenUsageRepository;
   };
   
   handlers: {
@@ -189,6 +193,7 @@ export function createAppContainer(): AppContainer {
   const projectDocumentRepository = new DrizzleProjectDocumentRepository();
   const scheduleActivityRepository = new DrizzleScheduleActivityRepository();
   const contractorDelayEventRepository = new DrizzleContractorDelayEventRepository();
+  const aiTokenUsageRepository = new DrizzleAITokenUsageRepository();
   const documentParserFactory = new DocumentParserFactory();
 
   let delayEventExtractor: IDelayEventExtractor | null = null;
@@ -445,6 +450,7 @@ export function createAppContainer(): AppContainer {
       projectDocument: projectDocumentRepository,
       scheduleActivity: scheduleActivityRepository,
       contractorDelayEvent: contractorDelayEventRepository,
+      aiTokenUsage: aiTokenUsageRepository,
     },
     handlers: {
       streamChatHandler,

@@ -1,4 +1,4 @@
-import type { IActivityMatcher, MatchResult } from '../../domain/delay-analysis/interfaces/IActivityMatcher';
+import type { IActivityMatcher, MatchResult, MatchOptions } from '../../domain/delay-analysis/interfaces/IActivityMatcher';
 import type { ScheduleActivity } from '../../domain/delay-analysis/entities/ScheduleActivity';
 import type { IAIClient } from '../../domain/interfaces/IAIClient';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
@@ -51,7 +51,8 @@ export class AIActivityMatcher implements IActivityMatcher {
   async matchEventToActivities(
     eventDescription: string,
     eventDate: Date | null,
-    activities: ScheduleActivity[]
+    activities: ScheduleActivity[],
+    options?: MatchOptions
   ): Promise<MatchResult | null> {
     if (activities.length === 0) {
       return null;
@@ -83,6 +84,16 @@ export class AIActivityMatcher implements IActivityMatcher {
 
       console.log('[AIActivityMatcher] Raw AI response:', response.content);
 
+      if (options?.onTokenUsage) {
+        await options.onTokenUsage({
+          operation: 'activity_matching',
+          model: response.model,
+          inputTokens: response.inputTokens,
+          outputTokens: response.outputTokens,
+          metadata: { activitiesCount: activities.length },
+        });
+      }
+
       const result = this.parseMatchResponse(response.content, activities);
       
       console.log('[AIActivityMatcher] Parsed result:', result ? {
@@ -100,7 +111,8 @@ export class AIActivityMatcher implements IActivityMatcher {
 
   async matchBatch(
     events: Array<{ id: string; description: string; eventDate: Date | null }>,
-    activities: ScheduleActivity[]
+    activities: ScheduleActivity[],
+    options?: MatchOptions
   ): Promise<Map<string, MatchResult>> {
     const results = new Map<string, MatchResult>();
 
@@ -108,7 +120,8 @@ export class AIActivityMatcher implements IActivityMatcher {
       const match = await this.matchEventToActivities(
         event.description,
         event.eventDate,
-        activities
+        activities,
+        options
       );
 
       if (match) {

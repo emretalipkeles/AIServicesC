@@ -1,4 +1,5 @@
 import type { ScheduleActivity } from '../entities/ScheduleActivity';
+import type { TokenUsageCallback } from './ITokenUsageRecorder';
 
 export interface MatchResult {
   matchedActivityId: string;
@@ -9,11 +10,16 @@ export interface MatchResult {
   reasoning: string;
 }
 
+export interface MatchOptions {
+  onTokenUsage?: TokenUsageCallback;
+}
+
 export interface IActivityMatcher {
   matchEventToActivities(
     eventDescription: string,
     eventDate: Date | null,
-    activities: ScheduleActivity[]
+    activities: ScheduleActivity[],
+    options?: MatchOptions
   ): Promise<MatchResult | null>;
   
   matchBatch(
@@ -22,6 +28,7 @@ export interface IActivityMatcher {
       description: string;
       eventDate: Date | null;
     }>,
-    activities: ScheduleActivity[]
+    activities: ScheduleActivity[],
+    options?: MatchOptions
   ): Promise<Map<string, MatchResult>>;
 }

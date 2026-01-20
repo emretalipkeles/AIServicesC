@@ -1,4 +1,4 @@
-import type { IDelayEventExtractor, ExtractionResult, ExtractedDelayEvent } from '../../domain/delay-analysis/interfaces/IDelayEventExtractor';
+import type { IDelayEventExtractor, ExtractionResult, ExtractedDelayEvent, ExtractionOptions } from '../../domain/delay-analysis/interfaces/IDelayEventExtractor';
 import type { DelayEventCategory } from '../../domain/delay-analysis/entities/ContractorDelayEvent';
 import type { IAIClient } from '../../domain/interfaces/IAIClient';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
@@ -33,7 +33,8 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
   async extractDelayEvents(
     documentContent: string,
     documentFilename: string,
-    documentId: string
+    documentId: string,
+    options?: ExtractionOptions
   ): Promise<ExtractionResult> {
     const truncatedContent = documentContent.slice(0, 30000);
     
@@ -46,6 +47,16 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
         maxTokens: 4000,
         temperature: 0.1,
       });
+
+      if (options?.onTokenUsage) {
+        await options.onTokenUsage({
+          operation: 'delay_event_extraction',
+          model: response.model,
+          inputTokens: response.inputTokens,
+          outputTokens: response.outputTokens,
+          metadata: { documentFilename, documentId },
+        });
+      }
 
       const events = this.parseExtractionResponse(response.content);
 

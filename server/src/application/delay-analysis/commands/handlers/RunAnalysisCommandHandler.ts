@@ -7,6 +7,7 @@ import type { IContractorDelayEventRepository } from '../../../../domain/delay-a
 import type { IDelayEventExtractor } from '../../../../domain/delay-analysis/interfaces/IDelayEventExtractor';
 import type { IActivityMatcher } from '../../../../domain/delay-analysis/interfaces/IActivityMatcher';
 import type { IProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
+import type { TokenUsageCallback } from '../../../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 
@@ -19,6 +20,7 @@ export interface RunAnalysisResult {
 
 export interface RunAnalysisOptions {
   progressReporter?: IProgressReporter;
+  onTokenUsage?: TokenUsageCallback;
 }
 
 export class RunAnalysisCommandHandler {
@@ -103,7 +105,8 @@ export class RunAnalysisCommandHandler {
             const extractionResult = await this.extractor.extractDelayEvents(
               doc.rawContent!,
               doc.filename,
-              doc.id
+              doc.id,
+              { onTokenUsage: options?.onTokenUsage }
             );
 
             for (const extracted of extractionResult.events) {
@@ -215,7 +218,8 @@ export class RunAnalysisCommandHandler {
               const matchResult = await this.matcher.matchEventToActivities(
                 event.eventDescription,
                 event.eventStartDate,
-                activities
+                activities,
+                { onTokenUsage: options?.onTokenUsage }
               );
 
               if (matchResult) {

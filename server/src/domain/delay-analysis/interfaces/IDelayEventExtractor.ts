@@ -1,4 +1,5 @@
 import type { DelayEventCategory } from '../entities/ContractorDelayEvent';
+import type { TokenUsageCallback } from './ITokenUsageRecorder';
 
 export interface ExtractedDelayEvent {
   eventDescription: string;
@@ -15,10 +16,15 @@ export interface ExtractionResult {
   totalEventsFound: number;
 }
 
+export interface ExtractionOptions {
+  onTokenUsage?: TokenUsageCallback;
+}
+
 export interface IDelayEventExtractor {
   extractDelayEvents(
     documentContent: string,
     documentFilename: string,
-    documentId: string
+    documentId: string,
+    options?: ExtractionOptions
   ): Promise<ExtractionResult>;
 }
