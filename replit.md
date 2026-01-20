@@ -11,8 +11,8 @@ The platform dynamically discovers agents from the database, uses LLM-based plan
 Preferred communication style: Simple, everyday language.
 
 **UI/Design Preferences:**
-- All buttons and interactive elements must use **Prophix Red** (primary color #E94B3C) - never use generic blue buttons
-- Maintain consistent Prophix branding throughout the application
+- All buttons and interactive elements must use **Professional Blue** (primary color #3B82F6 / HSL 217 91% 60%)
+- Maintain consistent branding throughout the application
 - Use gradient variants `from-primary to-primary/80` for emphasis buttons
 
 ## System Architecture
@@ -151,7 +151,7 @@ Core entities:
 - **Database Migrations**: Drizzle Kit with `npm run db:push`
 
 ### Design System
-- **Primary Brand Color**: Prophix Red (#E94B3C / HSL 6 82% 57%)
+- **Primary Brand Color**: Professional Blue (#3B82F6 / HSL 217 91% 60%)
 - **Typography**: Inter for UI text, JetBrains Mono for code
 - **Spacing**: Tailwind default units (2, 4, 6, 8)
 - **Components**: Full shadcn/ui component library with custom theme integration

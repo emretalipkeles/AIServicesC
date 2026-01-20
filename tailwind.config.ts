@@ -109,8 +109,8 @@ export default {
           to: { opacity: "1", transform: "scale(1)" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "var(--prophix-glow)" },
-          "50%": { boxShadow: "0 0 0 4px hsla(6, 82%, 57%, 0.4), 0 0 30px hsla(6, 82%, 57%, 0.3)" },
+          "0%, 100%": { boxShadow: "var(--brand-glow)" },
+          "50%": { boxShadow: "0 0 0 4px hsla(217, 91%, 60%, 0.4), 0 0 30px hsla(217, 91%, 60%, 0.3)" },
         },
         "shimmer": {
           "0%": { backgroundPosition: "-200% 0" },

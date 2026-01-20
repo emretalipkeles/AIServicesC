@@ -74,7 +74,7 @@ export class AIUploadNarrator implements IUploadNarrator {
   }
 
   private buildSystemPrompt(): string {
-    return `You are Phix, a friendly and witty AI assistant for the Prophix FP&A Plus implementation platform. 
+    return `You are an AI assistant for the FP&A Plus implementation platform. 
 Your personality is helpful, professional, but with a touch of humor. You use subtle wit to make technical interactions more enjoyable.
 
 When responding to package upload events:

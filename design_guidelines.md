@@ -1,10 +1,10 @@
-# Design Guidelines: Prophix AI Customer Journey Platform
+# Design Guidelines: AI-Powered Services Platform
 
 ## Design Approach
 **Reference-Based**: Inspired by Replit's sophisticated developer interface with split-screen layout, combined with Linear's refined typography and Stripe's professional restraint. The design emphasizes productivity while maintaining visual delight through subtle animations and premium finishes.
 
 ## Brand Identity
-**Primary Accent**: Prophix Red (#E94B3C) - used exclusively for all interactive states, focus indicators, active tabs, selections, and primary CTAs. This creates a strong, consistent brand presence throughout the application.
+**Primary Accent**: Professional Blue (#3B82F6 / HSL 217 91% 60%) - used exclusively for all interactive states, focus indicators, active tabs, selections, and primary CTAs. This creates a clean, professional brand presence throughout the application.
 
 ## Core Layout System
 
@@ -23,7 +23,7 @@
 
 **Tabbed Content Panel (Right)**:
 - Tab bar at top (h-12 to h-14) with horizontal layout
-- Active tab indicated by Prophix red bottom border (border-b-2)
+- Active tab indicated by blue bottom border (border-b-2)
 - Content area fills remaining viewport height
 - Generous padding (p-6 to p-8) for breathing room
 
@@ -47,7 +47,7 @@
 - **Text Primary**: Near white (#E8E9EB)
 - **Text Secondary**: Muted gray (#9BA1A6)
 - **Borders**: Subtle (#2D3239)
-- **Prophix Red Glow**: Soft red shadow with 40% opacity
+- **Brand Blue Glow**: Soft blue shadow with 40% opacity
 
 ### Light Mode
 - **Background**: Off-white (#FAFAFA)
@@ -55,7 +55,7 @@
 - **Text Primary**: Deep gray (#1A1F26)
 - **Text Secondary**: Medium gray (#5F6368)
 - **Borders**: Light gray (#E5E7EB)
-- **Prophix Red Glow**: Softer red shadow with 25% opacity
+- **Brand Blue Glow**: Softer blue shadow with 25% opacity
 
 ### Theme Toggle
 - Position: Top-right corner of interface
@@ -73,21 +73,21 @@
 - Placeholder text in secondary color
 
 **Focus State**:
-- Prophix red glow effect (box-shadow with 8px blur, 60% opacity)
-- Border transitions to Prophix red
+- Blue glow effect (box-shadow with 8px blur, 60% opacity)
+- Border transitions to primary blue
 - Auto-expands vertically as user types (max-h-64)
 - Smooth height transition (300ms ease)
 
 **Send Button**:
 - Positioned inline right
-- Prophix red background
+- Primary blue background
 - Icon-only (paper plane)
 - Disabled state when empty
 
 ### Tab Navigation
 - Horizontal layout with even spacing
 - Tab items: px-4, py-3
-- Active tab: Prophix red bottom border (border-b-2), bold text
+- Active tab: Primary blue bottom border (border-b-2), bold text
 - Inactive tabs: Secondary text color, regular weight
 - Hover: Smooth opacity change (0.7 to 1.0)
 - Tab transition: 200ms ease for border appearance
@@ -99,7 +99,7 @@
 - Each card fills equal space
 
 **Card Design - "Start New Journey"**:
-- Gradient background: Prophix red to deeper red variation
+- Gradient background: Primary blue to deeper blue variation
 - White text with drop shadow
 - Large icon (w-16, h-16) - Plus or Rocket
 - Title: text-xl, bold
@@ -129,7 +129,7 @@
 - Tabs: Opacity 70% to 100%, 200ms ease
 
 **Focus States**:
-- All interactive elements receive Prophix red outline or glow
+- All interactive elements receive primary blue outline or glow
 - Keyboard navigation clearly visible
 
 **Transitions**:
@@ -157,7 +157,7 @@
 
 **Borders**:
 - Default: 1px solid with theme-appropriate color
-- Focus: 2px solid Prophix red
+- Focus: 2px solid primary blue
 
 **Animations**:
 - Minimal and purposeful only

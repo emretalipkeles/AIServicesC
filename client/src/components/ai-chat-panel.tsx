@@ -921,7 +921,7 @@ export function AIChatPanel() {
         <div
           className={`rounded-lg border-2 theme-transition bg-muted/50 dark:bg-muted/30 ${
             isFocused
-              ? "border-primary prophix-glow"
+              ? "border-primary brand-glow"
               : "border-muted-foreground/20"
           }`}
         >
