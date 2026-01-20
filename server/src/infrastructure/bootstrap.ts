@@ -92,6 +92,8 @@ import { AIIntentClassifier } from "./pret/classifiers/AIIntentClassifier";
 import { PRET_COMMAND_DESCRIPTORS } from "./pret/classifiers/PretCommandDescriptors";
 import { AIPretResponseNarrator } from "./pret/narrators/AIPretResponseNarrator";
 import type { IIntentClassifier, IResponseNarrator } from "../domain/pret";
+import { DocumentParserFactory } from "./document-parsing/DocumentParserFactory";
+import type { IDocumentParserFactory } from "../domain/delay-analysis/interfaces/IDocumentParserFactory";
 
 import { DrizzleDelayAnalysisProjectRepository } from "./database/repositories/delay-analysis/DrizzleDelayAnalysisProjectRepository";
 import { DrizzleProjectDocumentRepository } from "./database/repositories/delay-analysis/DrizzleProjectDocumentRepository";
@@ -151,6 +153,7 @@ export interface AppContainer {
     packageAnalysisCache: IPackageAnalysisCache;
     pretCommandRegistry: IPretCommandRegistry;
     pretCommandExecutor: PretCommandExecutor | null;
+    documentParserFactory: IDocumentParserFactory;
   };
 }
 
@@ -175,6 +178,7 @@ export function createAppContainer(): AppContainer {
   const projectDocumentRepository = new DrizzleProjectDocumentRepository();
   const scheduleActivityRepository = new DrizzleScheduleActivityRepository();
   const contractorDelayEventRepository = new DrizzleContractorDelayEventRepository();
+  const documentParserFactory = new DocumentParserFactory();
 
   let pretPackageStorage: IPretPackageStorage | null = null;
   try {
@@ -439,6 +443,7 @@ export function createAppContainer(): AppContainer {
       packageAnalysisCache,
       pretCommandRegistry,
       pretCommandExecutor,
+      documentParserFactory,
     },
   };
 }

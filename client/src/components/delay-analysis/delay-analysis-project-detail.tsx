@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Save, FileText, Calendar, Upload, Table, Activity, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
+import { DocumentUpload } from "./document-upload";
 
 interface DelayAnalysisProjectDetailProps {
   projectId: string;
@@ -161,26 +162,7 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
           </TabsList>
 
           <TabsContent value="documents">
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Documents</CardTitle>
-                <CardDescription>
-                  Upload Inspector Daily Reports (IDRs), NCRs, and Field Memos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="border-2 border-dashed border-border rounded-lg p-12 text-center">
-                  <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-medium mb-2">Upload Documents</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Drag and drop PDF or Word files, or click to browse
-                  </p>
-                  <Button variant="outline" disabled>
-                    Coming Soon
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <DocumentUpload projectId={projectId} />
           </TabsContent>
 
           <TabsContent value="schedule">

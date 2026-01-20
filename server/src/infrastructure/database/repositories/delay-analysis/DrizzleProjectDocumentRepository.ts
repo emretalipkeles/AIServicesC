@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, count } from 'drizzle-orm';
 import type { IProjectDocumentRepository } from '../../../../domain/delay-analysis/repositories/IProjectDocumentRepository';
 import { ProjectDocument, type ProjectDocumentType, type DocumentProcessingStatus } from '../../../../domain/delay-analysis/entities/ProjectDocument';
 import { projectDocuments } from '@shared/schema';
@@ -46,6 +46,23 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
     return result.map(row => this.mapRowToEntity(row));
   }
 
+  async findByStatus(
+    projectId: string,
+    tenantId: string,
+    status: DocumentProcessingStatus
+  ): Promise<ProjectDocument[]> {
+    const result = await db
+      .select()
+      .from(projectDocuments)
+      .where(and(
+        eq(projectDocuments.projectId, projectId),
+        eq(projectDocuments.tenantId, tenantId),
+        eq(projectDocuments.status, status)
+      ));
+
+    return result.map(row => this.mapRowToEntity(row));
+  }
+
   async save(document: ProjectDocument): Promise<void> {
     await db.insert(projectDocuments).values({
       id: document.id,
@@ -61,6 +78,27 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
     });
+  }
+
+  async saveBatch(documents: ProjectDocument[]): Promise<void> {
+    if (documents.length === 0) return;
+    
+    await db.insert(projectDocuments).values(
+      documents.map(doc => ({
+        id: doc.id,
+        projectId: doc.projectId,
+        tenantId: doc.tenantId,
+        filename: doc.filename,
+        contentType: doc.contentType,
+        documentType: doc.documentType,
+        rawContent: doc.rawContent,
+        reportDate: doc.reportDate,
+        status: doc.status,
+        errorMessage: doc.errorMessage,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+      }))
+    );
   }
 
   async update(document: ProjectDocument): Promise<void> {
@@ -83,6 +121,18 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
     await db
       .delete(projectDocuments)
       .where(and(eq(projectDocuments.id, id), eq(projectDocuments.tenantId, tenantId)));
+  }
+
+  async countByProjectId(projectId: string, tenantId: string): Promise<number> {
+    const result = await db
+      .select({ count: count() })
+      .from(projectDocuments)
+      .where(and(
+        eq(projectDocuments.projectId, projectId),
+        eq(projectDocuments.tenantId, tenantId)
+      ));
+
+    return result[0]?.count ?? 0;
   }
 
   private mapRowToEntity(row: typeof projectDocuments.$inferSelect): ProjectDocument {

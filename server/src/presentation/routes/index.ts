@@ -11,6 +11,7 @@ import { registerOrchestratorRoutes } from "./orchestrator.routes";
 import { registerStructuredOutputRoutes } from "./structured-output.routes";
 import { registerPretPackageRoutes } from "./pretPackage.routes";
 import { registerDelayAnalysisProjectRoutes } from "./delay-analysis-project.routes";
+import { registerProjectDocumentRoutes } from "./project-document.routes";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -28,6 +29,7 @@ export async function registerRoutes(
   registerStructuredOutputRoutes(app, container);
   registerPretPackageRoutes(app, container);
   registerDelayAnalysisProjectRoutes(app, container);
+  registerProjectDocumentRoutes(app, container);
 
   return httpServer;
 }
