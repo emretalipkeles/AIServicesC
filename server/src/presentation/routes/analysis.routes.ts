@@ -1,10 +1,12 @@
+import { randomUUID } from 'crypto';
 import type { Express, Request, Response } from 'express';
 import type { AppContainer } from '../../infrastructure/bootstrap';
 import { RunAnalysisCommandHandler } from '../../application/delay-analysis/commands/handlers/RunAnalysisCommandHandler';
 import { ListDelayEventsQueryHandler } from '../../application/delay-analysis/queries/handlers/ListDelayEventsQueryHandler';
 import { RecordTokenUsageCommandHandler } from '../../application/delay-analysis/commands/handlers/RecordTokenUsageCommandHandler';
+import { GetTokenUsageByRunIdQuery } from '../../application/delay-analysis/queries/GetTokenUsageByRunIdQuery';
 import { SSEProgressReporter } from '../../infrastructure/document-parsing/SSEProgressReporter';
-import type { TokenUsageCallback } from '../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
+import type { TokenUsageCallback, TokenUsageRecord } from '../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
 import { runAnalysisParamsSchema, runAnalysisBodySchema, listDelayEventsParamsSchema } from '../validators/analysisValidators';
 
 const DEFAULT_TENANT_ID = 'default';
@@ -126,11 +128,12 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
   );
 
   const createTokenCallback = (projectId: string): TokenUsageCallback => {
-    return async (usage) => {
+    return async (usage: TokenUsageRecord) => {
       try {
         await tokenUsageHandler.handle({
           type: 'RecordTokenUsageCommand',
           projectId,
+          runId: usage.runId,
           operation: usage.operation,
           model: usage.model,
           inputTokens: usage.inputTokens,
@@ -149,6 +152,9 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
       try {
         const params = runAnalysisParamsSchema.parse(req.params);
         const body = runAnalysisBodySchema.parse(req.body);
+        const runId = randomUUID();
+
+        console.log(`[Analysis] Starting analysis run: ${runId} for project: ${params.projectId}`);
 
         const result = await runAnalysisHandler.execute(
           {
@@ -157,12 +163,16 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
             extractFromDocuments: body.extractFromDocuments,
             matchToActivities: body.matchToActivities,
           },
-          { onTokenUsage: createTokenCallback(params.projectId) }
+          { 
+            runId,
+            onTokenUsage: createTokenCallback(params.projectId) 
+          }
         );
 
         res.json({
           success: true,
           data: {
+            runId,
             eventsExtracted: result.eventsExtracted,
             eventsMatched: result.eventsMatched,
             documentsProcessed: result.documentsProcessed,
@@ -190,9 +200,12 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
       try {
         const params = runAnalysisParamsSchema.parse(req.params);
         const progressReporter = new SSEProgressReporter(res);
+        const runId = randomUUID();
 
         const extractFromDocuments = req.query.extractFromDocuments !== 'false';
         const matchToActivities = req.query.matchToActivities !== 'false';
+
+        console.log(`[Analysis] Starting streaming analysis run: ${runId} for project: ${params.projectId}`);
 
         await runAnalysisHandler.execute(
           {
@@ -202,6 +215,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
             matchToActivities,
           },
           {
+            runId,
             progressReporter,
             onTokenUsage: createTokenCallback(params.projectId),
           }
@@ -235,6 +249,27 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
       } catch (error) {
         console.error('[TokenUsage] Failed to get summary:', error);
         res.status(500).json({ success: false, error: 'Failed to get token usage' });
+      }
+    }
+  );
+
+  app.get(
+    '/api/delay-analysis/runs/:runId/token-usage',
+    async (req: Request, res: Response) => {
+      try {
+        const { runId } = req.params;
+        const query = new GetTokenUsageByRunIdQuery(runId);
+        const summary = await container.queryBus.execute(query);
+        
+        if (!summary) {
+          res.status(404).json({ success: false, error: 'Run not found' });
+          return;
+        }
+        
+        res.json({ success: true, data: summary });
+      } catch (error) {
+        console.error('[TokenUsage] Failed to get run summary:', error);
+        res.status(500).json({ success: false, error: 'Failed to get run token usage' });
       }
     }
   );

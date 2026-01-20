@@ -359,6 +359,7 @@ export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'needs_re
 export const aiTokenUsage = pgTable("ai_token_usage", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  runId: varchar("run_id").notNull(),
   operation: text("operation").notNull(),
   model: text("model").notNull(),
   inputTokens: integer("input_tokens").notNull(),

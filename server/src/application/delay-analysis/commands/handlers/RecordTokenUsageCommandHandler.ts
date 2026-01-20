@@ -15,6 +15,7 @@ export class RecordTokenUsageCommandHandler {
 
     const usage = AITokenUsage.create({
       projectId: command.projectId,
+      runId: command.runId,
       operation: command.operation,
       model: command.model,
       inputTokens: command.inputTokens,
@@ -26,6 +27,6 @@ export class RecordTokenUsageCommandHandler {
 
     await this.repository.save(usage);
     
-    console.log(`[TokenUsage] Recorded: ${command.operation} | ${command.model} | ${command.inputTokens} in / ${command.outputTokens} out | $${estimatedCostUsd.toFixed(6)}`);
+    console.log(`[TokenUsage] Recorded: runId=${command.runId} | ${command.operation} | ${command.model} | ${command.inputTokens} in / ${command.outputTokens} out | $${estimatedCostUsd.toFixed(6)}`);
   }
 }

@@ -11,6 +11,7 @@ export interface MatchResult {
 }
 
 export interface MatchOptions {
+  runId?: string;
   onTokenUsage?: TokenUsageCallback;
 }
 

@@ -112,6 +112,7 @@ import { UpdateDelayAnalysisProjectCommandHandler } from "../application/delay-a
 import { DeleteDelayAnalysisProjectCommandHandler } from "../application/delay-analysis/commands/handlers/DeleteDelayAnalysisProjectCommandHandler";
 import { GetDelayAnalysisProjectQueryHandler } from "../application/delay-analysis/queries/handlers/GetDelayAnalysisProjectQueryHandler";
 import { ListDelayAnalysisProjectsQueryHandler } from "../application/delay-analysis/queries/handlers/ListDelayAnalysisProjectsQueryHandler";
+import { GetTokenUsageByRunIdQueryHandler } from "../application/delay-analysis/queries/handlers/GetTokenUsageByRunIdQueryHandler";
 import type { IDelayAnalysisProjectRepository } from "../domain/delay-analysis/repositories/IDelayAnalysisProjectRepository";
 import type { IProjectDocumentRepository } from "../domain/delay-analysis/repositories/IProjectDocumentRepository";
 import type { IScheduleActivityRepository } from "../domain/delay-analysis/repositories/IScheduleActivityRepository";
@@ -360,6 +361,7 @@ export function createAppContainer(): AppContainer {
   const deleteDelayAnalysisProjectHandler = new DeleteDelayAnalysisProjectCommandHandler(delayAnalysisProjectRepository);
   const getDelayAnalysisProjectHandler = new GetDelayAnalysisProjectQueryHandler(delayAnalysisProjectRepository);
   const listDelayAnalysisProjectsHandler = new ListDelayAnalysisProjectsQueryHandler(delayAnalysisProjectRepository);
+  const getTokenUsageByRunIdHandler = new GetTokenUsageByRunIdQueryHandler(aiTokenUsageRepository);
 
   let importPretPackageHandler: ImportPretPackageHandler | null = null;
   let getPretPackageHandler: GetPretPackageHandler | null = null;
@@ -430,6 +432,7 @@ export function createAppContainer(): AppContainer {
   commandBus.register('DeleteDelayAnalysisProjectCommand', deleteDelayAnalysisProjectHandler);
   queryBus.register('GetDelayAnalysisProjectQuery', getDelayAnalysisProjectHandler);
   queryBus.register('ListDelayAnalysisProjectsQuery', listDelayAnalysisProjectsHandler);
+  queryBus.register('GetTokenUsageByRunIdQuery', getTokenUsageByRunIdHandler);
 
   return {
     commandBus,

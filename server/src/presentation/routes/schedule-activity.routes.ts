@@ -1,11 +1,14 @@
+import { randomUUID } from 'crypto';
 import type { Express } from 'express';
 import multer from 'multer';
 import type { AppContainer } from '../../infrastructure/bootstrap';
 import { ScheduleActivityController } from '../controllers/ScheduleActivityController';
 import { UploadScheduleCommandHandler } from '../../application/delay-analysis/commands/handlers/UploadScheduleCommandHandler';
 import { ListScheduleActivitiesQueryHandler } from '../../application/delay-analysis/queries/handlers/ListScheduleActivitiesQueryHandler';
+import { RecordTokenUsageCommandHandler } from '../../application/delay-analysis/commands/handlers/RecordTokenUsageCommandHandler';
 import { SSEProgressReporter } from '../../infrastructure/document-parsing/SSEProgressReporter';
 import type { UploadScheduleCommand } from '../../application/delay-analysis/commands/UploadScheduleCommand';
+import type { TokenUsageCallback, TokenUsageRecord } from '../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
 import { uploadScheduleParamsSchema, uploadScheduleBodySchema } from '../validators/scheduleValidators';
 
 const upload = multer({
@@ -40,6 +43,10 @@ export function registerScheduleActivityRoutes(app: Express, container: AppConta
 
   const listActivitiesHandler = new ListScheduleActivitiesQueryHandler(
     container.repositories.scheduleActivity
+  );
+
+  const tokenUsageHandler = new RecordTokenUsageCommandHandler(
+    container.repositories.aiTokenUsage
   );
 
   const controller = new ScheduleActivityController(
@@ -96,9 +103,24 @@ export function registerScheduleActivityRoutes(app: Express, container: AppConta
         }
 
         const progressReporter = new SSEProgressReporter(res);
+        const projectId = paramsResult.data.projectId;
+        const runId = `schedule-upload-${randomUUID()}`;
+
+        const tokenUsageCallback: TokenUsageCallback = async (usage: TokenUsageRecord) => {
+          await tokenUsageHandler.handle({
+            type: 'RecordTokenUsageCommand',
+            projectId,
+            runId: usage.runId,
+            operation: usage.operation,
+            model: usage.model,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            metadata: usage.metadata,
+          });
+        };
 
         const command: UploadScheduleCommand = {
-          projectId: paramsResult.data.projectId,
+          projectId,
           tenantId: 'default',
           file: {
             buffer: file.buffer,
@@ -112,9 +134,11 @@ export function registerScheduleActivityRoutes(app: Express, container: AppConta
         try {
           const result = await uploadScheduleHandler.execute(command, {
             progressReporter,
+            tokenUsageCallback,
+            runId,
           });
 
-          progressReporter.complete('Upload complete', result);
+          progressReporter.complete('Upload complete', { ...result, runId });
         } catch (error) {
           progressReporter.error(
             error instanceof Error ? error.message : 'Upload failed',

@@ -1,12 +1,15 @@
 export { ParsedScheduleRow } from './IExcelParser';
 import type { ParsedScheduleRow } from './IExcelParser';
 import type { IProgressReporter } from './IProgressReporter';
+import type { TokenUsageCallback } from './ITokenUsageRecorder';
 
 export interface ScheduleParseOptions {
   targetMonth: number;
   targetYear: number;
   filterActualOnly: boolean;
   progressReporter?: IProgressReporter;
+  tokenUsageCallback?: TokenUsageCallback;
+  runId?: string;
 }
 
 export interface ScheduleParseResult {

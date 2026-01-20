@@ -48,8 +48,9 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
         temperature: 0.1,
       });
 
-      if (options?.onTokenUsage) {
+      if (options?.onTokenUsage && options?.runId) {
         await options.onTokenUsage({
+          runId: options.runId,
           operation: 'delay_event_extraction',
           model: response.model,
           inputTokens: response.inputTokens,

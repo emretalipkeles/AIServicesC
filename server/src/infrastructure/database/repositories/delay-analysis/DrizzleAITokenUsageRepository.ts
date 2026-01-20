@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../../database';
 import { aiTokenUsage, type AITokenUsageRecord } from '@shared/schema';
-import type { IAITokenUsageRepository, TokenUsageSummary } from '../../../../domain/delay-analysis/repositories/IAITokenUsageRepository';
+import type { IAITokenUsageRepository, TokenUsageSummary, RunTokenUsageSummary } from '../../../../domain/delay-analysis/repositories/IAITokenUsageRepository';
 import { AITokenUsage } from '../../../../domain/delay-analysis/entities/AITokenUsage';
 
 export class DrizzleAITokenUsageRepository implements IAITokenUsageRepository {
@@ -9,6 +9,7 @@ export class DrizzleAITokenUsageRepository implements IAITokenUsageRepository {
     await db.insert(aiTokenUsage).values({
       id: usage.id,
       projectId: usage.projectId,
+      runId: usage.runId,
       operation: usage.operation,
       model: usage.model,
       inputTokens: usage.inputTokens,
@@ -26,18 +27,17 @@ export class DrizzleAITokenUsageRepository implements IAITokenUsageRepository {
       .where(eq(aiTokenUsage.projectId, projectId))
       .orderBy(aiTokenUsage.createdAt);
 
-    return records.map((record: AITokenUsageRecord) => AITokenUsage.fromPersistence({
-      id: record.id,
-      projectId: record.projectId,
-      operation: record.operation,
-      model: record.model,
-      inputTokens: record.inputTokens,
-      outputTokens: record.outputTokens,
-      totalTokens: record.totalTokens,
-      estimatedCostUsd: parseFloat(record.estimatedCostUsd),
-      metadata: record.metadata as Record<string, unknown> || {},
-      createdAt: record.createdAt || undefined,
-    }));
+    return this.mapRecordsToEntities(records);
+  }
+
+  async findByRunId(runId: string): Promise<AITokenUsage[]> {
+    const records = await db
+      .select()
+      .from(aiTokenUsage)
+      .where(eq(aiTokenUsage.runId, runId))
+      .orderBy(aiTokenUsage.createdAt);
+
+    return this.mapRecordsToEntities(records);
   }
 
   async getProjectSummary(projectId: string): Promise<TokenUsageSummary> {
@@ -45,12 +45,38 @@ export class DrizzleAITokenUsageRepository implements IAITokenUsageRepository {
     return this.buildSummary(records);
   }
 
+  async getRunSummary(runId: string): Promise<RunTokenUsageSummary | null> {
+    const records = await this.findByRunId(runId);
+    
+    if (records.length === 0) {
+      return null;
+    }
+
+    const baseSummary = this.buildSummary(records);
+    const sortedByTime = [...records].sort((a, b) => 
+      a.createdAt.getTime() - b.createdAt.getTime()
+    );
+
+    return {
+      ...baseSummary,
+      runId,
+      projectId: records[0].projectId,
+      startedAt: sortedByTime[0].createdAt,
+      endedAt: sortedByTime[sortedByTime.length - 1].createdAt,
+    };
+  }
+
   async getTotalUsage(): Promise<TokenUsageSummary> {
     const records = await db.select().from(aiTokenUsage);
-    
-    const usages = records.map((record: AITokenUsageRecord) => AITokenUsage.fromPersistence({
+    const usages = this.mapRecordsToEntities(records);
+    return this.buildSummary(usages);
+  }
+
+  private mapRecordsToEntities(records: AITokenUsageRecord[]): AITokenUsage[] {
+    return records.map((record: AITokenUsageRecord) => AITokenUsage.fromPersistence({
       id: record.id,
       projectId: record.projectId,
+      runId: record.runId,
       operation: record.operation,
       model: record.model,
       inputTokens: record.inputTokens,
@@ -60,8 +86,6 @@ export class DrizzleAITokenUsageRepository implements IAITokenUsageRepository {
       metadata: record.metadata as Record<string, unknown> || {},
       createdAt: record.createdAt || undefined,
     }));
-
-    return this.buildSummary(usages);
   }
 
   private buildSummary(records: AITokenUsage[]): TokenUsageSummary {

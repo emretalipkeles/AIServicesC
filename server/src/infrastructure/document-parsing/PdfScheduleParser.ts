@@ -6,6 +6,7 @@ import type {
   ScheduleParseResult 
 } from '../../domain/delay-analysis/interfaces/IScheduleParser';
 import type { IAIClient } from '../../domain/interfaces/IAIClient';
+import type { TokenUsageCallback } from '../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
 import { ModelId } from '../../domain/value-objects/ModelId';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 import { NoOpProgressReporter } from '../../domain/delay-analysis/interfaces/IProgressReporter';
@@ -100,7 +101,13 @@ export class PdfScheduleParser implements IScheduleParser {
         });
 
         try {
-          const batchRows = await this.parseWithAI(batches[i], options);
+          const batchRows = await this.parseWithAI(
+            batches[i], 
+            options,
+            options.tokenUsageCallback,
+            options.runId,
+            i + 1
+          );
           rows.push(...batchRows);
         } catch (batchError) {
           errors.push(`Batch ${i + 1}: ${batchError instanceof Error ? batchError.message : 'Parse error'}`);
@@ -182,7 +189,13 @@ export class PdfScheduleParser implements IScheduleParser {
     return false;
   }
 
-  private async parseWithAI(lines: string[], options: ScheduleParseOptions): Promise<ParsedScheduleRow[]> {
+  private async parseWithAI(
+    lines: string[], 
+    options: ScheduleParseOptions,
+    tokenUsageCallback?: TokenUsageCallback,
+    runId?: string,
+    batchNumber?: number
+  ): Promise<ParsedScheduleRow[]> {
     const prompt = `You are parsing CPM schedule data from a PDF. Extract structured activity data from these lines.
 
 Target month/year: ${options.targetMonth}/${options.targetYear}
@@ -216,6 +229,18 @@ Return ONLY the JSON array, no other text.`;
       model: modelId,
       messages: [AIMessage.user(prompt)],
     });
+
+    if (tokenUsageCallback && runId) {
+      await tokenUsageCallback({
+        operation: batchNumber !== undefined 
+          ? `schedule_parsing_batch_${batchNumber}` 
+          : 'schedule_parsing',
+        model: modelId.value,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        runId,
+      });
+    }
 
     const responseText = response.content;
     

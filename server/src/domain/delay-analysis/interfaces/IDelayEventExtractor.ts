@@ -17,6 +17,7 @@ export interface ExtractionResult {
 }
 
 export interface ExtractionOptions {
+  runId?: string;
   onTokenUsage?: TokenUsageCallback;
 }
 

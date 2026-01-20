@@ -19,6 +19,7 @@ export interface RunAnalysisResult {
 }
 
 export interface RunAnalysisOptions {
+  runId?: string;
   progressReporter?: IProgressReporter;
   onTokenUsage?: TokenUsageCallback;
 }
@@ -106,7 +107,7 @@ export class RunAnalysisCommandHandler {
               doc.rawContent!,
               doc.filename,
               doc.id,
-              { onTokenUsage: options?.onTokenUsage }
+              { runId: options?.runId, onTokenUsage: options?.onTokenUsage }
             );
 
             for (const extracted of extractionResult.events) {
@@ -219,7 +220,7 @@ export class RunAnalysisCommandHandler {
                 event.eventDescription,
                 event.eventStartDate,
                 activities,
-                { onTokenUsage: options?.onTokenUsage }
+                { runId: options?.runId, onTokenUsage: options?.onTokenUsage }
               );
 
               if (matchResult) {

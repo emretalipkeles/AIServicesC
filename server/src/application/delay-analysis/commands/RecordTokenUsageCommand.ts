@@ -1,6 +1,7 @@
 export interface RecordTokenUsageCommand {
   type: 'RecordTokenUsageCommand';
   projectId: string;
+  runId: string;
   operation: string;
   model: string;
   inputTokens: number;
@@ -10,6 +11,7 @@ export interface RecordTokenUsageCommand {
 
 export function createRecordTokenUsageCommand(
   projectId: string,
+  runId: string,
   operation: string,
   model: string,
   inputTokens: number,
@@ -19,6 +21,7 @@ export function createRecordTokenUsageCommand(
   return {
     type: 'RecordTokenUsageCommand',
     projectId,
+    runId,
     operation,
     model,
     inputTokens,

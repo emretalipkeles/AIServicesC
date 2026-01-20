@@ -84,8 +84,9 @@ export class AIActivityMatcher implements IActivityMatcher {
 
       console.log('[AIActivityMatcher] Raw AI response:', response.content);
 
-      if (options?.onTokenUsage) {
+      if (options?.onTokenUsage && options?.runId) {
         await options.onTokenUsage({
+          runId: options.runId,
           operation: 'activity_matching',
           model: response.model,
           inputTokens: response.inputTokens,

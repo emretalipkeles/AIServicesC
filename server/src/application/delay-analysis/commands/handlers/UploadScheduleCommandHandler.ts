@@ -6,6 +6,7 @@ import type { IScheduleActivityRepository } from '../../../../domain/delay-analy
 import type { IScheduleParserFactory } from '../../../../domain/delay-analysis/interfaces/IScheduleParserFactory';
 import type { IProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
+import type { TokenUsageCallback } from '../../../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
 import { ProjectDocument } from '../../../../domain/delay-analysis/entities/ProjectDocument';
 import { ScheduleActivity } from '../../../../domain/delay-analysis/entities/ScheduleActivity';
 import type { ParsedScheduleRow } from '../../../../domain/delay-analysis/interfaces/IExcelParser';
@@ -22,6 +23,8 @@ export interface UploadScheduleResult {
 
 export interface UploadScheduleOptions {
   progressReporter?: IProgressReporter;
+  tokenUsageCallback?: TokenUsageCallback;
+  runId?: string;
 }
 
 export class UploadScheduleCommandHandler {
@@ -89,6 +92,8 @@ export class UploadScheduleCommandHandler {
           targetYear: command.targetYear,
           filterActualOnly: true,
           progressReporter: progress,
+          tokenUsageCallback: options?.tokenUsageCallback,
+          runId: options?.runId,
         }
       );
 

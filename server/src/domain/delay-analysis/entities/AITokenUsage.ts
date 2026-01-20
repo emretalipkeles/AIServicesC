@@ -1,6 +1,7 @@
 export interface AITokenUsageProps {
   id?: string;
   projectId: string;
+  runId: string;
   operation: string;
   model: string;
   inputTokens: number;
@@ -14,6 +15,7 @@ export interface AITokenUsageProps {
 export class AITokenUsage {
   public readonly id: string;
   public readonly projectId: string;
+  public readonly runId: string;
   public readonly operation: string;
   public readonly model: string;
   public readonly inputTokens: number;
@@ -26,6 +28,7 @@ export class AITokenUsage {
   private constructor(props: AITokenUsageProps) {
     this.id = props.id || crypto.randomUUID();
     this.projectId = props.projectId;
+    this.runId = props.runId;
     this.operation = props.operation;
     this.model = props.model;
     this.inputTokens = props.inputTokens;
@@ -39,6 +42,9 @@ export class AITokenUsage {
   static create(props: AITokenUsageProps): AITokenUsage {
     if (props.inputTokens < 0 || props.outputTokens < 0) {
       throw new Error('Token counts cannot be negative');
+    }
+    if (!props.runId || props.runId.trim().length === 0) {
+      throw new Error('runId is required');
     }
     return new AITokenUsage(props);
   }
