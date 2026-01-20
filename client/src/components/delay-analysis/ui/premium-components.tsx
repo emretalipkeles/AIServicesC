@@ -229,13 +229,23 @@ export function HeroHeader({ title, subtitle, badge, onBack, actions, stats }: H
   );
 }
 
+interface UploadIndicator {
+  type: 'schedule' | 'document';
+  percentage?: number;
+  isIndeterminate?: boolean;
+  count?: number;
+}
+
 interface PremiumTabsProps {
   tabs: Array<{ value: string; label: string; icon: LucideIcon }>;
   value: string;
   onChange: (value: string) => void;
+  uploadIndicators?: UploadIndicator[];
 }
 
-export function PremiumTabs({ tabs, value, onChange }: PremiumTabsProps) {
+export function PremiumTabs({ tabs, value, onChange, uploadIndicators }: PremiumTabsProps) {
+  const activeIndicators = uploadIndicators?.filter(i => i.percentage !== undefined || i.isIndeterminate) || [];
+  
   return (
     <div className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-xl border border-border/50">
       {tabs.map((tab) => {
@@ -268,6 +278,120 @@ export function PremiumTabs({ tabs, value, onChange }: PremiumTabsProps) {
           </motion.button>
         );
       })}
+      
+      {activeIndicators.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          className="ml-auto flex items-center gap-2"
+        >
+          {activeIndicators.map((indicator, idx) => (
+            <CompactUploadIndicator key={idx} {...indicator} />
+          ))}
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+interface CompactUploadIndicatorProps {
+  type: 'schedule' | 'document';
+  percentage?: number;
+  isIndeterminate?: boolean;
+  count?: number;
+}
+
+function CompactUploadIndicator({ type, percentage, isIndeterminate, count }: CompactUploadIndicatorProps) {
+  const size = 28;
+  const strokeWidth = 3;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  
+  const colors = {
+    schedule: { stroke: '#a855f7', bg: 'rgba(168, 85, 247, 0.2)', text: 'text-purple-500' },
+    document: { stroke: '#3b82f6', bg: 'rgba(59, 130, 246, 0.2)', text: 'text-blue-500' },
+  };
+  
+  const color = colors[type];
+  const displayLabel = type === 'schedule' ? 'Schedule' : 'Document';
+  
+  if (isIndeterminate) {
+    return (
+      <div 
+        className="relative flex items-center justify-center"
+        title={`${displayLabel} upload${count ? `: ${count} file${count !== 1 ? 's' : ''}` : ''}`}
+      >
+        <svg width={size} height={size} className="transform -rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={color.bg}
+            strokeWidth={strokeWidth}
+          />
+          <motion.circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={color.stroke}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={`${circumference * 0.25} ${circumference * 0.75}`}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            style={{ transformOrigin: 'center' }}
+          />
+        </svg>
+        {count && (
+          <span 
+            className={cn("absolute text-[9px] font-bold", color.text)}
+          >
+            {count}
+          </span>
+        )}
+      </div>
+    );
+  }
+  
+  const pct = percentage ?? 0;
+  const offset = circumference - (pct / 100) * circumference;
+  
+  return (
+    <div 
+      className="relative flex items-center justify-center"
+      title={`${displayLabel} upload: ${Math.round(pct)}%`}
+    >
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color.bg}
+          strokeWidth={strokeWidth}
+        />
+        <motion.circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color.stroke}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        />
+      </svg>
+      <span 
+        className={cn("absolute text-[9px] font-bold", color.text)}
+      >
+        {Math.round(pct)}
+      </span>
     </div>
   );
 }

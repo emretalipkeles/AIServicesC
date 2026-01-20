@@ -32,6 +32,8 @@ const statusConfig: Record<string, { icon: typeof Clock; color: string; bgColor:
   failed: { icon: AlertCircle, color: "text-red-600 dark:text-red-400", bgColor: "bg-red-500/10", label: "Failed" },
 };
 
+type FilterType = ProjectDocumentType | "all";
+
 export function DocumentUpload({ projectId }: DocumentUploadProps) {
   const { data: documents = [], isLoading } = useProjectDocuments(projectId);
   const uploadDocuments = useUploadDocuments();
@@ -39,6 +41,7 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
   const { toast } = useToast();
 
   const [selectedType, setSelectedType] = useState<ProjectDocumentType>("idr");
+  const [filterType, setFilterType] = useState<FilterType>("all");
   const [isDragOver, setIsDragOver] = useState(false);
   const uploadSectionRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +56,10 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
     uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const filteredDocuments = filterType === "all" 
+    ? documents 
+    : documents.filter(d => d.documentType === filterType);
+  
   const completedDocs = documents.filter(d => d.status === 'completed').length;
   const pendingDocs = documents.filter(d => d.status === 'pending' || d.status === 'processing').length;
   const failedDocs = documents.filter(d => d.status === 'failed').length;
@@ -173,7 +180,27 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
             </Button>
           }
         />
-        <div className="p-6">
+        <div className="p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Filter by type:</label>
+            <Select value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
+              <SelectTrigger className={cn(selectTriggerStyles, "w-[260px]")}>
+                <SelectValue placeholder="All Documents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Documents</SelectItem>
+                {Object.entries(documentTypeLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {filterType !== "all" && (
+              <span className="text-xs text-muted-foreground">
+                Showing {filteredDocuments.length} of {documents.length}
+              </span>
+            )}
+          </div>
+
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -192,11 +219,21 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
                 Upload Inspector Daily Reports, NCRs, or Field Memos to begin delay analysis
               </p>
             </motion.div>
+          ) : filteredDocuments.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-8 text-center"
+            >
+              <p className="text-sm text-muted-foreground">
+                No documents match the selected filter
+              </p>
+            </motion.div>
           ) : (
             <ScrollArea className="h-[400px] pr-4">
               <div className="space-y-2">
                 <AnimatePresence>
-                  {documents.map((doc, index) => (
+                  {filteredDocuments.map((doc, index) => (
                     <DocumentRow 
                       key={doc.id} 
                       doc={doc} 
