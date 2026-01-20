@@ -11,6 +11,7 @@ import { Calendar, Upload, FileSpreadsheet, Trash2, FileText, Loader2 } from "lu
 import { useScheduleActivities, useDeleteAllActivities, uploadScheduleWithProgress, type ProgressEvent } from "@/lib/schedule-api";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 
 interface ScheduleUploadProps {
   projectId: string;
@@ -162,7 +163,13 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString();
+    try {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      return format(date, "d-MMM-yy");
+    } catch {
+      return "-";
+    }
   };
 
   return (

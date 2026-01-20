@@ -2,6 +2,14 @@ import type { ListScheduleActivitiesQuery } from '../ListScheduleActivitiesQuery
 import type { IScheduleActivityRepository } from '../../../../domain/delay-analysis/repositories/IScheduleActivityRepository';
 import type { ScheduleActivity } from '../../../../domain/delay-analysis/entities/ScheduleActivity';
 
+function formatDateOnly(date: Date | null): string | null {
+  if (!date) return null;
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export interface ScheduleActivityDto {
   id: string;
   activityId: string;
@@ -35,10 +43,10 @@ export class ListScheduleActivitiesQueryHandler {
       activityId: activity.activityId,
       wbs: activity.wbs,
       activityDescription: activity.activityDescription,
-      plannedStartDate: activity.plannedStartDate?.toISOString() ?? null,
-      plannedFinishDate: activity.plannedFinishDate?.toISOString() ?? null,
-      actualStartDate: activity.actualStartDate?.toISOString() ?? null,
-      actualFinishDate: activity.actualFinishDate?.toISOString() ?? null,
+      plannedStartDate: formatDateOnly(activity.plannedStartDate),
+      plannedFinishDate: formatDateOnly(activity.plannedFinishDate),
+      actualStartDate: formatDateOnly(activity.actualStartDate),
+      actualFinishDate: formatDateOnly(activity.actualFinishDate),
       scheduleUpdateMonth: activity.scheduleUpdateMonth,
       isCriticalPath: activity.isCriticalPath,
       sourceDocumentId: activity.sourceDocumentId,

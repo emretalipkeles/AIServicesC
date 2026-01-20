@@ -26,7 +26,9 @@ export class ListProjectDocumentsQueryHandler {
       query.tenantId
     );
 
-    return documents.map(doc => ({
+    const filteredDocuments = documents.filter(doc => doc.documentType !== 'cpm_schedule');
+
+    return filteredDocuments.map(doc => ({
       id: doc.id,
       projectId: doc.projectId,
       filename: doc.filename,
