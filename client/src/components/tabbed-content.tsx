@@ -1,11 +1,12 @@
 import { useRef, useEffect } from "react";
-import { Map as MapIcon, Plus, Bot, X, Activity, type LucideIcon } from "lucide-react";
+import { Map as MapIcon, Bot, X, Activity, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { JourneyDashboard } from "./journey-dashboard";
 import { AgentSetup } from "./agent-setup";
 import { DelayAnalysis } from "./delay-analysis";
 import { ThemeToggle } from "./theme-toggle";
 import { SettingsMenu } from "./settings-menu";
+import { AddMenu } from "./add-menu";
 import { useTabContext, type Tab } from "@/contexts/tab-context";
 import PackageVisualization from "@/pages/package-visualization";
 
@@ -125,14 +126,7 @@ export function TabbedContent() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground"
-            data-testid="button-add-tab"
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
+          <AddMenu onNavigate={handleSettingsNavigate} />
           <SettingsMenu onNavigate={handleSettingsNavigate} />
           <ThemeToggle />
         </div>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { 
   Settings, Bot, Users, Database, Bell, Shield, 
   Palette, Globe, ChevronRight, Sparkles, Zap,
-  FileText, Key, Mail, Webhook, Activity
+  FileText, Key, Mail, Webhook
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,7 +29,6 @@ const settingsCategories: SettingsCategory[] = [
     color: "from-primary to-primary/70",
     items: [
       { id: "agent-setup", label: "Agent Setup", icon: Bot },
-      { id: "delay-analysis", label: "Delay Analysis", icon: Activity },
       { id: "knowledge-base", label: "Knowledge Base", icon: FileText },
       { id: "ai-models", label: "AI Models", icon: Sparkles },
     ],
