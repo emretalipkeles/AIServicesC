@@ -1,5 +1,5 @@
 import type { IDocumentParser, ParsedDocumentResult } from '../../domain/delay-analysis/interfaces/IDocumentParser';
-import * as pdfParse from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 
 export class PdfDocumentParser implements IDocumentParser {
   private readonly supportedTypes = [
@@ -11,21 +11,24 @@ export class PdfDocumentParser implements IDocumentParser {
   }
 
   async parse(buffer: Buffer, filename: string): Promise<ParsedDocumentResult> {
+    const parser = new PDFParse({ data: buffer });
     try {
-      const pdf = (pdfParse as any).default || pdfParse;
-      const data = await pdf(buffer);
+      const pdfData = await parser.getText();
+      const text = pdfData.text;
       
       return {
-        rawContent: data.text,
+        rawContent: text,
         metadata: {
-          pageCount: data.numpages,
-          title: data.info?.Title || undefined,
-          author: data.info?.Author || undefined,
-          createdDate: data.info?.CreationDate ? new Date(data.info.CreationDate) : undefined,
+          pageCount: pdfData.pages?.length || 1,
+          title: undefined,
+          author: undefined,
+          createdDate: undefined,
         },
       };
     } catch (error) {
       throw new Error(`Failed to parse PDF ${filename}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      await parser.destroy();
     }
   }
 }
