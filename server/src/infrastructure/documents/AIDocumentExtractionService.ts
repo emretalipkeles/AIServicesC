@@ -210,7 +210,7 @@ ${base64Content}`;
 
     try {
       const response = await aiClient.chat({
-        model: ModelId.sonnet(),
+        model: ModelId.gpt52(),
         messages: [AIMessage.user(userMessage)],
         systemPrompt,
         maxTokens: 100000,

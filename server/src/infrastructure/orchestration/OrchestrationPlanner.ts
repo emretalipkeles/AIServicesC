@@ -66,7 +66,7 @@ Analyze which agent(s) should handle this question and create an execution plan.
 
     try {
       const response = await this.aiClient.chat({
-        model: ModelId.sonnet(),
+        model: ModelId.gpt52(),
         systemPrompt: PLANNING_SYSTEM_PROMPT,
         messages: [AIMessage.user(userPrompt)],
         maxTokens: 1024,

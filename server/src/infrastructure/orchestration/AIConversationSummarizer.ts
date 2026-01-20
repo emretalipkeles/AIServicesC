@@ -43,7 +43,7 @@ export class AIConversationSummarizer implements IConversationSummarizer {
     const conversationText = this.formatMessagesForSummarization(messages);
     
     const chatResponse = await this.aiClient.chat({
-      model: ModelId.sonnet(),
+      model: ModelId.gpt52(),
       messages: [AIMessage.user(`Summarize this conversation:\n\n${conversationText}`)],
       systemPrompt: SUMMARIZATION_PROMPT,
       maxTokens: 2000,

@@ -36,7 +36,7 @@ export class AIClientFactory implements IAIClientFactory {
 
   private getOpenAIClient(): IAIClient | null {
     if (!this.openAIInitialized) {
-      const apiKey = process.env.OPENAI_API_KEY;
+      const apiKey = process.env.OPEN_AI_KEY;
       if (apiKey) {
         this.openAIClient = new OpenAIResponsesClient(apiKey);
       }
@@ -51,7 +51,7 @@ export class AIClientFactory implements IAIClientFactory {
     }
     
     if (model.isOpenAI()) {
-      return !!process.env.OPENAI_API_KEY;
+      return !!process.env.OPEN_AI_KEY;
     }
 
     return false;

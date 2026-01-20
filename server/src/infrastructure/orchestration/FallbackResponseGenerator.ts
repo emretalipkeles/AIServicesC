@@ -47,7 +47,7 @@ Please respond to the user based on the conversation context. If the user is ref
 
     await this.aiClient.streamChat(
       {
-        model: ModelId.sonnet(),
+        model: ModelId.gpt52(),
         systemPrompt: FALLBACK_SYSTEM_PROMPT,
         messages: [AIMessage.user(userPrompt)],
         maxTokens: 512,
