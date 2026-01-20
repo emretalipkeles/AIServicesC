@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Sparkles, Bot, User, Paperclip, MoreHorizontal, Loader2, Package, ExternalLink, Upload } from "lucide-react";
+import { Send, Sparkles, Bot, User, Paperclip, MoreHorizontal, Loader2, Package, ExternalLink, Upload, PanelLeftClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AgentSelector } from "./agent-selector";
@@ -39,7 +39,11 @@ interface OrchestrationProgress {
   packageId?: string;
 }
 
-export function AIChatPanel() {
+interface AIChatPanelProps {
+  onCollapse?: () => void;
+}
+
+export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
   const tabContext = useOptionalTabContext();
   const openPackageTab = tabContext?.openPackageTab;
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -722,9 +726,22 @@ export function AIChatPanel() {
             <p className="text-xs text-muted-foreground leading-tight" data-testid="text-chat-subtitle"></p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" data-testid="button-chat-options">
-          <MoreHorizontal className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" data-testid="button-chat-options">
+            <MoreHorizontal className="w-4 h-4" />
+          </Button>
+          {onCollapse && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onCollapse}
+              title="Collapse panel"
+              data-testid="button-collapse-panel"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <ScrollArea className="flex-1 px-3 discreet-scroll overflow-x-hidden" ref={scrollAreaRef}>
