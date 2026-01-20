@@ -71,12 +71,7 @@ export class AnalysisController {
     try {
       const params = runAnalysisParamsSchema.parse(req.params);
 
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no');
-      res.flushHeaders();
-
+      // SSEProgressReporter handles all SSE setup (headers, flush, connection handling)
       const progressReporter = new SSEProgressReporter(res);
 
       const extractFromDocuments = req.query.extractFromDocuments !== 'false';
