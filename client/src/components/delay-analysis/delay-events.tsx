@@ -7,7 +7,7 @@ import { Activity, Play, Download, Loader2, DollarSign, CheckCircle, AlertCircle
 import { useDelayEvents, getExportUrl, runAnalysisWithProgress, fetchRunTokenUsage, type AnalysisProgressEvent, type RunTokenUsageSummary } from "@/lib/analysis-api";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { GlassCard, SectionHeader, ProgressIndicator, StatCard } from "./ui/premium-components";
+import { GlassCard, SectionHeader, ProgressIndicator, StatCard, TableFilter } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 
 interface DelayEventsProps {
@@ -21,6 +21,7 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progressState, setProgressState] = useState<AnalysisProgressEvent | null>(null);
   const [lastRunCost, setLastRunCost] = useState<RunTokenUsageSummary | null>(null);
+  const [filterText, setFilterText] = useState("");
 
   const matchedEvents = events.filter(e => e.cpmActivityId !== null);
   const highConfidence = matchedEvents.filter(e => (e.matchConfidence ?? 0) >= 80);
@@ -190,15 +191,32 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
               </motion.div>
             </motion.div>
           ) : (
-            <ScrollArea className="h-[500px]">
-              <div className="space-y-3">
+            <div className="space-y-4">
+              <TableFilter
+                value={filterText}
+                onChange={setFilterText}
+                placeholder="Filter by description, category, or activity..."
+                className="max-w-md"
+              />
+              <div className="space-y-3 max-h-[500px] overflow-auto">
                 <AnimatePresence>
-                  {events.map((event, index) => (
-                    <EventCard key={event.id} event={event} index={index} />
-                  ))}
+                  {events
+                    .filter(event => {
+                      if (!filterText) return true;
+                      const search = filterText.toLowerCase();
+                      return (
+                        event.eventDescription.toLowerCase().includes(search) ||
+                        (event.eventCategory || "").toLowerCase().includes(search) ||
+                        (event.cpmActivityId || "").toLowerCase().includes(search) ||
+                        (event.cpmActivityDescription || "").toLowerCase().includes(search)
+                      );
+                    })
+                    .map((event, index) => (
+                      <EventCard key={event.id} event={event} index={index} />
+                    ))}
                 </AnimatePresence>
               </div>
-            </ScrollArea>
+            </div>
           )}
         </div>
       </GlassCard>

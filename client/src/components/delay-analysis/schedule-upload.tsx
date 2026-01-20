@@ -3,13 +3,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, FileSpreadsheet, Trash2, FileText, Loader2, DollarSign, CheckCircle, Clock, AlertTriangle } from "lucide-react";
+import { Calendar, FileSpreadsheet, Trash2, FileText, Loader2, DollarSign, CheckCircle, Clock, Search } from "lucide-react";
 import { useScheduleActivities, useDeleteAllActivities, uploadScheduleWithProgress, type ProgressEvent } from "@/lib/schedule-api";
 import { fetchRunTokenUsage, type RunTokenUsageSummary } from "@/lib/analysis-api";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { GlassCard, SectionHeader, UploadZone, ProgressIndicator, StatCard, tableHeaderStyles, tableHeaderCellStyles, selectTriggerStyles } from "./ui/premium-components";
+import { GlassCard, SectionHeader, UploadZone, ProgressIndicator, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles, selectTriggerStyles } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 
 interface ScheduleUploadProps {
@@ -41,13 +41,13 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [progressState, setProgressState] = useState<ProgressEvent | null>(null);
   const [lastUploadCost, setLastUploadCost] = useState<RunTokenUsageSummary | null>(null);
+  const [filterText, setFilterText] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: activities = [], isLoading } = useScheduleActivities(projectId);
   const deleteMutation = useDeleteAllActivities();
 
-  const criticalActivities = activities.filter(a => a.isCriticalPath === "yes").length;
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -187,10 +187,9 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <StatCard label="Total Activities" value={activities.length} icon={Calendar} />
-        <StatCard label="Critical Path" value={criticalActivities} icon={AlertTriangle} color="danger" />
-        <StatCard label="On Track" value={activities.length - criticalActivities} icon={CheckCircle} color="success" />
+        <StatCard label="With Actual Dates" value={activities.filter(a => a.actualStartDate || a.actualFinishDate).length} icon={CheckCircle} color="success" />
       </div>
 
       <GlassCard>
@@ -328,55 +327,57 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
               </p>
             </motion.div>
           ) : (
-            <div className="rounded-xl border border-border/50 overflow-auto max-h-[500px]">
-              <table className="w-full">
-                <thead className={tableHeaderStyles}>
-                  <tr>
-                    <th className={tableHeaderCellStyles}>Activity ID</th>
-                    <th className={tableHeaderCellStyles}>WBS</th>
-                    <th className={cn(tableHeaderCellStyles, "min-w-[200px]")}>Description</th>
-                    <th className={tableHeaderCellStyles}>Actual Start</th>
-                    <th className={tableHeaderCellStyles}>Actual Finish</th>
-                    <th className={tableHeaderCellStyles}>Critical</th>
-                  </tr>
-                </thead>
+            <div className="space-y-4">
+              <TableFilter
+                value={filterText}
+                onChange={setFilterText}
+                placeholder="Filter by Activity ID, WBS, or Description..."
+                className="max-w-md"
+              />
+              <div className="rounded-xl border border-border/50 overflow-auto max-h-[500px]">
+                <table className="w-full">
+                  <thead className={tableHeaderStyles}>
+                    <tr>
+                      <th className={tableHeaderCellStyles}>Activity ID</th>
+                      <th className={tableHeaderCellStyles}>WBS</th>
+                      <th className={cn(tableHeaderCellStyles, "min-w-[200px]")}>Description</th>
+                      <th className={tableHeaderCellStyles}>Actual Start</th>
+                      <th className={tableHeaderCellStyles}>Actual Finish</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     <AnimatePresence>
-                      {activities.map((activity, index) => (
-                        <motion.tr
-                          key={activity.id}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: index * 0.02 }}
-                          className="border-b border-border/30 hover:bg-muted/20 transition-colors"
-                        >
-                          <td className="p-3 font-mono text-sm">{activity.activityId}</td>
-                          <td className="p-3 font-mono text-sm text-muted-foreground">{activity.wbs || "-"}</td>
-                          <td className="p-3 max-w-[300px] truncate" title={activity.activityDescription}>
-                            {activity.activityDescription}
-                          </td>
-                          <td className="p-3 text-sm">{formatDate(activity.actualStartDate)}</td>
-                          <td className="p-3 text-sm">{formatDate(activity.actualFinishDate)}</td>
-                          <td className="p-3">
-                            {activity.isCriticalPath === "yes" ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 ring-1 ring-red-500/20">
-                                Critical
-                              </span>
-                            ) : activity.isCriticalPath === "no" ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400">
-                                No
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                                Unknown
-                              </span>
-                            )}
-                          </td>
-                        </motion.tr>
-                      ))}
+                      {activities
+                        .filter(activity => {
+                          if (!filterText) return true;
+                          const search = filterText.toLowerCase();
+                          return (
+                            activity.activityId.toLowerCase().includes(search) ||
+                            (activity.wbs || "").toLowerCase().includes(search) ||
+                            activity.activityDescription.toLowerCase().includes(search)
+                          );
+                        })
+                        .map((activity, index) => (
+                          <motion.tr
+                            key={activity.id}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: index * 0.02 }}
+                            className="border-b border-border/30 hover:bg-muted/20 transition-colors"
+                          >
+                            <td className="p-3 font-mono text-sm">{activity.activityId}</td>
+                            <td className="p-3 font-mono text-sm text-muted-foreground">{activity.wbs || "-"}</td>
+                            <td className="p-3 max-w-[300px] truncate" title={activity.activityDescription}>
+                              {activity.activityDescription}
+                            </td>
+                            <td className="p-3 text-sm">{formatDate(activity.actualStartDate)}</td>
+                            <td className="p-3 text-sm">{formatDate(activity.actualFinishDate)}</td>
+                          </motion.tr>
+                        ))}
                     </AnimatePresence>
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

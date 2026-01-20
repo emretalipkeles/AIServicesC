@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  ArrowLeft, Save, FileText, Calendar, Upload, BarChart3, Activity, 
-  AlertCircle, Loader2, Clock, CheckCircle2, FolderOpen
+  ArrowLeft, Save, Calendar, Upload, BarChart3, Activity, 
+  AlertCircle, Loader2, CheckCircle2, FolderOpen
 } from "lucide-react";
 import { format } from "date-fns";
 import { DocumentUpload } from "./document-upload";
@@ -218,54 +218,6 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
                 {activeTab === "results" && <AnalysisResults projectId={projectId} />}
               </motion.div>
             </AnimatePresence>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <GlassCard>
-                <div className="p-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <FileText className="w-5 h-5 text-primary" />
-                    </div>
-                    <h3 className="text-lg font-semibold">Project Information</h3>
-                  </div>
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                    <InfoItem 
-                      icon={Clock} 
-                      label="Created" 
-                      value={format(new Date(project.createdAt), "MMM d, yyyy")} 
-                    />
-                    <InfoItem 
-                      icon={Clock} 
-                      label="Last Updated" 
-                      value={format(new Date(project.updatedAt), "MMM d, yyyy")} 
-                    />
-                    <InfoItem 
-                      icon={Calendar} 
-                      label="Notice to Proceed" 
-                      value={project.noticeToProceedDate 
-                        ? format(new Date(project.noticeToProceedDate), "MMM d, yyyy")
-                        : "Not set"} 
-                    />
-                    <InfoItem 
-                      icon={Activity} 
-                      label="Status" 
-                      value={project.status.charAt(0).toUpperCase() + project.status.slice(1)} 
-                      highlight={project.status === "active"}
-                    />
-                  </div>
-                  {project.description && (
-                    <div className="mt-6 pt-6 border-t border-border/50">
-                      <p className="text-sm font-medium text-muted-foreground mb-2">Description</p>
-                      <p className="text-foreground">{project.description}</p>
-                    </div>
-                  )}
-                </div>
-              </GlassCard>
-            </motion.div>
           </>
         )}
       </div>
@@ -273,29 +225,3 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
   );
 }
 
-interface InfoItemProps {
-  icon: typeof Clock;
-  label: string;
-  value: string;
-  highlight?: boolean;
-}
-
-function InfoItem({ icon: Icon, label, value, highlight }: InfoItemProps) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className={cn(
-        "w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0",
-        highlight ? "bg-green-500/10 text-green-600 dark:text-green-400" : "bg-muted/50 text-muted-foreground"
-      )}>
-        <Icon className="w-4 h-4" />
-      </div>
-      <div>
-        <p className="text-xs text-muted-foreground font-medium">{label}</p>
-        <p className={cn(
-          "font-medium",
-          highlight && "text-green-600 dark:text-green-400"
-        )}>{value}</p>
-      </div>
-    </div>
-  );
-}

@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Download, CheckCircle, AlertCircle, Clock, TrendingUp } from "lucide-react";
 import { useDelayEvents, getExportUrl } from "@/lib/analysis-api";
-import { GlassCard, SectionHeader, StatCard, tableHeaderStyles, tableHeaderCellStyles } from "./ui/premium-components";
+import { GlassCard, SectionHeader, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 
 interface AnalysisResultsProps {
@@ -11,6 +12,7 @@ interface AnalysisResultsProps {
 
 export function AnalysisResults({ projectId }: AnalysisResultsProps) {
   const { data: events = [], isLoading } = useDelayEvents(projectId);
+  const [filterText, setFilterText] = useState("");
 
   const matchedEvents = events.filter(e => e.cpmActivityId !== null);
   const highConfidence = matchedEvents.filter(e => (e.matchConfidence ?? 0) >= 80);
@@ -96,6 +98,13 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                 </div>
               </div>
 
+              <TableFilter
+                value={filterText}
+                onChange={setFilterText}
+                placeholder="Filter by activity, WBS, or description..."
+                className="max-w-md"
+              />
+
               <div className="rounded-xl border border-border/50 overflow-auto max-h-[500px]">
                 <table className="w-full">
                   <thead className={tableHeaderStyles}>
@@ -111,35 +120,46 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                   </thead>
                   <tbody>
                     <AnimatePresence>
-                      {matchedEvents.map((event, index) => (
-                        <motion.tr
-                          key={event.id}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: index * 0.02 }}
-                          className="border-b border-border/30 hover:bg-muted/20 transition-colors group"
-                        >
-                          <td className="p-3 font-mono text-sm text-muted-foreground">{event.wbs || "-"}</td>
-                          <td className="p-3 font-mono text-sm text-primary font-medium">{event.cpmActivityId}</td>
-                          <td className="p-3 max-w-[150px] truncate text-sm" title={event.cpmActivityDescription || ""}>
-                            {event.cpmActivityDescription || "-"}
-                          </td>
-                          <td className="p-3 max-w-[200px] text-sm">
-                            <span className="line-clamp-2" title={event.eventDescription}>
-                              {event.eventDescription}
-                            </span>
-                          </td>
-                          <td className="p-3 text-sm text-muted-foreground">{formatDate(event.eventStartDate)}</td>
-                          <td className="p-3 text-sm">
-                            {event.impactDurationHours ? (
-                              <span className="font-medium">{event.impactDurationHours}h</span>
-                            ) : "-"}
-                          </td>
-                          <td className="p-3">
-                            <ConfidenceBadge confidence={event.matchConfidence} />
-                          </td>
-                        </motion.tr>
-                      ))}
+                      {matchedEvents
+                        .filter(event => {
+                          if (!filterText) return true;
+                          const search = filterText.toLowerCase();
+                          return (
+                            (event.wbs || "").toLowerCase().includes(search) ||
+                            (event.cpmActivityId || "").toLowerCase().includes(search) ||
+                            (event.cpmActivityDescription || "").toLowerCase().includes(search) ||
+                            event.eventDescription.toLowerCase().includes(search)
+                          );
+                        })
+                        .map((event, index) => (
+                          <motion.tr
+                            key={event.id}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: index * 0.02 }}
+                            className="border-b border-border/30 hover:bg-muted/20 transition-colors group"
+                          >
+                            <td className="p-3 font-mono text-sm text-muted-foreground">{event.wbs || "-"}</td>
+                            <td className="p-3 font-mono text-sm text-primary font-medium">{event.cpmActivityId}</td>
+                            <td className="p-3 max-w-[150px] truncate text-sm" title={event.cpmActivityDescription || ""}>
+                              {event.cpmActivityDescription || "-"}
+                            </td>
+                            <td className="p-3 max-w-[200px] text-sm">
+                              <span className="line-clamp-2" title={event.eventDescription}>
+                                {event.eventDescription}
+                              </span>
+                            </td>
+                            <td className="p-3 text-sm text-muted-foreground">{formatDate(event.eventStartDate)}</td>
+                            <td className="p-3 text-sm">
+                              {event.impactDurationHours ? (
+                                <span className="font-medium">{event.impactDurationHours}h</span>
+                              ) : "-"}
+                            </td>
+                            <td className="p-3">
+                              <ConfidenceBadge confidence={event.matchConfidence} />
+                            </td>
+                          </motion.tr>
+                        ))}
                     </AnimatePresence>
                   </tbody>
                 </table>
