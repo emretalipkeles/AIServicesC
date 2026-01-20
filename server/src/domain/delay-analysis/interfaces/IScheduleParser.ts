@@ -1,10 +1,12 @@
 export { ParsedScheduleRow } from './IExcelParser';
 import type { ParsedScheduleRow } from './IExcelParser';
+import type { IProgressReporter } from './IProgressReporter';
 
 export interface ScheduleParseOptions {
   targetMonth: number;
   targetYear: number;
   filterActualOnly: boolean;
+  progressReporter?: IProgressReporter;
 }
 
 export interface ScheduleParseResult {

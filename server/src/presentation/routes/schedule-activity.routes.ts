@@ -4,6 +4,9 @@ import type { AppContainer } from '../../infrastructure/bootstrap';
 import { ScheduleActivityController } from '../controllers/ScheduleActivityController';
 import { UploadScheduleCommandHandler } from '../../application/delay-analysis/commands/handlers/UploadScheduleCommandHandler';
 import { ListScheduleActivitiesQueryHandler } from '../../application/delay-analysis/queries/handlers/ListScheduleActivitiesQueryHandler';
+import { SSEProgressReporter } from '../../infrastructure/document-parsing/SSEProgressReporter';
+import type { UploadScheduleCommand } from '../../application/delay-analysis/commands/UploadScheduleCommand';
+import { uploadScheduleParamsSchema, uploadScheduleBodySchema } from '../validators/scheduleValidators';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -64,5 +67,67 @@ export function registerScheduleActivityRoutes(app: Express, container: AppConta
   app.delete(
     '/api/delay-analysis/projects/:projectId/schedule/activities',
     (req, res) => controller.deleteAllByProject(req, res)
+  );
+
+  app.post(
+    '/api/delay-analysis/projects/:projectId/schedule/stream',
+    upload.single('file'),
+    async (req, res) => {
+      try {
+        const paramsResult = uploadScheduleParamsSchema.safeParse(req.params);
+        if (!paramsResult.success) {
+          res.status(400).json({ error: paramsResult.error.message });
+          return;
+        }
+
+        const bodyResult = uploadScheduleBodySchema.safeParse({
+          targetMonth: Number(req.body.targetMonth),
+          targetYear: Number(req.body.targetYear),
+        });
+        if (!bodyResult.success) {
+          res.status(400).json({ error: bodyResult.error.message });
+          return;
+        }
+
+        const file = req.file;
+        if (!file) {
+          res.status(400).json({ error: 'No file uploaded' });
+          return;
+        }
+
+        const progressReporter = new SSEProgressReporter(res);
+
+        const command: UploadScheduleCommand = {
+          projectId: paramsResult.data.projectId,
+          tenantId: 'default',
+          file: {
+            buffer: file.buffer,
+            filename: file.originalname,
+            contentType: file.mimetype,
+          },
+          targetMonth: bodyResult.data.targetMonth,
+          targetYear: bodyResult.data.targetYear,
+        };
+
+        try {
+          const result = await uploadScheduleHandler.execute(command, {
+            progressReporter,
+          });
+
+          progressReporter.complete('Upload complete', result);
+        } catch (error) {
+          progressReporter.error(
+            error instanceof Error ? error.message : 'Upload failed',
+            error instanceof Error ? error : undefined
+          );
+        }
+      } catch (error) {
+        if (!res.headersSent) {
+          res.status(500).json({
+            error: error instanceof Error ? error.message : 'Internal server error',
+          });
+        }
+      }
+    }
   );
 }

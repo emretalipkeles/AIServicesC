@@ -6,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar, Upload, FileSpreadsheet, Trash2, FileText } from "lucide-react";
-import { useScheduleActivities, useUploadSchedule, useDeleteAllActivities } from "@/lib/schedule-api";
+import { Progress } from "@/components/ui/progress";
+import { Calendar, Upload, FileSpreadsheet, Trash2, FileText, Loader2 } from "lucide-react";
+import { useScheduleActivities, useDeleteAllActivities, uploadScheduleWithProgress, type ProgressEvent } from "@/lib/schedule-api";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface ScheduleUploadProps {
   projectId: string;
@@ -36,10 +38,12 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [targetMonth, setTargetMonth] = useState<number>(new Date().getMonth() + 1);
   const [targetYear, setTargetYear] = useState<number>(currentYear);
+  const [isUploading, setIsUploading] = useState(false);
+  const [progressState, setProgressState] = useState<ProgressEvent | null>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: activities = [], isLoading } = useScheduleActivities(projectId);
-  const uploadMutation = useUploadSchedule();
   const deleteMutation = useDeleteAllActivities();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -81,13 +85,27 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
   };
 
   const handleUpload = async (file: File) => {
+    setIsUploading(true);
+    setProgressState({
+      type: 'progress',
+      stage: 'uploading',
+      message: 'Starting upload...',
+      percentage: 0,
+    });
+
     try {
-      const result = await uploadMutation.mutateAsync({
+      const result = await uploadScheduleWithProgress(
         projectId,
         file,
         targetMonth,
         targetYear,
-      });
+        (event) => {
+          setProgressState(event);
+        }
+      );
+
+      queryClient.invalidateQueries({ queryKey: ["schedule-activities", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
 
       const monthName = MONTHS.find(m => m.value === targetMonth)?.label || "";
       
@@ -116,6 +134,9 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
         description: error instanceof Error ? error.message : "Failed to upload schedule",
         variant: "destructive",
       });
+    } finally {
+      setIsUploading(false);
+      setProgressState(null);
     }
   };
 
@@ -160,6 +181,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
               <Select
                 value={targetMonth.toString()}
                 onValueChange={(v) => setTargetMonth(parseInt(v))}
+                disabled={isUploading}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -178,6 +200,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
               <Select
                 value={targetYear.toString()}
                 onValueChange={(v) => setTargetYear(parseInt(v))}
+                disabled={isUploading}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -193,42 +216,66 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
             </div>
           </div>
 
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              isDragOver 
-                ? "border-primary bg-primary/5" 
-                : "border-border hover:border-primary/50"
-            }`}
-          >
-            <div className="flex justify-center gap-2 mb-4">
-              <FileSpreadsheet className="w-10 h-10 text-muted-foreground" />
-              <FileText className="w-10 h-10 text-muted-foreground" />
+          {isUploading && progressState ? (
+            <div className="border rounded-lg p-6 space-y-4 bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <span className="font-medium">{progressState.message}</span>
+              </div>
+              <Progress value={progressState.percentage || 0} className="h-2" />
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>{progressState.stage?.replace(/_/g, ' ')}</span>
+                <span>{progressState.percentage}%</span>
+              </div>
+              {progressState.details && (
+                <div className="text-sm text-muted-foreground">
+                  {progressState.details.batchNumber && progressState.details.totalBatches && (
+                    <span>Batch {progressState.details.batchNumber} of {progressState.details.totalBatches}</span>
+                  )}
+                  {progressState.details.current !== undefined && progressState.details.total !== undefined && !progressState.details.batchNumber && (
+                    <span>Processed {progressState.details.current} of {progressState.details.total}</span>
+                  )}
+                </div>
+              )}
             </div>
-            <h3 className="font-medium mb-2">Upload CPM Schedule</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Drag and drop Excel (.xlsx, .xls) or PDF files
-            </p>
-            <div className="flex justify-center gap-2">
-              <Button
-                variant="outline"
-                disabled={uploadMutation.isPending}
-                onClick={() => document.getElementById("schedule-file-input")?.click()}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                {uploadMutation.isPending ? "Processing..." : "Select File"}
-              </Button>
-              <input
-                id="schedule-file-input"
-                type="file"
-                accept=".xlsx,.xls,.pdf"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
+          ) : (
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                isDragOver 
+                  ? "border-primary bg-primary/5" 
+                  : "border-border hover:border-primary/50"
+              }`}
+            >
+              <div className="flex justify-center gap-2 mb-4">
+                <FileSpreadsheet className="w-10 h-10 text-muted-foreground" />
+                <FileText className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h3 className="font-medium mb-2">Upload CPM Schedule</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Drag and drop Excel (.xlsx, .xls) or PDF files
+              </p>
+              <div className="flex justify-center gap-2">
+                <Button
+                  variant="outline"
+                  disabled={isUploading}
+                  onClick={() => document.getElementById("schedule-file-input")?.click()}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Select File
+                </Button>
+                <input
+                  id="schedule-file-input"
+                  type="file"
+                  accept=".xlsx,.xls,.pdf"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 

@@ -8,6 +8,7 @@ import type {
 import type { IAIClient } from '../../domain/interfaces/IAIClient';
 import { ModelId } from '../../domain/value-objects/ModelId';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
+import { NoOpProgressReporter } from '../../domain/delay-analysis/interfaces/IProgressReporter';
 
 const MONTH_NAMES: Record<string, number> = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
@@ -33,16 +34,34 @@ export class PdfScheduleParser implements IScheduleParser {
   ): Promise<ScheduleParseResult> {
     const errors: string[] = [];
     const rows: ParsedScheduleRow[] = [];
+    const progress = options.progressReporter || new NoOpProgressReporter();
 
     try {
+      progress.report({
+        stage: 'extracting_text',
+        message: 'Extracting text from PDF...',
+        percentage: 5,
+      });
+
       const parser = new PDFParse({ data: buffer });
       const pdfData = await parser.getText();
       const fullText = pdfData.text;
       await parser.destroy();
 
+      progress.report({
+        stage: 'filtering_dates',
+        message: `Filtering for activities with actual dates in ${options.targetMonth}/${options.targetYear}...`,
+        percentage: 15,
+      });
+
       const filteredLines = this.filterActualDateLines(fullText, options);
 
       if (filteredLines.length === 0) {
+        progress.report({
+          stage: 'complete',
+          message: 'No activities with actual dates found for selected month',
+          percentage: 100,
+        });
         return {
           rows: [],
           scheduleUpdateMonth: `${options.targetYear}-${String(options.targetMonth).padStart(2, '0')}`,
@@ -53,10 +72,30 @@ export class PdfScheduleParser implements IScheduleParser {
         };
       }
 
+      progress.report({
+        stage: 'ai_processing',
+        message: `Found ${filteredLines.length} potential activities. Starting AI analysis...`,
+        percentage: 20,
+        details: { total: filteredLines.length },
+      });
+
       const batchSize = 30;
       const batches = this.chunkArray(filteredLines, batchSize);
 
       for (let i = 0; i < batches.length; i++) {
+        const batchProgress = 20 + ((i + 1) / batches.length) * 60;
+        progress.report({
+          stage: 'processing_batch',
+          message: `Processing batch ${i + 1} of ${batches.length}...`,
+          percentage: Math.round(batchProgress),
+          details: {
+            batchNumber: i + 1,
+            totalBatches: batches.length,
+            current: rows.length,
+            total: filteredLines.length,
+          },
+        });
+
         try {
           const batchRows = await this.parseWithAI(batches[i], options);
           rows.push(...batchRows);

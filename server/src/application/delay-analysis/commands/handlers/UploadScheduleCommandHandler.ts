@@ -4,6 +4,8 @@ import type { IDelayAnalysisProjectRepository } from '../../../../domain/delay-a
 import type { IProjectDocumentRepository } from '../../../../domain/delay-analysis/repositories/IProjectDocumentRepository';
 import type { IScheduleActivityRepository } from '../../../../domain/delay-analysis/repositories/IScheduleActivityRepository';
 import type { IScheduleParserFactory } from '../../../../domain/delay-analysis/interfaces/IScheduleParserFactory';
+import type { IProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
+import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ProjectDocument } from '../../../../domain/delay-analysis/entities/ProjectDocument';
 import { ScheduleActivity } from '../../../../domain/delay-analysis/entities/ScheduleActivity';
 
@@ -17,6 +19,10 @@ export interface UploadScheduleResult {
   scheduleUpdateMonth: string | null;
 }
 
+export interface UploadScheduleOptions {
+  progressReporter?: IProgressReporter;
+}
+
 export class UploadScheduleCommandHandler {
   constructor(
     private readonly projectRepository: IDelayAnalysisProjectRepository,
@@ -25,7 +31,18 @@ export class UploadScheduleCommandHandler {
     private readonly parserFactory: IScheduleParserFactory
   ) {}
 
-  async execute(command: UploadScheduleCommand): Promise<UploadScheduleResult> {
+  async execute(
+    command: UploadScheduleCommand, 
+    options?: UploadScheduleOptions
+  ): Promise<UploadScheduleResult> {
+    const progress = options?.progressReporter || new NoOpProgressReporter();
+
+    progress.report({
+      stage: 'uploading',
+      message: 'Starting schedule upload...',
+      percentage: 0,
+    });
+
     const project = await this.projectRepository.findById(command.projectId, command.tenantId);
     if (!project) {
       throw new Error(`Project ${command.projectId} not found`);
@@ -56,6 +73,12 @@ export class UploadScheduleCommandHandler {
 
     await this.documentRepository.save(document);
 
+    progress.report({
+      stage: 'parsing_pdf',
+      message: 'Parsing schedule file...',
+      percentage: 5,
+    });
+
     try {
       const parseResult = await parser.parseSchedule(
         command.file.buffer,
@@ -64,6 +87,7 @@ export class UploadScheduleCommandHandler {
           targetMonth: command.targetMonth,
           targetYear: command.targetYear,
           filterActualOnly: true,
+          progressReporter: progress,
         }
       );
 
@@ -91,8 +115,17 @@ export class UploadScheduleCommandHandler {
       let imported = 0;
       let updated = 0;
       let skipped = 0;
+      const totalRows = parseResult.rows.length;
 
-      for (const row of parseResult.rows) {
+      progress.report({
+        stage: 'saving_activities',
+        message: `Saving ${totalRows} activities to database...`,
+        percentage: 85,
+        details: { total: totalRows },
+      });
+
+      for (let i = 0; i < parseResult.rows.length; i++) {
+        const row = parseResult.rows[i];
         const existing = await this.scheduleRepository.findByActivityId(
           command.projectId,
           command.tenantId,
@@ -146,10 +179,33 @@ export class UploadScheduleCommandHandler {
           await this.scheduleRepository.save(newActivity);
           imported++;
         }
+
+        if ((i + 1) % 10 === 0 || i === totalRows - 1) {
+          const saveProgress = 85 + ((i + 1) / totalRows) * 10;
+          progress.report({
+            stage: 'saving_activities',
+            message: `Saved ${i + 1} of ${totalRows} activities...`,
+            percentage: Math.round(saveProgress),
+            details: {
+              current: i + 1,
+              total: totalRows,
+            },
+          });
+        }
       }
 
       const updatedDoc = document.withProcessingStatus('completed');
       await this.documentRepository.update(updatedDoc);
+
+      progress.report({
+        stage: 'complete',
+        message: `Complete! ${imported} new, ${updated} updated, ${skipped} unchanged`,
+        percentage: 100,
+        details: {
+          current: totalRows,
+          total: totalRows,
+        },
+      });
 
       return {
         documentId: docId,
