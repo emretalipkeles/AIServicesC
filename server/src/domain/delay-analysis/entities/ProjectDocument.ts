@@ -43,6 +43,16 @@ export class ProjectDocument {
     this.errorMessage = props.errorMessage ?? null;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
+    this.validate();
+  }
+
+  private validate(): void {
+    if (!this.filename || this.filename.trim().length === 0) {
+      throw new Error('Document filename is required');
+    }
+    if (!this.projectId || this.projectId.trim().length === 0) {
+      throw new Error('Project ID is required');
+    }
   }
 
   isFieldReport(): boolean {

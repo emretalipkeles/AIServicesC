@@ -93,6 +93,20 @@ import { PRET_COMMAND_DESCRIPTORS } from "./pret/classifiers/PretCommandDescript
 import { AIPretResponseNarrator } from "./pret/narrators/AIPretResponseNarrator";
 import type { IIntentClassifier, IResponseNarrator } from "../domain/pret";
 
+import { DrizzleDelayAnalysisProjectRepository } from "./database/repositories/delay-analysis/DrizzleDelayAnalysisProjectRepository";
+import { DrizzleProjectDocumentRepository } from "./database/repositories/delay-analysis/DrizzleProjectDocumentRepository";
+import { DrizzleScheduleActivityRepository } from "./database/repositories/delay-analysis/DrizzleScheduleActivityRepository";
+import { DrizzleContractorDelayEventRepository } from "./database/repositories/delay-analysis/DrizzleContractorDelayEventRepository";
+import { CreateDelayAnalysisProjectCommandHandler } from "../application/delay-analysis/commands/handlers/CreateDelayAnalysisProjectCommandHandler";
+import { UpdateDelayAnalysisProjectCommandHandler } from "../application/delay-analysis/commands/handlers/UpdateDelayAnalysisProjectCommandHandler";
+import { DeleteDelayAnalysisProjectCommandHandler } from "../application/delay-analysis/commands/handlers/DeleteDelayAnalysisProjectCommandHandler";
+import { GetDelayAnalysisProjectQueryHandler } from "../application/delay-analysis/queries/handlers/GetDelayAnalysisProjectQueryHandler";
+import { ListDelayAnalysisProjectsQueryHandler } from "../application/delay-analysis/queries/handlers/ListDelayAnalysisProjectsQueryHandler";
+import type { IDelayAnalysisProjectRepository } from "../domain/delay-analysis/repositories/IDelayAnalysisProjectRepository";
+import type { IProjectDocumentRepository } from "../domain/delay-analysis/repositories/IProjectDocumentRepository";
+import type { IScheduleActivityRepository } from "../domain/delay-analysis/repositories/IScheduleActivityRepository";
+import type { IContractorDelayEventRepository } from "../domain/delay-analysis/repositories/IContractorDelayEventRepository";
+
 export interface AppContainer {
   commandBus: ICommandBus;
   queryBus: IQueryBus;
@@ -109,6 +123,10 @@ export interface AppContainer {
     pretPackageSession: IPretPackageSessionRepository;
     pretPackageStorage: IPretPackageStorage | null;
     sessionMemory: ISessionMemoryRepository;
+    delayAnalysisProject: IDelayAnalysisProjectRepository;
+    projectDocument: IProjectDocumentRepository;
+    scheduleActivity: IScheduleActivityRepository;
+    contractorDelayEvent: IContractorDelayEventRepository;
   };
   
   handlers: {
@@ -152,6 +170,11 @@ export function createAppContainer(): AppContainer {
   const conversationContextRepository = new InMemoryConversationContextRepository();
   const packageAnalysisCache: IPackageAnalysisCache = new InMemoryPackageAnalysisCache();
   const sessionMemoryRepository = new InMemorySessionMemoryRepository();
+
+  const delayAnalysisProjectRepository = new DrizzleDelayAnalysisProjectRepository();
+  const projectDocumentRepository = new DrizzleProjectDocumentRepository();
+  const scheduleActivityRepository = new DrizzleScheduleActivityRepository();
+  const contractorDelayEventRepository = new DrizzleContractorDelayEventRepository();
 
   let pretPackageStorage: IPretPackageStorage | null = null;
   try {
@@ -299,6 +322,12 @@ export function createAppContainer(): AppContainer {
   const listAgentsHandler = new ListAgentsQueryHandler(agentRepository);
   const listAgentDocumentsHandler = new ListAgentDocumentsQueryHandler(documentRepository);
 
+  const createDelayAnalysisProjectHandler = new CreateDelayAnalysisProjectCommandHandler(delayAnalysisProjectRepository);
+  const updateDelayAnalysisProjectHandler = new UpdateDelayAnalysisProjectCommandHandler(delayAnalysisProjectRepository);
+  const deleteDelayAnalysisProjectHandler = new DeleteDelayAnalysisProjectCommandHandler(delayAnalysisProjectRepository);
+  const getDelayAnalysisProjectHandler = new GetDelayAnalysisProjectQueryHandler(delayAnalysisProjectRepository);
+  const listDelayAnalysisProjectsHandler = new ListDelayAnalysisProjectsQueryHandler(delayAnalysisProjectRepository);
+
   let importPretPackageHandler: ImportPretPackageHandler | null = null;
   let getPretPackageHandler: GetPretPackageHandler | null = null;
   let analyzePackageHandler: AnalyzePackageHandler | null = null;
@@ -363,6 +392,12 @@ export function createAppContainer(): AppContainer {
   queryBus.register('ListAgentsQuery', listAgentsHandler);
   queryBus.register('ListAgentDocumentsQuery', listAgentDocumentsHandler);
 
+  commandBus.register('CreateDelayAnalysisProjectCommand', createDelayAnalysisProjectHandler);
+  commandBus.register('UpdateDelayAnalysisProjectCommand', updateDelayAnalysisProjectHandler);
+  commandBus.register('DeleteDelayAnalysisProjectCommand', deleteDelayAnalysisProjectHandler);
+  queryBus.register('GetDelayAnalysisProjectQuery', getDelayAnalysisProjectHandler);
+  queryBus.register('ListDelayAnalysisProjectsQuery', listDelayAnalysisProjectsHandler);
+
   return {
     commandBus,
     queryBus,
@@ -378,6 +413,10 @@ export function createAppContainer(): AppContainer {
       pretPackageSession: pretPackageSessionRepository,
       pretPackageStorage,
       sessionMemory: sessionMemoryRepository,
+      delayAnalysisProject: delayAnalysisProjectRepository,
+      projectDocument: projectDocumentRepository,
+      scheduleActivity: scheduleActivityRepository,
+      contractorDelayEvent: contractorDelayEventRepository,
     },
     handlers: {
       streamChatHandler,

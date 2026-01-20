@@ -242,7 +242,7 @@ export const delayAnalysisProjects = pgTable("delay_analysis_projects", {
   name: text("name").notNull(),
   description: text("description"),
   contractNumber: text("contract_number"),
-  noticeToProceeedDate: timestamp("notice_to_proceed_date"),
+  noticeToProceedDate: timestamp("notice_to_proceed_date"),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

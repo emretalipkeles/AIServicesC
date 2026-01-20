@@ -49,6 +49,16 @@ export class ScheduleActivity {
     this.isCriticalPath = props.isCriticalPath;
     this.metadata = props.metadata ?? null;
     this.createdAt = props.createdAt;
+    this.validate();
+  }
+
+  private validate(): void {
+    if (!this.activityId || this.activityId.trim().length === 0) {
+      throw new Error('Activity ID is required');
+    }
+    if (!this.activityDescription || this.activityDescription.trim().length === 0) {
+      throw new Error('Activity description is required');
+    }
   }
 
   wasActiveOnDate(date: Date): boolean {
