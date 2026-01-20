@@ -1,8 +1,9 @@
 import { useRef, useEffect } from "react";
-import { Map as MapIcon, Plus, Bot, X, type LucideIcon } from "lucide-react";
+import { Map as MapIcon, Plus, Bot, X, Activity, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { JourneyDashboard } from "./journey-dashboard";
 import { AgentSetup } from "./agent-setup";
+import { DelayAnalysis } from "./delay-analysis";
 import { ThemeToggle } from "./theme-toggle";
 import { SettingsMenu } from "./settings-menu";
 import { useTabContext, type Tab } from "@/contexts/tab-context";
@@ -18,6 +19,7 @@ const defaultTabs: StaticTab[] = [];
 
 const settingsTabMap: Record<string, Tab> = {
   "agent-setup": { id: "agent-setup", label: "Agent Setup", icon: Bot, type: "static" },
+  "delay-analysis": { id: "delay-analysis", label: "Delay Analysis", icon: Activity, type: "delay-analysis" },
 };
 
 export function TabbedContent() {
@@ -66,6 +68,9 @@ export function TabbedContent() {
     }
     if (tab.id === "agent-setup") {
       return <AgentSetup />;
+    }
+    if (tab.id === "delay-analysis") {
+      return <DelayAnalysis />;
     }
     if ("type" in tab && tab.type === "package" && tab.packageId) {
       return <PackageVisualization packageId={tab.packageId} embedded />;
