@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useProjectDocuments, useUploadDocuments, useDeleteDocument, type ProjectDocumentDto, type ProjectDocumentType } from "@/lib/project-documents-api";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,11 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
 
   const [selectedType, setSelectedType] = useState<ProjectDocumentType>("idr");
   const [isDragOver, setIsDragOver] = useState(false);
+  const uploadSectionRef = useRef<HTMLDivElement>(null);
+
+  const scrollToUpload = () => {
+    uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const completedDocs = documents.filter(d => d.status === 'completed').length;
   const pendingDocs = documents.filter(d => d.status === 'pending' || d.status === 'processing').length;
@@ -143,58 +148,16 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
 
       <GlassCard>
         <SectionHeader 
-          icon={Upload} 
-          title="Upload Documents" 
-          description="Add Inspector Daily Reports, NCRs, and Field Memos for analysis"
-          gradient="blue"
-        />
-        <div className="p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <label className="text-sm font-medium text-muted-foreground mb-2 block">Document Type</label>
-              <Select value={selectedType} onValueChange={(v) => setSelectedType(v as ProjectDocumentType)}>
-                <SelectTrigger className={selectTriggerStyles}>
-                  <SelectValue placeholder="Select document type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(documentTypeLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <input
-            type="file"
-            id="file-upload"
-            className="hidden"
-            multiple
-            accept=".pdf,.doc,.docx"
-            onChange={handleFileSelect}
-          />
-
-          <UploadZone
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            isDragOver={isDragOver}
-            isUploading={uploadDocuments.isPending}
-            onBrowse={() => document.getElementById('file-upload')?.click()}
-            title={isDragOver ? "Drop files here" : "Drag and drop files here"}
-            description="Upload your project documents for AI analysis"
-            icons={[FileText, File]}
-            acceptedFormats="PDF and Word documents (.pdf, .doc, .docx)"
-          />
-        </div>
-      </GlassCard>
-
-      <GlassCard delay={0.1}>
-        <SectionHeader 
           icon={FolderOpen} 
           title="Uploaded Documents" 
           description={`${documents.length} document${documents.length !== 1 ? 's' : ''} in this project`}
           gradient="teal"
+          action={
+            <Button onClick={scrollToUpload} size="sm" className="gap-2">
+              <Upload className="w-4 h-4" />
+              Upload
+            </Button>
+          }
         />
         <div className="p-6">
           {isLoading ? (
@@ -233,6 +196,56 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
           )}
         </div>
       </GlassCard>
+
+      <div ref={uploadSectionRef}>
+        <GlassCard delay={0.1}>
+          <SectionHeader 
+            icon={Upload} 
+            title="Upload Documents" 
+            description="Add Inspector Daily Reports, NCRs, and Field Memos for analysis"
+            gradient="blue"
+          />
+          <div className="p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">Document Type</label>
+                <Select value={selectedType} onValueChange={(v) => setSelectedType(v as ProjectDocumentType)}>
+                  <SelectTrigger className={selectTriggerStyles}>
+                    <SelectValue placeholder="Select document type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(documentTypeLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <input
+              type="file"
+              id="file-upload"
+              className="hidden"
+              multiple
+              accept=".pdf,.doc,.docx"
+              onChange={handleFileSelect}
+            />
+
+            <UploadZone
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              isDragOver={isDragOver}
+              isUploading={uploadDocuments.isPending}
+              onBrowse={() => document.getElementById('file-upload')?.click()}
+              title={isDragOver ? "Drop files here" : "Drag and drop files here"}
+              description="Upload your project documents for AI analysis"
+              icons={[FileText, File]}
+              acceptedFormats="PDF and Word documents (.pdf, .doc, .docx)"
+            />
+          </div>
+        </GlassCard>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -42,7 +42,12 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
   const [progressState, setProgressState] = useState<ProgressEvent | null>(null);
   const [lastUploadCost, setLastUploadCost] = useState<RunTokenUsageSummary | null>(null);
   const [filterText, setFilterText] = useState("");
+  const uploadSectionRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const scrollToUpload = () => {
+    uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   const queryClient = useQueryClient();
 
   const { data: activities = [], isLoading } = useScheduleActivities(projectId);
@@ -194,117 +199,29 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
 
       <GlassCard>
         <SectionHeader 
-          icon={Calendar} 
-          title="Upload CPM Schedule" 
-          description="Extract activities with actual dates from Excel or PDF files"
-          gradient="purple"
-        />
-        <div className="p-6 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-muted-foreground mb-2 block">Target Month</label>
-              <Select
-                value={targetMonth.toString()}
-                onValueChange={(v) => setTargetMonth(parseInt(v))}
-                disabled={isUploading}
-              >
-                <SelectTrigger className={selectTriggerStyles}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((month) => (
-                    <SelectItem key={month.value} value={month.value.toString()}>
-                      {month.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground mb-2 block">Target Year</label>
-              <Select
-                value={targetYear.toString()}
-                onValueChange={(v) => setTargetYear(parseInt(v))}
-                disabled={isUploading}
-              >
-                <SelectTrigger className={selectTriggerStyles}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {YEARS.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {lastUploadCost && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-3 bg-green-50 dark:bg-green-950/30 rounded-xl border border-green-200 dark:border-green-800 flex items-center gap-2"
-            >
-              <DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" />
-              <span className="text-sm text-green-700 dark:text-green-300">
-                AI cost for this upload: <span className="font-semibold">${lastUploadCost.totalCostUsd.toFixed(4)}</span>
-              </span>
-            </motion.div>
-          )}
-
-          <input
-            type="file"
-            id="schedule-file-input"
-            className="hidden"
-            accept=".xlsx,.xls,.pdf"
-            onChange={handleFileSelect}
-          />
-
-          {isUploading && progressState ? (
-            <ProgressIndicator
-              stage={progressState.stage || ''}
-              message={progressState.message}
-              percentage={progressState.percentage || 0}
-              details={progressState.details}
-            />
-          ) : (
-            <UploadZone
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              isDragOver={isDragOver}
-              isUploading={isUploading}
-              onBrowse={() => document.getElementById('schedule-file-input')?.click()}
-              title={isDragOver ? "Drop schedule here" : "Upload CPM Schedule"}
-              description="Drag and drop your schedule file"
-              icons={[FileSpreadsheet, FileText]}
-              acceptedFormats="Excel (.xlsx, .xls) or PDF files"
-            />
-          )}
-        </div>
-      </GlassCard>
-
-      <GlassCard delay={0.1}>
-        <SectionHeader 
           icon={Clock} 
           title="Schedule Activities" 
           description={`${activities.length} activities with actual dates loaded`}
           gradient="teal"
           action={
-            activities.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDeleteAll}
-                disabled={deleteMutation.isPending}
-                className="gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete All
+            <div className="flex items-center gap-2">
+              {activities.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteAll}
+                  disabled={deleteMutation.isPending}
+                  className="gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete All
+                </Button>
+              )}
+              <Button onClick={scrollToUpload} size="sm" className="gap-2">
+                <Calendar className="w-4 h-4" />
+                Upload
               </Button>
-            )
+            </div>
           }
         />
         <div className="p-6">
@@ -382,6 +299,102 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
           )}
         </div>
       </GlassCard>
+
+      <div ref={uploadSectionRef}>
+        <GlassCard delay={0.1}>
+          <SectionHeader 
+            icon={Calendar} 
+            title="Upload CPM Schedule" 
+            description="Extract activities with actual dates from Excel or PDF files"
+            gradient="purple"
+          />
+          <div className="p-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">Target Month</label>
+                <Select
+                  value={targetMonth.toString()}
+                  onValueChange={(v) => setTargetMonth(parseInt(v))}
+                  disabled={isUploading}
+                >
+                  <SelectTrigger className={selectTriggerStyles}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((month) => (
+                      <SelectItem key={month.value} value={month.value.toString()}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">Target Year</label>
+                <Select
+                  value={targetYear.toString()}
+                  onValueChange={(v) => setTargetYear(parseInt(v))}
+                  disabled={isUploading}
+                >
+                  <SelectTrigger className={selectTriggerStyles}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {YEARS.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {lastUploadCost && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-3 bg-green-50 dark:bg-green-950/30 rounded-xl border border-green-200 dark:border-green-800 flex items-center gap-2"
+              >
+                <DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span className="text-sm text-green-700 dark:text-green-300">
+                  AI cost for this upload: <span className="font-semibold">${lastUploadCost.totalCostUsd.toFixed(4)}</span>
+                </span>
+              </motion.div>
+            )}
+
+            <input
+              type="file"
+              id="schedule-file-input"
+              className="hidden"
+              accept=".xlsx,.xls,.pdf"
+              onChange={handleFileSelect}
+            />
+
+            {isUploading && progressState ? (
+              <ProgressIndicator
+                stage={progressState.stage || ''}
+                message={progressState.message}
+                percentage={progressState.percentage || 0}
+                details={progressState.details}
+              />
+            ) : (
+              <UploadZone
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                isDragOver={isDragOver}
+                isUploading={isUploading}
+                onBrowse={() => document.getElementById('schedule-file-input')?.click()}
+                title={isDragOver ? "Drop schedule here" : "Upload CPM Schedule"}
+                description="Drag and drop your schedule file"
+                icons={[FileSpreadsheet, FileText]}
+                acceptedFormats="Excel (.xlsx, .xls) or PDF files"
+              />
+            )}
+          </div>
+        </GlassCard>
+      </div>
     </div>
   );
 }
