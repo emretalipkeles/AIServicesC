@@ -105,9 +105,6 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
         }
       );
 
-      queryClient.invalidateQueries({ queryKey: ["schedule-activities", projectId] });
-      queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
-
       const monthName = MONTHS.find(m => m.value === targetMonth)?.label || "";
       
       let description = `For ${monthName} ${targetYear}: `;
@@ -138,6 +135,8 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
     } finally {
       setIsUploading(false);
       setProgressState(null);
+      queryClient.invalidateQueries({ queryKey: ["schedule-activities", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
     }
   };
 

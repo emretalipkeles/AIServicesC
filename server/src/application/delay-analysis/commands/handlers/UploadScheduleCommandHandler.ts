@@ -8,6 +8,7 @@ import type { IProgressReporter } from '../../../../domain/delay-analysis/interf
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ProjectDocument } from '../../../../domain/delay-analysis/entities/ProjectDocument';
 import { ScheduleActivity } from '../../../../domain/delay-analysis/entities/ScheduleActivity';
+import type { ParsedScheduleRow } from '../../../../domain/delay-analysis/interfaces/IExcelParser';
 
 export interface UploadScheduleResult {
   documentId: string;
@@ -112,10 +113,12 @@ export class UploadScheduleCommandHandler {
       const scheduleMonth = parseResult.scheduleUpdateMonth || 
         `${command.targetYear}-${String(command.targetMonth).padStart(2, '0')}`;
 
+      const deduplicatedRows = this.deduplicateByActivityId(parseResult.rows);
+      
       let imported = 0;
       let updated = 0;
       let skipped = 0;
-      const totalRows = parseResult.rows.length;
+      const totalRows = deduplicatedRows.length;
 
       progress.report({
         stage: 'saving_activities',
@@ -124,8 +127,8 @@ export class UploadScheduleCommandHandler {
         details: { total: totalRows },
       });
 
-      for (let i = 0; i < parseResult.rows.length; i++) {
-        const row = parseResult.rows[i];
+      for (let i = 0; i < deduplicatedRows.length; i++) {
+        const row = deduplicatedRows[i];
         const existing = await this.scheduleRepository.findByActivityId(
           command.projectId,
           command.tenantId,
@@ -244,5 +247,13 @@ export class UploadScheduleCommandHandler {
       datesDiffer(existing.actualFinishDate, newRow.actualFinishDate) ||
       existing.activityDescription !== newRow.activityDescription
     );
+  }
+
+  private deduplicateByActivityId(rows: ParsedScheduleRow[]): ParsedScheduleRow[] {
+    const seen = new Map<string, ParsedScheduleRow>();
+    for (const row of rows) {
+      seen.set(row.activityId, row);
+    }
+    return Array.from(seen.values());
   }
 }
