@@ -1,4 +1,4 @@
-import * as pdfParse from 'pdf-parse';
+import { createRequire } from 'module';
 import type { ParsedScheduleRow } from '../../domain/delay-analysis/interfaces/IExcelParser';
 import type { 
   IScheduleParser, 
@@ -8,6 +8,9 @@ import type {
 import type { IAIClient } from '../../domain/interfaces/IAIClient';
 import { ModelId } from '../../domain/value-objects/ModelId';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
+
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 const MONTH_NAMES: Record<string, number> = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
@@ -35,7 +38,7 @@ export class PdfScheduleParser implements IScheduleParser {
     const rows: ParsedScheduleRow[] = [];
 
     try {
-      const pdfData = await (pdfParse as unknown as (buffer: Buffer) => Promise<{ text: string }>)(buffer);
+      const pdfData = await pdfParse(buffer);
       const fullText = pdfData.text;
 
       const filteredLines = this.filterActualDateLines(fullText, options);

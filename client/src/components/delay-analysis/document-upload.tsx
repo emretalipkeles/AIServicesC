@@ -12,11 +12,10 @@ interface DocumentUploadProps {
   projectId: string;
 }
 
-const documentTypeLabels: Record<ProjectDocumentType, string> = {
+const documentTypeLabels: Partial<Record<ProjectDocumentType, string>> = {
   idr: "Inspector Daily Report (IDR)",
   ncr: "Non-Conformance Report (NCR)",
   field_memo: "Field Memo",
-  cpm_schedule: "CPM Schedule",
   contract_plan: "Contract Plan",
   dsc_claim: "DSC Claim",
   other: "Other",
