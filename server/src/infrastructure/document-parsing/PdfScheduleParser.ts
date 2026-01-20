@@ -15,13 +15,6 @@ const MONTH_NAMES: Record<string, number> = {
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
 };
 
-const ALL_ACTIVITIES_MARKERS = [
-  'ALL ACTIVITIES',
-  'All Activities',
-  'ALL_ACTIVITIES',
-  'ALLACTIVITIES',
-];
-
 export class PdfScheduleParser implements IScheduleParser {
   private readonly supportedContentTypes = ['application/pdf'];
   private readonly supportedExtensions = ['.pdf'];
@@ -63,6 +56,8 @@ export class PdfScheduleParser implements IScheduleParser {
 
       const textToProcess = this.extractAllActivitiesSection(fullText);
       const filteredLines = this.filterActualDateLines(textToProcess, options);
+      
+      console.log(`[PdfScheduleParser] Filtered ${filteredLines.length} lines with actual dates for ${options.targetMonth}/${options.targetYear}`);
 
       if (filteredLines.length === 0) {
         progress.report({
@@ -261,17 +256,24 @@ Return ONLY the JSON array, no other text.`;
   }
 
   private extractAllActivitiesSection(fullText: string): string {
-    const upperText = fullText.toUpperCase();
+    const allActivitiesPattern = /ALL\s*ACTIVITIES/gi;
+    const matches: number[] = [];
+    let match: RegExpExecArray | null;
     
-    for (const marker of ALL_ACTIVITIES_MARKERS) {
-      const upperMarker = marker.toUpperCase();
-      const markerIndex = upperText.lastIndexOf(upperMarker);
-      
-      if (markerIndex !== -1) {
-        return fullText.substring(markerIndex);
-      }
+    while ((match = allActivitiesPattern.exec(fullText)) !== null) {
+      matches.push(match.index);
     }
     
+    if (matches.length > 0) {
+      const lastMatchIndex = matches[matches.length - 1];
+      console.log(`[PdfScheduleParser] Found "ALL ACTIVITIES" at ${matches.length} location(s), using last one at index ${lastMatchIndex}`);
+      const extracted = fullText.substring(lastMatchIndex);
+      console.log(`[PdfScheduleParser] Extracted section length: ${extracted.length} chars (from ${fullText.length} total)`);
+      console.log(`[PdfScheduleParser] First 500 chars of extracted section:\n${extracted.substring(0, 500)}`);
+      return extracted;
+    }
+    
+    console.log(`[PdfScheduleParser] "ALL ACTIVITIES" marker not found, processing full text (${fullText.length} chars)`);
     return fullText;
   }
 }
