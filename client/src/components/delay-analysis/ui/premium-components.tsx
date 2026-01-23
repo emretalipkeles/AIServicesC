@@ -2,6 +2,7 @@ import React, { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 interface GlassCardProps {
   children: ReactNode;
@@ -887,37 +888,51 @@ export function TruncatedTextWithTooltip({
 
   const isLongText = text.length > longTextThreshold;
 
-  const popoverContent = (
-    <div className="space-y-2">
-      <p className="whitespace-pre-wrap">{text}</p>
-      {isLongText && (
-        <button
-          onClick={() => setDrawerOpen(true)}
-          className={cn(
-            "mt-2 text-xs font-medium px-2 py-1 rounded",
-            "bg-primary/20 text-primary hover:bg-primary/30",
-            "transition-colors"
-          )}
-        >
-          View Full Text
-        </button>
-      )}
-    </div>
-  );
-
   return (
     <>
-      <SmartPopover content={popoverContent}>
-        <span
-          style={{ maxWidth }}
+      <HoverCard openDelay={200} closeDelay={100}>
+        <HoverCardTrigger asChild>
+          <span
+            style={{ maxWidth }}
+            className={cn(
+              "block truncate cursor-default hover:text-foreground transition-colors",
+              className
+            )}
+          >
+            {text}
+          </span>
+        </HoverCardTrigger>
+        <HoverCardContent 
+          side="top" 
+          align="center"
+          sideOffset={8}
+          collisionPadding={16}
+          avoidCollisions={true}
           className={cn(
-            "block truncate cursor-default hover:text-foreground transition-colors",
-            className
+            "w-auto max-w-[380px] max-h-[280px] overflow-auto p-3",
+            "bg-zinc-900/95 dark:bg-zinc-800/95 text-white",
+            "border border-zinc-700/60",
+            "backdrop-blur-xl",
+            "shadow-2xl"
           )}
         >
-          {text}
-        </span>
-      </SmartPopover>
+          <div className="space-y-2">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
+            {isLongText && (
+              <button
+                onClick={() => setDrawerOpen(true)}
+                className={cn(
+                  "mt-2 text-xs font-medium px-2 py-1 rounded",
+                  "bg-primary/20 text-primary hover:bg-primary/30",
+                  "transition-colors"
+                )}
+              >
+                View Full Text
+              </button>
+            )}
+          </div>
+        </HoverCardContent>
+      </HoverCard>
       <DetailDrawer 
         isOpen={drawerOpen} 
         onClose={() => setDrawerOpen(false)}
