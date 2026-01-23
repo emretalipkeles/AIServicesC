@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs';
+import ExcelJS from "exceljs";
 
 interface DelayEventData {
   wbs?: string | null;
@@ -30,7 +30,34 @@ function formatDate(dateStr: string | null | undefined): string {
 
 export async function exportDelayEventsToExcel(events: DelayEventData[]): Promise<void> {
   const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet('Results');
+
+  const addSheet = (name: string, headers: string[], rows: string[][], wrapCols: number[] = []) => {
+    const sheet = workbook.addWorksheet(name);
+    const headerRow = sheet.addRow(headers);
+    headerRow.font = { bold: true };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
+    rows.forEach(row => sheet.addRow(row));
+    sheet.columns.forEach((column, colIdx) => {
+      let maxLength = headers[colIdx]?.length || 10;
+      const shouldWrap = wrapCols.includes(colIdx);
+      rows.forEach(row => {
+        const cellValue = row[colIdx] || "";
+        const lines = cellValue.split("\n");
+        const longestLine = Math.max(...lines.map(l => l.length));
+        if (longestLine > maxLength) maxLength = longestLine;
+      });
+      column.width = Math.min(maxLength + 2, shouldWrap ? 60 : 40);
+      if (shouldWrap) {
+        sheet.eachRow((row, rowNum) => {
+          if (rowNum > 1) {
+            const cell = row.getCell(colIdx + 1);
+            cell.alignment = { wrapText: true, vertical: "top" };
+          }
+        });
+      }
+    });
+    sheet.views = [{ state: "frozen", ySplit: 1 }];
+  };
 
   const headers = [
     'WBS',
@@ -46,35 +73,29 @@ export async function exportDelayEventsToExcel(events: DelayEventData[]): Promis
     'Status',
   ];
 
-  const headerRow = worksheet.addRow(headers);
-  headerRow.font = { bold: true };
+  const rows = events.map(event => [
+    event.wbs || '',
+    event.cpmActivityId || '',
+    event.cpmActivityDescription || '',
+    event.eventDescription,
+    formatCategory(event.eventCategory),
+    formatDate(event.eventStartDate),
+    event.impactDurationHours?.toString() || '',
+    event.sourceReference || '',
+    event.matchConfidence ? `${event.matchConfidence}%` : '',
+    event.matchReasoning || '',
+    event.verificationStatus,
+  ]);
 
-  events.forEach((event) => {
-    worksheet.addRow([
-      event.wbs || '',
-      event.cpmActivityId || '',
-      event.cpmActivityDescription || '',
-      event.eventDescription,
-      formatCategory(event.eventCategory),
-      formatDate(event.eventStartDate),
-      event.impactDurationHours || '',
-      event.sourceReference || '',
-      event.matchConfidence ? `${event.matchConfidence}%` : '',
-      event.matchReasoning || '',
-      event.verificationStatus,
-    ]);
-  });
-
-  worksheet.columns.forEach((column, i) => {
-    const widths = [10, 12, 30, 35, 18, 10, 12, 20, 10, 35, 12];
-    column.width = widths[i] || 15;
-  });
+  addSheet("Delay Analysis", headers, rows, [3, 9]);
 
   const buffer = await workbook.xlsx.writeBuffer();
-
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const link = document.createElement('a');
+  const blob = new Blob([buffer], { 
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
+  });
+  const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = 'project_analysis_results.xlsx';
+  link.download = "delay_analysis_export.xlsx";
   link.click();
+  URL.revokeObjectURL(link.href);
 }

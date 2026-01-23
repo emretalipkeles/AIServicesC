@@ -1,0 +1,74 @@
+Here's the complete working code for the Excel export:
+
+1. Import (at top of file)
+import ExcelJS from "exceljs";
+2. Export Function Definition
+const exportImplementationGuide = async () => {
+  // Create workbook
+  const workbook = new ExcelJS.Workbook();
+  
+  // Helper function to add sheets
+  const addSheet = (name: string, headers: string[], rows: string[][], wrapCols: number[] = []) => {
+    const sheet = workbook.addWorksheet(name);
+    const headerRow = sheet.addRow(headers);
+    headerRow.font = { bold: true };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
+    rows.forEach(row => sheet.addRow(row));
+    sheet.columns.forEach((column, colIdx) => {
+      let maxLength = headers[colIdx]?.length || 10;
+      const shouldWrap = wrapCols.includes(colIdx);
+      rows.forEach(row => {
+        const cellValue = row[colIdx] || "";
+        const lines = cellValue.split("\n");
+        const longestLine = Math.max(...lines.map(l => l.length));
+        if (longestLine > maxLength) maxLength = longestLine;
+      });
+      column.width = Math.min(maxLength + 2, shouldWrap ? 60 : 40);
+      if (shouldWrap) {
+        sheet.eachRow((row, rowNum) => {
+          if (rowNum > 1) {
+            const cell = row.getCell(colIdx + 1);
+            cell.alignment = { wrapText: true, vertical: "top" };
+          }
+        });
+      }
+    });
+    sheet.views = [{ state: "frozen", ySplit: 1 }];
+  };
+  
+  // Add your sheets
+  addSheet("Sheet1", ["Header1", "Header2"], [["Row1Col1", "Row1Col2"]]);
+  
+  // KEY PART - Write buffer and download
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { 
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
+  });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "my_export.xlsx";
+  link.click();
+  URL.revokeObjectURL(link.href);
+};
+3. Button to Trigger Export
+<Button 
+  onClick={exportImplementationGuide} 
+  disabled={isLoading}
+  className="bg-green-600 text-white"
+>
+  <Download className="w-4 h-4 mr-2" />
+  Export to Excel
+</Button>
+Common Issues That Cause Antivirus Flags:
+Wrong MIME type - Make sure you use exactly:
+
+type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+Not revoking the URL - Always call URL.revokeObjectURL(link.href) after clicking
+
+Using deprecated methods - Use workbook.xlsx.writeBuffer() not other methods
+
+Library version - Use a recent version of exceljs (check package.json)
+
+Creating link incorrectly - The pattern above (createElement → set href → set download → click → revoke) is the safe pattern
+
+If the other app is doing anything different from this pattern, that could be triggering the antivirus.
