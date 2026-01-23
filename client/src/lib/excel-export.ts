@@ -1,5 +1,4 @@
 import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
 
 interface DelayEventData {
   wbs?: string | null;
@@ -137,5 +136,8 @@ export async function exportDelayEventsToExcel(events: DelayEventData[]): Promis
   const filename = `Delay-Analysis-Export-${dateStr}.xlsx`;
 
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  saveAs(blob, filename);
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
 }
