@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useProjectDocuments, useUploadDocuments, useDeleteDocument, type ProjectDocumentDto, type ProjectDocumentType } from "@/lib/project-documents-api";
+import { useProjectDocuments, useDeleteDocument, uploadDocumentsInBatches, type ProjectDocumentDto, type ProjectDocumentType, type BatchUploadProgress } from "@/lib/project-documents-api";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import { useUploadState } from "@/contexts/upload-state-context";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader2, File, FolderOpen } from "lucide-react";
 import { format } from "date-fns";
@@ -36,18 +38,21 @@ type FilterType = ProjectDocumentType | "all";
 
 export function DocumentUpload({ projectId }: DocumentUploadProps) {
   const { data: documents = [], isLoading } = useProjectDocuments(projectId);
-  const uploadDocuments = useUploadDocuments();
   const deleteDocument = useDeleteDocument();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [selectedType, setSelectedType] = useState<ProjectDocumentType>("idr");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [isDragOver, setIsDragOver] = useState(false);
+  const [lastFailedFiles, setLastFailedFiles] = useState<Array<{ filename: string; error: string }>>([]);
+  const [showFailedFiles, setShowFailedFiles] = useState(false);
   const uploadSectionRef = useRef<HTMLDivElement>(null);
 
   const {
     documentUpload,
     startDocumentUpload,
+    updateDocumentProgress,
     completeDocumentUpload,
     failDocumentUpload,
   } = useUploadState(projectId);
@@ -88,27 +93,42 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
     startDocumentUpload(validFiles.length);
 
     try {
-      const result = await uploadDocuments.mutateAsync({
+      const result = await uploadDocumentsInBatches(
         projectId,
-        files: validFiles,
-        documentType: selectedType,
-      });
+        validFiles,
+        selectedType,
+        (progress: BatchUploadProgress) => {
+          updateDocumentProgress({
+            currentBatch: progress.currentBatch,
+            totalBatches: progress.totalBatches,
+            uploadedCount: progress.uploadedCount,
+            totalFiles: progress.totalFiles,
+            failedFiles: progress.failedFiles,
+          });
+        }
+      );
 
-      completeDocumentUpload();
+      queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
+      completeDocumentUpload(result.failed);
 
       if (result.uploaded.length > 0) {
         toast({
           title: "Upload successful",
-          description: `${result.uploaded.length} file(s) uploaded successfully`,
+          description: `${result.uploaded.length} file(s) uploaded successfully${result.totalBatches > 1 ? ` in ${result.totalBatches} batches` : ''}`,
         });
       }
 
       if (result.failed.length > 0) {
+        setLastFailedFiles(result.failed);
+        setShowFailedFiles(true);
         toast({
           title: "Some files failed",
-          description: result.failed.map(f => `${f.filename}: ${f.error}`).join(", "),
+          description: `${result.failed.length} file(s) failed to upload. Click "View Failed" to see details.`,
           variant: "destructive",
         });
+      } else {
+        setLastFailedFiles([]);
+        setShowFailedFiles(false);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to upload documents";
@@ -119,7 +139,7 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
         variant: "destructive",
       });
     }
-  }, [projectId, selectedType, uploadDocuments, toast, startDocumentUpload, completeDocumentUpload, failDocumentUpload]);
+  }, [projectId, selectedType, queryClient, toast, startDocumentUpload, updateDocumentProgress, completeDocumentUpload, failDocumentUpload]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -286,12 +306,35 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-800 flex items-center gap-3"
+                className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-800 space-y-3"
               >
-                <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
-                <span className="text-sm text-blue-700 dark:text-blue-300">
-                  Uploading {documentUpload.uploadingCount} document{documentUpload.uploadingCount !== 1 ? 's' : ''}...
-                </span>
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                        Uploading {documentUpload.uploadingCount} document{documentUpload.uploadingCount !== 1 ? 's' : ''}
+                      </span>
+                      {documentUpload.totalBatches > 1 && (
+                        <span className="text-xs text-blue-600 dark:text-blue-400">
+                          Batch {documentUpload.currentBatch} of {documentUpload.totalBatches}
+                        </span>
+                      )}
+                    </div>
+                    {documentUpload.totalBatches > 1 && (
+                      <Progress 
+                        value={(documentUpload.uploadedCount / documentUpload.uploadingCount) * 100} 
+                        className="h-2"
+                      />
+                    )}
+                  </div>
+                </div>
+                {documentUpload.uploadedCount > 0 && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    {documentUpload.uploadedCount} of {documentUpload.uploadingCount} uploaded
+                    {documentUpload.failedFiles.length > 0 && ` (${documentUpload.failedFiles.length} failed)`}
+                  </p>
+                )}
               </motion.div>
             )}
 
@@ -300,13 +343,48 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               isDragOver={isDragOver}
-              isUploading={documentUpload.isUploading || uploadDocuments.isPending}
+              isUploading={documentUpload.isUploading}
               onBrowse={() => document.getElementById('file-upload')?.click()}
               title={isDragOver ? "Drop files here" : "Drag and drop files here"}
               description="Upload your project documents for AI analysis"
               icons={[FileText, File]}
               acceptedFormats="PDF and Word documents (.pdf, .doc, .docx)"
             />
+
+            {lastFailedFiles.length > 0 && showFailedFiles && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-200 dark:border-red-800 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                      {lastFailedFiles.length} file(s) failed to upload
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowFailedFiles(false)}
+                    className="text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30"
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+                <ScrollArea className="max-h-[120px]">
+                  <ul className="text-xs text-red-600 dark:text-red-400 space-y-1">
+                    {lastFailedFiles.map((file, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="font-medium truncate max-w-[200px]">{file.filename}:</span>
+                        <span className="text-red-500 dark:text-red-500">{file.error}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </ScrollArea>
+              </motion.div>
+            )}
           </div>
         </GlassCard>
       </div>

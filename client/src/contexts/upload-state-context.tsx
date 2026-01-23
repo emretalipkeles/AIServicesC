@@ -12,6 +12,10 @@ export interface ScheduleUploadState {
 export interface DocumentUploadState {
   isUploading: boolean;
   uploadingCount: number;
+  currentBatch: number;
+  totalBatches: number;
+  uploadedCount: number;
+  failedFiles: Array<{ filename: string; error: string }>;
   error: string | null;
 }
 
@@ -30,6 +34,14 @@ export interface ProjectUploadState {
 
 type UploadStateMap = Record<string, ProjectUploadState>;
 
+export interface DocumentBatchProgress {
+  currentBatch: number;
+  totalBatches: number;
+  uploadedCount: number;
+  totalFiles: number;
+  failedFiles: Array<{ filename: string; error: string }>;
+}
+
 type UploadAction =
   | { type: "SCHEDULE_UPLOAD_START"; projectId: string }
   | { type: "SCHEDULE_UPLOAD_PROGRESS"; projectId: string; progress: ProgressEvent }
@@ -37,7 +49,8 @@ type UploadAction =
   | { type: "SCHEDULE_UPLOAD_ERROR"; projectId: string; error: string }
   | { type: "SCHEDULE_UPLOAD_RESET"; projectId: string }
   | { type: "DOCUMENT_UPLOAD_START"; projectId: string; count: number }
-  | { type: "DOCUMENT_UPLOAD_SUCCESS"; projectId: string }
+  | { type: "DOCUMENT_UPLOAD_PROGRESS"; projectId: string; progress: DocumentBatchProgress }
+  | { type: "DOCUMENT_UPLOAD_SUCCESS"; projectId: string; failedFiles: Array<{ filename: string; error: string }> }
   | { type: "DOCUMENT_UPLOAD_ERROR"; projectId: string; error: string }
   | { type: "DOCUMENT_UPLOAD_RESET"; projectId: string }
   | { type: "ANALYSIS_START"; projectId: string }
@@ -56,6 +69,10 @@ const initialProjectState: ProjectUploadState = {
   documents: {
     isUploading: false,
     uploadingCount: 0,
+    currentBatch: 0,
+    totalBatches: 0,
+    uploadedCount: 0,
+    failedFiles: [],
     error: null,
   },
   analysis: {
@@ -146,7 +163,26 @@ function uploadReducer(state: UploadStateMap, action: UploadAction): UploadState
           documents: {
             isUploading: true,
             uploadingCount: action.count,
+            currentBatch: 0,
+            totalBatches: 0,
+            uploadedCount: 0,
+            failedFiles: [],
             error: null,
+          },
+        },
+      };
+
+    case "DOCUMENT_UPLOAD_PROGRESS":
+      return {
+        ...state,
+        [projectId]: {
+          ...projectState,
+          documents: {
+            ...projectState.documents,
+            currentBatch: action.progress.currentBatch,
+            totalBatches: action.progress.totalBatches,
+            uploadedCount: action.progress.uploadedCount,
+            failedFiles: action.progress.failedFiles,
           },
         },
       };
@@ -159,6 +195,10 @@ function uploadReducer(state: UploadStateMap, action: UploadAction): UploadState
           documents: {
             isUploading: false,
             uploadingCount: 0,
+            currentBatch: 0,
+            totalBatches: 0,
+            uploadedCount: 0,
+            failedFiles: action.failedFiles,
             error: null,
           },
         },
@@ -170,8 +210,8 @@ function uploadReducer(state: UploadStateMap, action: UploadAction): UploadState
         [projectId]: {
           ...projectState,
           documents: {
+            ...projectState.documents,
             isUploading: false,
-            uploadingCount: 0,
             error: action.error,
           },
         },
@@ -261,7 +301,8 @@ interface UploadStateContextValue {
   completeScheduleUpload: (projectId: string, cost: RunTokenUsageSummary | null) => void;
   failScheduleUpload: (projectId: string, error: string) => void;
   startDocumentUpload: (projectId: string, count: number) => void;
-  completeDocumentUpload: (projectId: string) => void;
+  updateDocumentProgress: (projectId: string, progress: DocumentBatchProgress) => void;
+  completeDocumentUpload: (projectId: string, failedFiles: Array<{ filename: string; error: string }>) => void;
   failDocumentUpload: (projectId: string, error: string) => void;
   startAnalysis: (projectId: string) => void;
   updateAnalysisProgress: (projectId: string, progress: AnalysisProgressEvent) => void;
@@ -303,8 +344,12 @@ export function UploadStateProvider({ children }: UploadStateProviderProps) {
     dispatch({ type: "DOCUMENT_UPLOAD_START", projectId, count });
   }, []);
 
-  const completeDocumentUpload = useCallback((projectId: string) => {
-    dispatch({ type: "DOCUMENT_UPLOAD_SUCCESS", projectId });
+  const updateDocumentProgress = useCallback((projectId: string, progress: DocumentBatchProgress) => {
+    dispatch({ type: "DOCUMENT_UPLOAD_PROGRESS", projectId, progress });
+  }, []);
+
+  const completeDocumentUpload = useCallback((projectId: string, failedFiles: Array<{ filename: string; error: string }>) => {
+    dispatch({ type: "DOCUMENT_UPLOAD_SUCCESS", projectId, failedFiles });
   }, []);
 
   const failDocumentUpload = useCallback((projectId: string, error: string) => {
@@ -334,6 +379,7 @@ export function UploadStateProvider({ children }: UploadStateProviderProps) {
     completeScheduleUpload,
     failScheduleUpload,
     startDocumentUpload,
+    updateDocumentProgress,
     completeDocumentUpload,
     failDocumentUpload,
     startAnalysis,
@@ -366,7 +412,8 @@ export function useUploadState(projectId: string) {
     completeScheduleUpload: (cost: RunTokenUsageSummary | null) => context.completeScheduleUpload(projectId, cost),
     failScheduleUpload: (error: string) => context.failScheduleUpload(projectId, error),
     startDocumentUpload: (count: number) => context.startDocumentUpload(projectId, count),
-    completeDocumentUpload: () => context.completeDocumentUpload(projectId),
+    updateDocumentProgress: (progress: DocumentBatchProgress) => context.updateDocumentProgress(projectId, progress),
+    completeDocumentUpload: (failedFiles: Array<{ filename: string; error: string }>) => context.completeDocumentUpload(projectId, failedFiles),
     failDocumentUpload: (error: string) => context.failDocumentUpload(projectId, error),
     startAnalysis: () => context.startAnalysis(projectId),
     updateAnalysisProgress: (progress: AnalysisProgressEvent) => context.updateAnalysisProgress(projectId, progress),

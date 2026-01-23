@@ -26,7 +26,30 @@ export interface UploadResult {
   }>;
 }
 
+export interface BatchUploadProgress {
+  currentBatch: number;
+  totalBatches: number;
+  uploadedCount: number;
+  totalFiles: number;
+  failedFiles: Array<{ filename: string; error: string }>;
+}
+
+export interface BatchUploadResult {
+  uploaded: Array<{
+    id: string;
+    filename: string;
+    status: string;
+  }>;
+  failed: Array<{
+    filename: string;
+    error: string;
+  }>;
+  totalBatches: number;
+}
+
 export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'other';
+
+const BATCH_SIZE = 25;
 
 async function fetchDocuments(projectId: string): Promise<ProjectDocumentDto[]> {
   const response = await fetch(`/api/delay-analysis/projects/${projectId}/documents`);
@@ -36,7 +59,7 @@ async function fetchDocuments(projectId: string): Promise<ProjectDocumentDto[]> 
   return response.json();
 }
 
-async function uploadDocuments(
+async function uploadDocumentsBatch(
   projectId: string, 
   files: File[], 
   documentType: ProjectDocumentType
@@ -54,6 +77,66 @@ async function uploadDocuments(
     throw new Error("Failed to upload documents");
   }
   return response.json();
+}
+
+export async function uploadDocumentsInBatches(
+  projectId: string,
+  files: File[],
+  documentType: ProjectDocumentType,
+  onProgress?: (progress: BatchUploadProgress) => void
+): Promise<BatchUploadResult> {
+  const batches: File[][] = [];
+  for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    batches.push(files.slice(i, i + BATCH_SIZE));
+  }
+
+  const allUploaded: BatchUploadResult['uploaded'] = [];
+  const allFailed: BatchUploadResult['failed'] = [];
+
+  onProgress?.({
+    currentBatch: 0,
+    totalBatches: batches.length,
+    uploadedCount: 0,
+    totalFiles: files.length,
+    failedFiles: [],
+  });
+
+  for (let i = 0; i < batches.length; i++) {
+    const batch = batches[i];
+    
+    onProgress?.({
+      currentBatch: i + 1,
+      totalBatches: batches.length,
+      uploadedCount: allUploaded.length,
+      totalFiles: files.length,
+      failedFiles: [...allFailed],
+    });
+
+    try {
+      const result = await uploadDocumentsBatch(projectId, batch, documentType);
+      allUploaded.push(...result.uploaded);
+      allFailed.push(...result.failed);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+      batch.forEach(file => {
+        allFailed.push({ filename: file.name, error: errorMessage });
+      });
+    }
+
+    onProgress?.({
+      currentBatch: i + 1,
+      totalBatches: batches.length,
+      uploadedCount: allUploaded.length,
+      totalFiles: files.length,
+      failedFiles: [...allFailed],
+    });
+  }
+
+  return {
+    uploaded: allUploaded,
+    failed: allFailed,
+    totalBatches: batches.length,
+  };
 }
 
 async function deleteDocument(projectId: string, documentId: string): Promise<void> {
@@ -81,7 +164,7 @@ export function useUploadDocuments() {
       projectId: string; 
       files: File[]; 
       documentType: ProjectDocumentType;
-    }) => uploadDocuments(projectId, files, documentType),
+    }) => uploadDocumentsBatch(projectId, files, documentType),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
     },
