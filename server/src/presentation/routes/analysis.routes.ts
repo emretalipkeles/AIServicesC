@@ -8,6 +8,7 @@ import { GetTokenUsageByRunIdQuery } from '../../application/delay-analysis/quer
 import { SSEProgressReporter } from '../../infrastructure/document-parsing/SSEProgressReporter';
 import type { TokenUsageCallback, TokenUsageRecord } from '../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
 import { runAnalysisParamsSchema, runAnalysisBodySchema, listDelayEventsParamsSchema } from '../validators/analysisValidators';
+import ExcelJS from 'exceljs';
 
 const DEFAULT_TENANT_ID = 'default';
 
@@ -62,38 +63,142 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
           tenantId: DEFAULT_TENANT_ID,
         });
 
-        const headers = [
-          'WBS', 'Activity ID', 'Activity Description', 'Event Description',
-          'Event Category', 'Event Date', 'Duration (Hours)', 'Source Reference',
-          'Confidence (%)', 'Match Reasoning', 'Status',
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Data First - Delay Analysis';
+        workbook.created = new Date();
+
+        const worksheet = workbook.addWorksheet('Delay Analysis Results', {
+          views: [{ state: 'frozen', ySplit: 1 }],
+        });
+
+        worksheet.columns = [
+          { header: 'WBS', key: 'wbs', width: 12 },
+          { header: 'Activity ID', key: 'activityId', width: 15 },
+          { header: 'Activity Description', key: 'activityDesc', width: 35 },
+          { header: 'Delay Event', key: 'eventDesc', width: 40 },
+          { header: 'Category', key: 'category', width: 22 },
+          { header: 'Date', key: 'date', width: 12 },
+          { header: 'Duration (hrs)', key: 'duration', width: 14 },
+          { header: 'Source Reference', key: 'sourceRef', width: 25 },
+          { header: 'Confidence', key: 'confidence', width: 12 },
+          { header: 'Match Reasoning', key: 'reasoning', width: 45 },
+          { header: 'Status', key: 'status', width: 14 },
         ];
 
-        const rows = events.map(event => [
-          event.wbs || '',
-          event.cpmActivityId || '',
-          event.cpmActivityDescription || '',
-          `"${event.eventDescription.replace(/"/g, '""')}"`,
-          event.eventCategory || '',
-          event.eventStartDate ? new Date(event.eventStartDate).toISOString().split('T')[0] : '',
-          event.impactDurationHours?.toString() || '',
-          event.sourceReference || '',
-          event.matchConfidence?.toString() || '',
-          event.matchReasoning ? `"${event.matchReasoning.replace(/"/g, '""')}"` : '',
-          event.verificationStatus,
-        ]);
+        const headerRow = worksheet.getRow(1);
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+        headerRow.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF1E293B' },
+        };
+        headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        headerRow.height = 28;
 
-        const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+        headerRow.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF3B82F6' } },
+            bottom: { style: 'medium', color: { argb: 'FF3B82F6' } },
+            left: { style: 'thin', color: { argb: 'FF334155' } },
+            right: { style: 'thin', color: { argb: 'FF334155' } },
+          };
+        });
 
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename="delay-analysis-${params.projectId}.csv"`);
-        res.send(csv);
+        const categoryColors: Record<string, string> = {
+          'Weather': 'FF2563EB',
+          'Labor Related': 'FF7C3AED',
+          'Materials Equipment': 'FFF59E0B',
+          'Site Management Safety': 'FF10B981',
+          'Utility Infrastructure': 'FF06B6D4',
+          'Quality Rework': 'FFEF4444',
+          'Planning Mobilization': 'FF6366F1',
+          'Third Party': 'FF8B5CF6',
+          'Owner Related': 'FFEC4899',
+        };
+
+        events.forEach((event, index) => {
+          const rowData = {
+            wbs: event.wbs || '',
+            activityId: event.cpmActivityId || '',
+            activityDesc: event.cpmActivityDescription || '',
+            eventDesc: event.eventDescription,
+            category: event.eventCategory || '',
+            date: event.eventStartDate ? new Date(event.eventStartDate) : null,
+            duration: event.impactDurationHours || null,
+            sourceRef: event.sourceReference || '',
+            confidence: event.matchConfidence ? `${event.matchConfidence}%` : '',
+            reasoning: event.matchReasoning || '',
+            status: event.verificationStatus,
+          };
+
+          const row = worksheet.addRow(rowData);
+          const isEvenRow = index % 2 === 0;
+
+          row.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: isEvenRow ? 'FF0F172A' : 'FF1E293B' },
+          };
+          row.font = { color: { argb: 'FFE2E8F0' }, size: 10 };
+          row.alignment = { vertical: 'middle', wrapText: true };
+          row.height = 22;
+
+          row.eachCell((cell, colNumber) => {
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FF334155' } },
+              bottom: { style: 'thin', color: { argb: 'FF334155' } },
+              left: { style: 'thin', color: { argb: 'FF334155' } },
+              right: { style: 'thin', color: { argb: 'FF334155' } },
+            };
+
+            if (colNumber === 5 && event.eventCategory) {
+              const categoryKey = Object.keys(categoryColors).find(
+                k => event.eventCategory?.toLowerCase().includes(k.toLowerCase().split(' ')[0])
+              );
+              if (categoryKey) {
+                cell.fill = {
+                  type: 'pattern',
+                  pattern: 'solid',
+                  fgColor: { argb: categoryColors[categoryKey] },
+                };
+                cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
+              }
+            }
+
+            if (colNumber === 9 && event.matchConfidence) {
+              const conf = event.matchConfidence;
+              if (conf >= 80) {
+                cell.font = { color: { argb: 'FF22C55E' }, bold: true, size: 10 };
+              } else if (conf >= 50) {
+                cell.font = { color: { argb: 'FFFBBF24' }, bold: true, size: 10 };
+              } else {
+                cell.font = { color: { argb: 'FFEF4444' }, size: 10 };
+              }
+            }
+
+            if (colNumber === 6 && event.eventStartDate) {
+              cell.numFmt = 'mm/dd/yyyy';
+            }
+          });
+        });
+
+        worksheet.autoFilter = {
+          from: { row: 1, column: 1 },
+          to: { row: events.length + 1, column: 11 },
+        };
+
+        const buffer = await workbook.xlsx.writeBuffer();
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="delay-analysis-${params.projectId}.xlsx"`);
+        res.send(Buffer.from(buffer));
       } catch (error) {
         if (error instanceof Error && error.name === 'ZodError') {
           res.status(400).json({ success: false, error: 'Invalid request parameters' });
           return;
         }
 
-        console.error('Error exporting to CSV:', error);
+        console.error('Error exporting to Excel:', error);
         res.status(500).json({ success: false, error: 'Failed to export data' });
       }
     }
