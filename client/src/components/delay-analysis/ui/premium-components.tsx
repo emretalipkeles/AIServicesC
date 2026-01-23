@@ -1,5 +1,5 @@
 import React, { ReactNode } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
 
@@ -643,77 +643,275 @@ export function TableFilter({ value, onChange, placeholder = "Search...", classN
   );
 }
 
-interface TruncatedTextWithTooltipProps {
-  text: string | null | undefined;
-  maxWidth?: string;
+interface SmartPopoverProps {
+  content: React.ReactNode;
+  children: React.ReactNode;
+  maxHeight?: number;
+  maxWidth?: number;
   className?: string;
+  disabled?: boolean;
 }
 
-export function TruncatedTextWithTooltip({ text, maxWidth = "200px", className }: TruncatedTextWithTooltipProps) {
-  const [isHovered, setIsHovered] = React.useState(false);
-  const [tooltipPosition, setTooltipPosition] = React.useState({ x: 0, y: 0 });
-  const textRef = React.useRef<HTMLSpanElement>(null);
+export function SmartPopover({ 
+  content, 
+  children, 
+  maxHeight = 280, 
+  maxWidth = 380,
+  className,
+  disabled = false 
+}: SmartPopoverProps) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [position, setPosition] = React.useState<{ x: number; y: number; placement: 'top' | 'bottom' }>({ x: 0, y: 0, placement: 'top' });
+  const triggerRef = React.useRef<HTMLDivElement>(null);
+  const popoverRef = React.useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = React.useRef<NodeJS.Timeout>();
 
-  if (!text) return <span className="text-muted-foreground">-</span>;
+  const calculatePosition = React.useCallback(() => {
+    if (!triggerRef.current) return;
+    
+    const rect = triggerRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const padding = 12;
+    
+    const spaceAbove = rect.top;
+    const spaceBelow = viewportHeight - rect.bottom;
+    const preferTop = spaceAbove > maxHeight + padding || spaceAbove > spaceBelow;
+    
+    let x = rect.left + rect.width / 2;
+    if (x - maxWidth / 2 < padding) x = maxWidth / 2 + padding;
+    if (x + maxWidth / 2 > viewportWidth - padding) x = viewportWidth - maxWidth / 2 - padding;
+    
+    const y = preferTop ? rect.top - padding : rect.bottom + padding;
+    
+    setPosition({ x, y, placement: preferTop ? 'top' : 'bottom' });
+  }, [maxHeight, maxWidth]);
 
-  const handleMouseEnter = (e: React.MouseEvent) => {
-    const rect = (e.target as HTMLElement).getBoundingClientRect();
-    setTooltipPosition({ 
-      x: rect.left + rect.width / 2, 
-      y: rect.top - 8 
-    });
-    setIsHovered(true);
+  const handleMouseEnter = () => {
+    if (disabled) return;
+    clearTimeout(hoverTimeoutRef.current);
+    calculatePosition();
+    setIsOpen(true);
   };
 
+  const handleMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => setIsOpen(false), 150);
+  };
+
+  const handlePopoverEnter = () => {
+    clearTimeout(hoverTimeoutRef.current);
+  };
+
+  React.useEffect(() => {
+    return () => clearTimeout(hoverTimeoutRef.current);
+  }, []);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      const handleScroll = () => calculatePosition();
+      window.addEventListener('scroll', handleScroll, true);
+      return () => window.removeEventListener('scroll', handleScroll, true);
+    }
+  }, [isOpen, calculatePosition]);
+
   return (
-    <div className="relative">
-      <span
-        ref={textRef}
+    <>
+      <div 
+        ref={triggerRef}
         onMouseEnter={handleMouseEnter}
-        onMouseLeave={() => setIsHovered(false)}
-        style={{ maxWidth }}
-        className={cn(
-          "block truncate cursor-default",
-          className
-        )}
+        onMouseLeave={handleMouseLeave}
+        className={className}
       >
-        {text}
-      </span>
-      {isHovered && (
-        <div 
-          className="fixed z-[100] pointer-events-none"
-          style={{ 
-            left: `${tooltipPosition.x}px`, 
-            top: `${tooltipPosition.y}px`,
-            transform: 'translate(-50%, -100%)'
-          }}
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className={cn(
-              "max-w-sm px-3 py-2 rounded-lg shadow-xl",
-              "bg-zinc-900 dark:bg-zinc-800 text-white",
-              "border border-zinc-700/50",
-              "text-sm leading-relaxed",
-              "backdrop-blur-xl"
-            )}
+        {children}
+      </div>
+      <AnimatePresence>
+        {isOpen && (
+          <div 
+            ref={popoverRef}
+            className="fixed z-[100]"
+            style={{ 
+              left: `${position.x}px`, 
+              top: `${position.y}px`,
+              transform: position.placement === 'top' 
+                ? 'translate(-50%, -100%)' 
+                : 'translate(-50%, 0)'
+            }}
+            onMouseEnter={handlePopoverEnter}
+            onMouseLeave={handleMouseLeave}
           >
-            <div className="relative">
-              {text}
+            <motion.div
+              initial={{ opacity: 0, y: position.placement === 'top' ? 8 : -8, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: position.placement === 'top' ? 4 : -4, scale: 0.98 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              style={{ maxWidth: `${maxWidth}px`, maxHeight: `${maxHeight}px` }}
+              className={cn(
+                "overflow-auto rounded-xl shadow-2xl",
+                "bg-zinc-900/95 dark:bg-zinc-800/95 text-white",
+                "border border-zinc-700/60",
+                "backdrop-blur-xl",
+                "ring-1 ring-white/5"
+              )}
+            >
+              <div className="p-3 text-sm leading-relaxed">
+                {content}
+              </div>
               <div 
-                className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0"
+                className={cn(
+                  "absolute left-1/2 -translate-x-1/2 w-0 h-0",
+                  position.placement === 'top' ? 'top-full' : 'bottom-full'
+                )}
                 style={{
-                  borderLeft: '6px solid transparent',
-                  borderRight: '6px solid transparent',
-                  borderTop: '6px solid rgb(39 39 42)',
+                  borderLeft: '8px solid transparent',
+                  borderRight: '8px solid transparent',
+                  ...(position.placement === 'top' 
+                    ? { borderTop: '8px solid rgba(39, 39, 42, 0.95)' }
+                    : { borderBottom: '8px solid rgba(39, 39, 42, 0.95)' }
+                  ),
                 }}
               />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+interface DetailDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  content: React.ReactNode;
+}
+
+export function DetailDrawer({ isOpen, onClose, title, content }: DetailDrawerProps) {
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, onClose]);
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[200]">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            className={cn(
+              "absolute right-0 top-0 bottom-0 w-full max-w-lg",
+              "bg-background/95 backdrop-blur-xl",
+              "border-l border-border/50",
+              "shadow-2xl"
+            )}
+          >
+            <div className="flex flex-col h-full">
+              <div className="flex items-center justify-between p-4 border-b border-border/50">
+                <h3 className="font-semibold text-lg">{title || 'Details'}</h3>
+                <button
+                  onClick={onClose}
+                  className={cn(
+                    "p-2 rounded-lg transition-colors",
+                    "hover:bg-muted text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto p-6">
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  {content}
+                </div>
+              </div>
             </div>
           </motion.div>
         </div>
       )}
+    </AnimatePresence>
+  );
+}
+
+interface TruncatedTextWithTooltipProps {
+  text: string | null | undefined;
+  maxWidth?: string;
+  className?: string;
+  label?: string;
+  longTextThreshold?: number;
+}
+
+export function TruncatedTextWithTooltip({ 
+  text, 
+  maxWidth = "200px", 
+  className,
+  label,
+  longTextThreshold = 500
+}: TruncatedTextWithTooltipProps) {
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+
+  if (!text) return <span className="text-muted-foreground">-</span>;
+
+  const isLongText = text.length > longTextThreshold;
+
+  const popoverContent = (
+    <div className="space-y-2">
+      <p className="whitespace-pre-wrap">{text}</p>
+      {isLongText && (
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className={cn(
+            "mt-2 text-xs font-medium px-2 py-1 rounded",
+            "bg-primary/20 text-primary hover:bg-primary/30",
+            "transition-colors"
+          )}
+        >
+          View Full Text
+        </button>
+      )}
     </div>
+  );
+
+  return (
+    <>
+      <SmartPopover content={popoverContent}>
+        <span
+          style={{ maxWidth }}
+          className={cn(
+            "block truncate cursor-default hover:text-foreground transition-colors",
+            className
+          )}
+        >
+          {text}
+        </span>
+      </SmartPopover>
+      <DetailDrawer 
+        isOpen={drawerOpen} 
+        onClose={() => setDrawerOpen(false)}
+        title={label || "Full Text"}
+        content={<p className="whitespace-pre-wrap text-foreground">{text}</p>}
+      />
+    </>
   );
 }

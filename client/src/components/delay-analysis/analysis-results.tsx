@@ -165,6 +165,7 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                                 text={event.cpmActivityDescription} 
                                 maxWidth="120px"
                                 className="text-xs"
+                                label="Activity Description"
                               />
                             </td>
                             <td className="p-2">
@@ -179,6 +180,7 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                                 text={event.eventDescription} 
                                 maxWidth="160px"
                                 className="text-xs"
+                                label="Delay Event"
                               />
                             </td>
                             <td className="p-2 max-w-[100px]">
@@ -186,16 +188,23 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                                 text={event.sourceReference} 
                                 maxWidth="100px"
                                 className="text-xs text-muted-foreground"
+                                label="Source Reference"
                               />
                             </td>
-                            <td className="p-2 text-xs text-muted-foreground max-w-[80px] truncate">
-                              {event.sourceDocumentId ? documentNameMap.get(event.sourceDocumentId) || "-" : "-"}
+                            <td className="p-2 max-w-[100px]">
+                              <TruncatedTextWithTooltip 
+                                text={event.sourceDocumentId ? documentNameMap.get(event.sourceDocumentId) : null}
+                                maxWidth="100px"
+                                className="text-xs text-muted-foreground"
+                                label="Source Document"
+                              />
                             </td>
                             <td className="p-2 max-w-[120px]">
                               <TruncatedTextWithTooltip 
                                 text={event.matchReasoning} 
                                 maxWidth="120px"
                                 className="text-xs text-muted-foreground"
+                                label="Match Reasoning"
                               />
                             </td>
                             <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">{formatDate(event.eventStartDate)}</td>
