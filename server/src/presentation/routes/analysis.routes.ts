@@ -190,6 +190,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
         };
 
         const buffer = await workbook.xlsx.writeBuffer();
+        const bufferData = Buffer.from(buffer);
 
         const today = new Date();
         const dateStr = today.toISOString().split('T')[0];
@@ -197,7 +198,12 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.send(Buffer.from(buffer));
+        res.setHeader('Content-Length', bufferData.length.toString());
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.send(bufferData);
       } catch (error) {
         if (error instanceof Error && error.name === 'ZodError') {
           res.status(400).json({ success: false, error: 'Invalid request parameters' });
