@@ -1,6 +1,6 @@
 import { PDFParse } from 'pdf-parse';
 import mammoth from 'mammoth';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { getDocumentProxy, extractText } from 'unpdf';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -370,15 +370,24 @@ export class NativeDocumentParser {
 
   private async parseExcel(buffer: Buffer): Promise<ParseResult> {
     try {
-      const workbook = XLSX.read(buffer, { type: 'buffer' });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
       const sheets: string[] = [];
 
-      for (const sheetName of workbook.SheetNames) {
-        const sheet = workbook.Sheets[sheetName];
-        const csvContent = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+      for (const worksheet of workbook.worksheets) {
+        const rows: string[] = [];
+        worksheet.eachRow((row) => {
+          const values: string[] = [];
+          row.eachCell((cell) => {
+            values.push(cell.value?.toString() || '');
+          });
+          if (values.some(v => v.trim())) {
+            rows.push(values.join(','));
+          }
+        });
         
-        if (csvContent.trim()) {
-          sheets.push(`=== Sheet: ${sheetName} ===\n${csvContent}`);
+        if (rows.length > 0) {
+          sheets.push(`=== Sheet: ${worksheet.name} ===\n${rows.join('\n')}`);
         }
       }
 

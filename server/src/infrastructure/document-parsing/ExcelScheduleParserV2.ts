@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import type { ParsedScheduleRow } from '../../domain/delay-analysis/interfaces/IExcelParser';
 import type { 
   IScheduleParser, 
@@ -53,9 +53,10 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
     let filteredByMonth = 0;
 
     try {
-      const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
       
-      if (workbook.SheetNames.length === 0) {
+      if (workbook.worksheets.length === 0) {
         return {
           rows: [],
           scheduleUpdateMonth: null,
@@ -66,9 +67,8 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
         };
       }
 
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
+      const worksheet = workbook.worksheets[0];
+      const jsonData = this.worksheetToJson(worksheet);
 
       if (jsonData.length === 0) {
         return {
@@ -177,6 +177,30 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
     };
 
     return checkDate(actualStart) || checkDate(actualFinish);
+  }
+
+  private worksheetToJson(worksheet: ExcelJS.Worksheet): Record<string, unknown>[] {
+    const rows: Record<string, unknown>[] = [];
+    const headers: string[] = [];
+    
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) {
+        row.eachCell((cell, colNumber) => {
+          headers[colNumber - 1] = cell.value?.toString() || `Column${colNumber}`;
+        });
+      } else {
+        const rowData: Record<string, unknown> = {};
+        row.eachCell((cell, colNumber) => {
+          const header = headers[colNumber - 1] || `Column${colNumber}`;
+          rowData[header] = cell.value;
+        });
+        if (Object.keys(rowData).length > 0) {
+          rows.push(rowData);
+        }
+      }
+    });
+    
+    return rows;
   }
 
   private detectColumns(headers: string[]): Record<string, string | null> {
