@@ -2,10 +2,11 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Download, CheckCircle, AlertCircle, Clock, TrendingUp } from "lucide-react";
-import { useDelayEvents, getExportUrl } from "@/lib/analysis-api";
+import { useDelayEvents } from "@/lib/analysis-api";
 import { useProjectDocuments } from "@/lib/project-documents-api";
 import { GlassCard, SectionHeader, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles, TruncatedTextWithTooltip } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
+import { exportDelayEventsToExcel } from "@/lib/excel-export";
 
 interface AnalysisResultsProps {
   projectId: string;
@@ -35,8 +36,8 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
     return conf > 0 && conf < 50;
   });
 
-  const handleExport = () => {
-    window.open(getExportUrl(projectId), "_blank");
+  const handleExport = async () => {
+    await exportDelayEventsToExcel(events);
   };
 
   const formatDate = (dateStr: string | null) => {

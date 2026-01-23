@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
 interface DelayEventData {
@@ -28,82 +28,114 @@ const categoryColors: Record<string, { bg: string; text: string }> = {
   'Subcontractor': { bg: 'CFFAFE', text: '0891B2' },
 };
 
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '';
-  try {
-    return new Date(dateStr).toLocaleDateString();
-  } catch {
-    return dateStr;
-  }
-}
-
 function formatCategory(category: string | null | undefined): string {
   if (!category) return '';
   return category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
-export function exportDelayEventsToExcel(events: DelayEventData[]): void {
-  const headers = [
-    'WBS',
-    'Activity ID',
-    'Activity Description',
-    'Delay Event',
-    'Category',
-    'Date',
-    'Duration (hrs)',
-    'Source Reference',
-    'Confidence',
-    'Match Reasoning',
-    'Status',
+export async function exportDelayEventsToExcel(events: DelayEventData[]): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Data First - Delay Analysis';
+  workbook.created = new Date();
+
+  const worksheet = workbook.addWorksheet('Delay Analysis Results', {
+    views: [{ state: 'frozen', ySplit: 1 }],
+  });
+
+  worksheet.columns = [
+    { header: 'WBS', key: 'wbs', width: 12 },
+    { header: 'Activity ID', key: 'activityId', width: 15 },
+    { header: 'Activity Description', key: 'activityDesc', width: 35 },
+    { header: 'Delay Event', key: 'eventDesc', width: 40 },
+    { header: 'Category', key: 'category', width: 22 },
+    { header: 'Date', key: 'date', width: 12 },
+    { header: 'Duration (hrs)', key: 'duration', width: 14 },
+    { header: 'Source Reference', key: 'sourceRef', width: 25 },
+    { header: 'Confidence', key: 'confidence', width: 12 },
+    { header: 'Match Reasoning', key: 'reasoning', width: 45 },
+    { header: 'Status', key: 'status', width: 14 },
   ];
 
-  const data = events.map(event => [
-    event.wbs || '',
-    event.cpmActivityId || '',
-    event.cpmActivityDescription || '',
-    event.eventDescription,
-    formatCategory(event.eventCategory),
-    formatDate(event.eventStartDate),
-    event.impactDurationHours != null ? event.impactDurationHours : '',
-    event.sourceReference || '',
-    event.matchConfidence != null ? `${event.matchConfidence}%` : '',
-    event.matchReasoning || '',
-    event.verificationStatus,
-  ]);
+  const headerRow = worksheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+  headerRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF3B82F6' },
+  };
+  headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  headerRow.height = 28;
 
-  const wsData = [headers, ...data];
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  headerRow.eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF3B82F6' } },
+      bottom: { style: 'medium', color: { argb: 'FF3B82F6' } },
+      left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    };
+  });
 
-  const colWidths = [
-    { wch: 12 },
-    { wch: 15 },
-    { wch: 35 },
-    { wch: 40 },
-    { wch: 22 },
-    { wch: 12 },
-    { wch: 14 },
-    { wch: 25 },
-    { wch: 12 },
-    { wch: 45 },
-    { wch: 14 },
-  ];
-  ws['!cols'] = colWidths;
+  events.forEach((event, index) => {
+    const rowData = {
+      wbs: event.wbs || '',
+      activityId: event.cpmActivityId || '',
+      activityDesc: event.cpmActivityDescription || '',
+      eventDesc: event.eventDescription,
+      category: formatCategory(event.eventCategory),
+      date: event.eventStartDate ? new Date(event.eventStartDate) : null,
+      duration: event.impactDurationHours || null,
+      sourceRef: event.sourceReference || '',
+      confidence: event.matchConfidence ? `${event.matchConfidence}%` : '',
+      reasoning: event.matchReasoning || '',
+      status: event.verificationStatus,
+    };
 
-  const wb = XLSX.utils.book_new();
-  wb.Props = {
-    Title: 'Delay Analysis Export',
-    Author: 'Data First - Delay Analysis',
-    CreatedDate: new Date(),
+    const row = worksheet.addRow(rowData);
+    const isEvenRow = index % 2 === 0;
+
+    row.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: isEvenRow ? 'FFFFFFFF' : 'FFF8FAFC' },
+    };
+    row.font = { color: { argb: 'FF1E293B' }, size: 10 };
+    row.alignment = { vertical: 'middle', wrapText: true };
+    row.height = 22;
+
+    row.eachCell((cell, colNumber) => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      };
+
+      if (colNumber === 5) {
+        const formattedCategory = formatCategory(event.eventCategory);
+        const colors = categoryColors[formattedCategory];
+        if (colors) {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: `FF${colors.bg}` },
+          };
+          cell.font = { color: { argb: `FF${colors.text}` }, size: 10, bold: true };
+        }
+      }
+    });
+  });
+
+  worksheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: events.length + 1, column: 11 },
   };
 
-  XLSX.utils.book_append_sheet(wb, ws, 'Delay Analysis Results');
-
-  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const buffer = await workbook.xlsx.writeBuffer();
 
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0];
   const filename = `Delay-Analysis-Export-${dateStr}.xlsx`;
 
-  const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   saveAs(blob, filename);
 }

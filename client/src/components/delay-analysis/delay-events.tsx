@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Activity, Play, Download, Loader2, DollarSign, CheckCircle, AlertCircle, Clock, Zap } from "lucide-react";
-import { useDelayEvents, getExportUrl, runAnalysisWithProgress, fetchRunTokenUsage } from "@/lib/analysis-api";
+import { useDelayEvents, runAnalysisWithProgress, fetchRunTokenUsage } from "@/lib/analysis-api";
 import { useUploadState } from "@/contexts/upload-state-context";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { GlassCard, SectionHeader, ProgressIndicator, StatCard, TableFilter } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
+import { exportDelayEventsToExcel } from "@/lib/excel-export";
 
 interface DelayEventsProps {
   projectId: string;
@@ -80,8 +81,8 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
     }
   };
 
-  const handleExport = () => {
-    window.open(getExportUrl(projectId), "_blank");
+  const handleExport = async () => {
+    await exportDelayEventsToExcel(events);
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -133,7 +134,7 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
               {events.length > 0 && (
                 <Button variant="outline" onClick={handleExport} disabled={analysis.isAnalyzing} className="gap-2">
                   <Download className="w-4 h-4" />
-                  Export CSV
+                  Export to Excel
                 </Button>
               )}
             </div>
