@@ -14,80 +14,124 @@ interface DelayEventData {
   verificationStatus: string;
 }
 
+const categoryColors: Record<string, { bg: string; text: string }> = {
+  'Weather': { bg: 'DBEAFE', text: '1E40AF' },
+  'Labor Related': { bg: 'FEE2E2', text: 'DC2626' },
+  'Materials Equipment': { bg: 'FEF3C7', text: 'D97706' },
+  'Site Management Safety': { bg: 'D1FAE5', text: '059669' },
+  'Utility Infrastructure': { bg: 'E0E7FF', text: '4F46E5' },
+  'Quality Rework': { bg: 'FCE7F3', text: 'DB2777' },
+  'Planning Mobilization': { bg: 'DBEAFE', text: '2563EB' },
+  'Third Party': { bg: 'F3E8FF', text: '9333EA' },
+  'Owner Related': { bg: 'FCE7F3', text: 'EC4899' },
+  'Subcontractor': { bg: 'CFFAFE', text: '0891B2' },
+};
+
 function formatCategory(category: string | null | undefined): string {
   if (!category) return '';
   return category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '';
-  try {
-    return new Date(dateStr).toLocaleDateString();
-  } catch {
-    return '';
-  }
-}
-
 export async function exportDelayEventsToExcel(events: DelayEventData[]): Promise<void> {
   const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Data First - Delay Analysis';
+  workbook.created = new Date();
 
-  const addSheet = (name: string, headers: string[], rows: string[][], wrapCols: number[] = []) => {
-    const sheet = workbook.addWorksheet(name);
-    const headerRow = sheet.addRow(headers);
-    headerRow.font = { bold: true };
-    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
-    rows.forEach(row => sheet.addRow(row));
-    sheet.columns.forEach((column, colIdx) => {
-      let maxLength = headers[colIdx]?.length || 10;
-      const shouldWrap = wrapCols.includes(colIdx);
-      rows.forEach(row => {
-        const cellValue = row[colIdx] || "";
-        const lines = cellValue.split("\n");
-        const longestLine = Math.max(...lines.map(l => l.length));
-        if (longestLine > maxLength) maxLength = longestLine;
-      });
-      column.width = Math.min(maxLength + 2, shouldWrap ? 60 : 40);
-      if (shouldWrap) {
-        sheet.eachRow((row, rowNum) => {
-          if (rowNum > 1) {
-            const cell = row.getCell(colIdx + 1);
-            cell.alignment = { wrapText: true, vertical: "top" };
-          }
-        });
-      }
-    });
-    sheet.views = [{ state: "frozen", ySplit: 1 }];
-  };
+  const worksheet = workbook.addWorksheet('Delay Analysis Results', {
+    views: [{ state: 'frozen', ySplit: 1 }],
+  });
 
-  const headers = [
-    'WBS',
-    'Activity ID',
-    'Activity Description',
-    'Delay Event',
-    'Category',
-    'Date',
-    'Duration (hrs)',
-    'Source Reference',
-    'Confidence',
-    'Match Reasoning',
-    'Status',
+  worksheet.columns = [
+    { header: 'WBS', key: 'wbs', width: 12 },
+    { header: 'Activity ID', key: 'activityId', width: 15 },
+    { header: 'Activity Description', key: 'activityDesc', width: 35 },
+    { header: 'Delay Event', key: 'eventDesc', width: 40 },
+    { header: 'Category', key: 'category', width: 22 },
+    { header: 'Date', key: 'date', width: 12 },
+    { header: 'Duration (hrs)', key: 'duration', width: 14 },
+    { header: 'Source Reference', key: 'sourceRef', width: 25 },
+    { header: 'Confidence', key: 'confidence', width: 12 },
+    { header: 'Match Reasoning', key: 'reasoning', width: 45 },
+    { header: 'Status', key: 'status', width: 14 },
   ];
 
-  const rows = events.map(event => [
-    event.wbs || '',
-    event.cpmActivityId || '',
-    event.cpmActivityDescription || '',
-    event.eventDescription,
-    formatCategory(event.eventCategory),
-    formatDate(event.eventStartDate),
-    event.impactDurationHours?.toString() || '',
-    event.sourceReference || '',
-    event.matchConfidence ? `${event.matchConfidence}%` : '',
-    event.matchReasoning || '',
-    event.verificationStatus,
-  ]);
+  const headerRow = worksheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+  headerRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF3B82F6' },
+  };
+  headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  headerRow.height = 28;
 
-  addSheet("Delay Analysis", headers, rows, [3, 9]);
+  headerRow.eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF3B82F6' } },
+      bottom: { style: 'medium', color: { argb: 'FF3B82F6' } },
+      left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    };
+  });
+
+  events.forEach((event, index) => {
+    const rowData = {
+      wbs: event.wbs || '',
+      activityId: event.cpmActivityId || '',
+      activityDesc: event.cpmActivityDescription || '',
+      eventDesc: event.eventDescription,
+      category: formatCategory(event.eventCategory),
+      date: event.eventStartDate ? new Date(event.eventStartDate) : null,
+      duration: event.impactDurationHours || null,
+      sourceRef: event.sourceReference || '',
+      confidence: event.matchConfidence ? `${event.matchConfidence}%` : '',
+      reasoning: event.matchReasoning || '',
+      status: event.verificationStatus,
+    };
+
+    const row = worksheet.addRow(rowData);
+    const isEvenRow = index % 2 === 0;
+
+    row.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: isEvenRow ? 'FFFFFFFF' : 'FFF8FAFC' },
+    };
+    row.font = { color: { argb: 'FF1E293B' }, size: 10 };
+    row.alignment = { vertical: 'middle', wrapText: true };
+    row.height = 22;
+
+    row.eachCell((cell, colNumber) => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      };
+
+      if (colNumber === 5) {
+        const formattedCategory = formatCategory(event.eventCategory);
+        const colors = categoryColors[formattedCategory];
+        if (colors) {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: `FF${colors.bg}` },
+          };
+          cell.font = { color: { argb: `FF${colors.text}` }, size: 10, bold: true };
+        }
+      }
+    });
+  });
+
+  worksheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: events.length + 1, column: 11 },
+  };
+
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0];
+  const filename = `Delay-Analysis-Export-${dateStr}.xlsx`;
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], { 
@@ -95,7 +139,7 @@ export async function exportDelayEventsToExcel(events: DelayEventData[]): Promis
   });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "delay_analysis_export.xlsx";
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(link.href);
 }
