@@ -121,6 +121,31 @@ export async function exportDelayEventsToExcel(events: DelayEventData[]): Promis
           cell.font = { color: { argb: `FF${colors.text}` }, size: 10, bold: true };
         }
       }
+
+      if (colNumber === 9 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
+        const confidence = event.matchConfidence;
+        let bgColor: string;
+        let textColor: string;
+        
+        if (confidence < 50) {
+          bgColor = 'FFFEE2E2';
+          textColor = 'FFDC2626';
+        } else if (confidence < 80) {
+          bgColor = 'FFFEF3C7';
+          textColor = 'FFB45309';
+        } else {
+          bgColor = 'FFD1FAE5';
+          textColor = 'FF059669';
+        }
+        
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: bgColor },
+        };
+        cell.font = { color: { argb: textColor }, size: 10, bold: true };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      }
     });
   });
 
