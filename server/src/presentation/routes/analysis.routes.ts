@@ -90,7 +90,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
         headerRow.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FF1E293B' },
+          fgColor: { argb: 'FF3B82F6' },
         };
         headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         headerRow.height = 28;
@@ -99,21 +99,22 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
           cell.border = {
             top: { style: 'thin', color: { argb: 'FF3B82F6' } },
             bottom: { style: 'medium', color: { argb: 'FF3B82F6' } },
-            left: { style: 'thin', color: { argb: 'FF334155' } },
-            right: { style: 'thin', color: { argb: 'FF334155' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
           };
         });
 
-        const categoryColors: Record<string, string> = {
-          'Weather': 'FF2563EB',
-          'Labor Related': 'FF7C3AED',
-          'Materials Equipment': 'FFF59E0B',
-          'Site Management Safety': 'FF10B981',
-          'Utility Infrastructure': 'FF06B6D4',
-          'Quality Rework': 'FFEF4444',
-          'Planning Mobilization': 'FF6366F1',
-          'Third Party': 'FF8B5CF6',
-          'Owner Related': 'FFEC4899',
+        const categoryColors: Record<string, { bg: string; text: string }> = {
+          'Weather': { bg: 'FFDBEAFE', text: 'FF1E40AF' },
+          'Labor Related': { bg: 'FFFEE2E2', text: 'FFDC2626' },
+          'Materials Equipment': { bg: 'FFFEF3C7', text: 'FFD97706' },
+          'Site Management Safety': { bg: 'FFD1FAE5', text: 'FF059669' },
+          'Utility Infrastructure': { bg: 'FFE0E7FF', text: 'FF4F46E5' },
+          'Quality Rework': { bg: 'FFFCE7F3', text: 'FFDB2777' },
+          'Planning Mobilization': { bg: 'FFDBEAFE', text: 'FF2563EB' },
+          'Third Party': { bg: 'FFF3E8FF', text: 'FF9333EA' },
+          'Owner Related': { bg: 'FFFCE7F3', text: 'FFEC4899' },
+          'Subcontractor': { bg: 'FFCFFAFE', text: 'FF0891B2' },
         };
 
         events.forEach((event, index) => {
@@ -137,18 +138,18 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
           row.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: isEvenRow ? 'FF0F172A' : 'FF1E293B' },
+            fgColor: { argb: isEvenRow ? 'FFFFFFFF' : 'FFF8FAFC' },
           };
-          row.font = { color: { argb: 'FFE2E8F0' }, size: 10 };
+          row.font = { color: { argb: 'FF1E293B' }, size: 10 };
           row.alignment = { vertical: 'middle', wrapText: true };
           row.height = 22;
 
           row.eachCell((cell, colNumber) => {
             cell.border = {
-              top: { style: 'thin', color: { argb: 'FF334155' } },
-              bottom: { style: 'thin', color: { argb: 'FF334155' } },
-              left: { style: 'thin', color: { argb: 'FF334155' } },
-              right: { style: 'thin', color: { argb: 'FF334155' } },
+              top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
             };
 
             if (colNumber === 5 && event.eventCategory) {
@@ -156,23 +157,24 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
                 k => event.eventCategory?.toLowerCase().includes(k.toLowerCase().split(' ')[0])
               );
               if (categoryKey) {
+                const colors = categoryColors[categoryKey];
                 cell.fill = {
                   type: 'pattern',
                   pattern: 'solid',
-                  fgColor: { argb: categoryColors[categoryKey] },
+                  fgColor: { argb: colors.bg },
                 };
-                cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
+                cell.font = { color: { argb: colors.text }, bold: true, size: 10 };
               }
             }
 
             if (colNumber === 9 && event.matchConfidence) {
               const conf = event.matchConfidence;
               if (conf >= 80) {
-                cell.font = { color: { argb: 'FF22C55E' }, bold: true, size: 10 };
+                cell.font = { color: { argb: 'FF16A34A' }, bold: true, size: 10 };
               } else if (conf >= 50) {
-                cell.font = { color: { argb: 'FFFBBF24' }, bold: true, size: 10 };
+                cell.font = { color: { argb: 'FFD97706' }, bold: true, size: 10 };
               } else {
-                cell.font = { color: { argb: 'FFEF4444' }, size: 10 };
+                cell.font = { color: { argb: 'FFDC2626' }, size: 10 };
               }
             }
 
@@ -189,8 +191,12 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
 
         const buffer = await workbook.xlsx.writeBuffer();
 
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0];
+        const filename = `Delay-Analysis-Export-${dateStr}.xlsx`;
+
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="delay-analysis-${params.projectId}.xlsx"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.send(Buffer.from(buffer));
       } catch (error) {
         if (error instanceof Error && error.name === 'ZodError') {
