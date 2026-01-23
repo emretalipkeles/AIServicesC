@@ -672,11 +672,23 @@ export function SmartPopover({
     const rect = triggerRef.current.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
-    const padding = 12;
+    const padding = 16;
+    const safetyBuffer = 40;
     
     const spaceAbove = rect.top;
     const spaceBelow = viewportHeight - rect.bottom;
-    const preferTop = spaceAbove > maxHeight + padding || spaceAbove > spaceBelow;
+    
+    const canFitBelow = spaceBelow >= maxHeight + padding + safetyBuffer;
+    const canFitAbove = spaceAbove >= maxHeight + padding + safetyBuffer;
+    
+    let preferTop: boolean;
+    if (canFitBelow) {
+      preferTop = false;
+    } else if (canFitAbove) {
+      preferTop = true;
+    } else {
+      preferTop = spaceAbove > spaceBelow;
+    }
     
     let x = rect.left + rect.width / 2;
     if (x - maxWidth / 2 < padding) x = maxWidth / 2 + padding;
