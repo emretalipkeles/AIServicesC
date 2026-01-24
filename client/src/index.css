@@ -370,6 +370,8 @@
    * 1. Header (fixed)
    * 2. Messages (scrollable, flex-1)
    * 3. Input (fixed at bottom)
+   * 
+   * Key principle: contain-intrinsic-size prevents content from expanding containers
    */
 
   /* Root chat container - three-region flex column */
@@ -397,15 +399,29 @@
     overflow-x: hidden;
   }
 
+  /* Radix ScrollArea viewport must also constrain width */
+  .chat-messages [data-radix-scroll-area-viewport] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .chat-messages [data-radix-scroll-area-viewport] > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
   /* Fixed input region */
   .chat-input {
     flex-shrink: 0;
   }
 
-  /* Message row container */
+  /* Message row container - use width:100% to force constraint */
   .chat-message-row {
     display: flex;
     gap: 0.5rem;
+    width: 100%;
     min-width: 0;
     max-width: 100%;
   }
@@ -414,18 +430,17 @@
     flex-direction: row-reverse;
   }
 
-  /* Message content wrapper - prevents expansion */
+  /* Message content wrapper - min-width:0 allows flex shrinking */
   .chat-message-content {
     flex: 1 1 0%;
     min-width: 0;
     max-width: 100%;
-    overflow: hidden;
   }
 
-  /* Message bubble - constrained width with natural sizing */
+  /* Message bubble - constrained width, NO overflow:hidden (let scroll containers work) */
   .chat-bubble {
-    display: inline-block;
-    max-width: min(75ch, 100%);
+    display: block;
+    max-width: 100%;
     min-width: 0;
     word-break: break-word;
     overflow-wrap: anywhere;
@@ -465,15 +480,16 @@
 
   /* Table container with independent scroll */
   .chat-table-wrapper {
+    display: block;
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    overflow: hidden;
     border-radius: 0.5rem;
     margin: 1rem 0;
   }
 
   .chat-table-scroll {
+    display: block;
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -483,8 +499,8 @@
   }
 
   .chat-table {
-    min-width: 100%;
-    width: max-content;
+    width: 100%;
+    min-width: max-content;
     border-collapse: collapse;
     font-size: 0.875rem;
   }
