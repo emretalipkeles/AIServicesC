@@ -11,4 +11,5 @@ export interface IContractorDelayEventRepository {
   update(event: ContractorDelayEvent): Promise<void>;
   delete(id: string, tenantId: string): Promise<void>;
   deleteByDocumentId(documentId: string, tenantId: string): Promise<void>;
+  deleteByProjectId(projectId: string, tenantId: string): Promise<number>;
 }

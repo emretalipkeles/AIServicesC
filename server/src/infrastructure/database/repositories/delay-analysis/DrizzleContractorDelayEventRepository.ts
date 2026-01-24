@@ -1,4 +1,4 @@
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, count } from 'drizzle-orm';
 import type { IContractorDelayEventRepository } from '../../../../domain/delay-analysis/repositories/IContractorDelayEventRepository';
 import { ContractorDelayEvent, type DelayEventCategory, type VerificationStatus } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 import { contractorDelayEvents } from '@shared/schema';
@@ -171,6 +171,27 @@ export class DrizzleContractorDelayEventRepository implements IContractorDelayEv
         eq(contractorDelayEvents.sourceDocumentId, documentId), 
         eq(contractorDelayEvents.tenantId, tenantId)
       ));
+  }
+
+  async deleteByProjectId(projectId: string, tenantId: string): Promise<number> {
+    const eventsToDelete = await db
+      .select({ count: count() })
+      .from(contractorDelayEvents)
+      .where(and(
+        eq(contractorDelayEvents.projectId, projectId),
+        eq(contractorDelayEvents.tenantId, tenantId)
+      ));
+
+    const deletedCount = eventsToDelete[0]?.count ?? 0;
+
+    await db
+      .delete(contractorDelayEvents)
+      .where(and(
+        eq(contractorDelayEvents.projectId, projectId),
+        eq(contractorDelayEvents.tenantId, tenantId)
+      ));
+
+    return deletedCount;
   }
 
   private mapRowToEntity(row: typeof contractorDelayEvents.$inferSelect): ContractorDelayEvent {

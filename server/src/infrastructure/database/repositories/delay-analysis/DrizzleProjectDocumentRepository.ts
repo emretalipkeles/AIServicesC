@@ -123,6 +123,27 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
       .where(and(eq(projectDocuments.id, id), eq(projectDocuments.tenantId, tenantId)));
   }
 
+  async deleteByProjectId(projectId: string, tenantId: string): Promise<number> {
+    const docsToDelete = await db
+      .select({ count: count() })
+      .from(projectDocuments)
+      .where(and(
+        eq(projectDocuments.projectId, projectId),
+        eq(projectDocuments.tenantId, tenantId)
+      ));
+
+    const deletedCount = docsToDelete[0]?.count ?? 0;
+
+    await db
+      .delete(projectDocuments)
+      .where(and(
+        eq(projectDocuments.projectId, projectId),
+        eq(projectDocuments.tenantId, tenantId)
+      ));
+
+    return deletedCount;
+  }
+
   async countByProjectId(projectId: string, tenantId: string): Promise<number> {
     const result = await db
       .select({ count: count() })

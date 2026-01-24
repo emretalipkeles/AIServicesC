@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useProjectDocuments, useDeleteDocument, uploadDocumentsInBatches, type ProjectDocumentDto, type ProjectDocumentType, type BatchUploadProgress } from "@/lib/project-documents-api";
+import { useProjectDocuments, useDeleteDocument, useDeleteAllDocuments, uploadDocumentsInBatches, type ProjectDocumentDto, type ProjectDocumentType, type BatchUploadProgress } from "@/lib/project-documents-api";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useUploadState } from "@/contexts/upload-state-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +40,7 @@ type FilterType = ProjectDocumentType | "all";
 export function DocumentUpload({ projectId }: DocumentUploadProps) {
   const { data: documents = [], isLoading } = useProjectDocuments(projectId);
   const deleteDocument = useDeleteDocument();
+  const deleteAllDocuments = useDeleteAllDocuments();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -47,6 +49,7 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [lastFailedFiles, setLastFailedFiles] = useState<Array<{ filename: string; error: string }>>([]);
   const [showFailedFiles, setShowFailedFiles] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const uploadSectionRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -179,6 +182,23 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
     }
   }, [projectId, deleteDocument, toast]);
 
+  const handleDeleteAll = useCallback(async () => {
+    try {
+      const result = await deleteAllDocuments.mutateAsync({ projectId });
+      setShowDeleteAllConfirm(false);
+      toast({ 
+        title: "All documents deleted",
+        description: `Removed ${result.deletedDocumentsCount} documents and ${result.deletedEventsCount} delay events`,
+      });
+    } catch (error) {
+      toast({
+        title: "Delete failed",
+        description: error instanceof Error ? error.message : "Failed to delete all documents",
+        variant: "destructive",
+      });
+    }
+  }, [projectId, deleteAllDocuments, toast]);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -201,23 +221,66 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
           }
         />
         <div className="p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Filter by type:</label>
-            <Select value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
-              <SelectTrigger className={cn(selectTriggerStyles, "w-[260px]")}>
-                <SelectValue placeholder="All Documents" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Documents</SelectItem>
-                {Object.entries(documentTypeLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {filterType !== "all" && (
-              <span className="text-xs text-muted-foreground">
-                Showing {filteredDocuments.length} of {documents.length}
-              </span>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Filter by type:</label>
+              <Select value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
+                <SelectTrigger className={cn(selectTriggerStyles, "w-[260px]")}>
+                  <SelectValue placeholder="All Documents" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Documents</SelectItem>
+                  {Object.entries(documentTypeLabels).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {filterType !== "all" && (
+                <span className="text-xs text-muted-foreground">
+                  Showing {filteredDocuments.length} of {documents.length}
+                </span>
+              )}
+            </div>
+            {documents.length > 0 && (
+              <AlertDialog open={showDeleteAllConfirm} onOpenChange={setShowDeleteAllConfirm}>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete All
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete All Documents?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete all {documents.length} documents and their associated delay events. 
+                      Your schedule activities will not be affected.
+                      This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAll}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={deleteAllDocuments.isPending}
+                    >
+                      {deleteAllDocuments.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        'Delete All'
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
           </div>
 

@@ -148,6 +148,22 @@ async function deleteDocument(projectId: string, documentId: string): Promise<vo
   }
 }
 
+export interface DeleteAllDocumentsResult {
+  success: boolean;
+  deletedDocumentsCount: number;
+  deletedEventsCount: number;
+}
+
+async function deleteAllDocuments(projectId: string): Promise<DeleteAllDocumentsResult> {
+  const response = await fetch(`/api/delay-analysis/projects/${projectId}/documents`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to delete all documents");
+  }
+  return response.json();
+}
+
 export function useProjectDocuments(projectId: string) {
   return useQuery({
     queryKey: ["project-documents", projectId],
@@ -178,6 +194,18 @@ export function useDeleteDocument() {
       deleteDocument(projectId, documentId),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
+    },
+  });
+}
+
+export function useDeleteAllDocuments() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId }: { projectId: string }) => 
+      deleteAllDocuments(projectId),
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["delay-events", projectId] });
     },
   });
 }

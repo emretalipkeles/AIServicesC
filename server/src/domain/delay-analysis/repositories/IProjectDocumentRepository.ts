@@ -9,5 +9,6 @@ export interface IProjectDocumentRepository {
   saveBatch(documents: ProjectDocument[]): Promise<void>;
   update(document: ProjectDocument): Promise<void>;
   delete(id: string, tenantId: string): Promise<void>;
+  deleteByProjectId(projectId: string, tenantId: string): Promise<number>;
   countByProjectId(projectId: string, tenantId: string): Promise<number>;
 }

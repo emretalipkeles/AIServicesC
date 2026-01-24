@@ -1,6 +1,8 @@
 import type { Request, Response } from 'express';
 import { UploadDocumentsCommand, type UploadedFile } from '../../application/delay-analysis/commands/UploadDocumentsCommand';
 import { UploadDocumentsCommandHandler } from '../../application/delay-analysis/commands/handlers/UploadDocumentsCommandHandler';
+import { DeleteAllProjectDocumentsCommand } from '../../application/delay-analysis/commands/DeleteAllProjectDocumentsCommand';
+import { DeleteAllProjectDocumentsCommandHandler } from '../../application/delay-analysis/commands/handlers/DeleteAllProjectDocumentsCommandHandler';
 import { ListProjectDocumentsQuery } from '../../application/delay-analysis/queries/ListProjectDocumentsQuery';
 import { ListProjectDocumentsQueryHandler } from '../../application/delay-analysis/queries/handlers/ListProjectDocumentsQueryHandler';
 import type { ProjectDocumentType } from '../../domain/delay-analysis/entities/ProjectDocument';
@@ -10,7 +12,8 @@ export class ProjectDocumentController {
   constructor(
     private readonly uploadHandler: UploadDocumentsCommandHandler,
     private readonly listHandler: ListProjectDocumentsQueryHandler,
-    private readonly documentRepository: IProjectDocumentRepository
+    private readonly documentRepository: IProjectDocumentRepository,
+    private readonly deleteAllHandler?: DeleteAllProjectDocumentsCommandHandler
   ) {}
 
   async upload(req: Request, res: Response): Promise<void> {
@@ -112,6 +115,32 @@ export class ProjectDocumentController {
       console.error('Error deleting document:', error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : 'Failed to delete document' 
+      });
+    }
+  }
+
+  async deleteAll(req: Request, res: Response): Promise<void> {
+    try {
+      const { projectId } = req.params;
+      const tenantId = (req as any).tenantId || 'default';
+
+      if (!this.deleteAllHandler) {
+        res.status(500).json({ error: 'Delete all handler not configured' });
+        return;
+      }
+
+      const command = new DeleteAllProjectDocumentsCommand(tenantId, projectId);
+      const result = await this.deleteAllHandler.handle(command);
+
+      res.json({
+        success: true,
+        deletedDocumentsCount: result.deletedDocumentsCount,
+        deletedEventsCount: result.deletedEventsCount,
+      });
+    } catch (error) {
+      console.error('Error deleting all documents:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to delete all documents' 
       });
     }
   }

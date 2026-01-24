@@ -4,6 +4,7 @@ import type { AppContainer } from '../../infrastructure/bootstrap';
 import { ProjectDocumentController } from '../controllers/ProjectDocumentController';
 import { UploadDocumentsCommandHandler } from '../../application/delay-analysis/commands/handlers/UploadDocumentsCommandHandler';
 import { ListProjectDocumentsQueryHandler } from '../../application/delay-analysis/queries/handlers/ListProjectDocumentsQueryHandler';
+import { DeleteAllProjectDocumentsCommandHandler } from '../../application/delay-analysis/commands/handlers/DeleteAllProjectDocumentsCommandHandler';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -37,10 +38,16 @@ export function registerProjectDocumentRoutes(app: Express, container: AppContai
     container.repositories.projectDocument
   );
 
+  const deleteAllHandler = new DeleteAllProjectDocumentsCommandHandler(
+    container.repositories.projectDocument,
+    container.repositories.contractorDelayEvent
+  );
+
   const controller = new ProjectDocumentController(
     uploadHandler,
     listHandler,
-    container.repositories.projectDocument
+    container.repositories.projectDocument,
+    deleteAllHandler
   );
 
   app.post(
@@ -62,5 +69,10 @@ export function registerProjectDocumentRoutes(app: Express, container: AppContai
   app.delete(
     '/api/delay-analysis/projects/:projectId/documents/:documentId',
     (req, res) => controller.delete(req, res)
+  );
+
+  app.delete(
+    '/api/delay-analysis/projects/:projectId/documents',
+    (req, res) => controller.deleteAll(req, res)
   );
 }
