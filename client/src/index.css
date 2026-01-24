@@ -182,30 +182,28 @@
     transition: background-color 0.3s ease, color 0.3s ease;
   }
 
-  /* Clean Minimal Table Styling - matches reference design */
+  /* Table styling is handled by ReactMarkdown custom components in ai-chat-panel.tsx */
+  /* These are fallback styles for other prose contexts */
   .prose table {
     @apply w-full border-collapse text-sm my-4;
     background: transparent;
   }
 
-  /* Header - slightly elevated, uppercase, minimal */
-  .prose thead {
-    background: hsl(var(--muted) / 0.5);
-    border-bottom: 1px solid hsl(var(--border) / 0.3);
-  }
-
-  .dark .prose thead {
-    background: hsl(var(--muted) / 0.3);
-  }
-
   .prose th {
-    @apply font-medium text-[11px] uppercase tracking-wide py-3 px-4 text-left;
+    @apply font-medium text-[11px] uppercase tracking-wide py-2.5 px-3 text-left;
     color: hsl(var(--muted-foreground));
     border: none;
     letter-spacing: 0.04em;
   }
 
-  /* Body rows - clean horizontal separators */
+  .prose td {
+    @apply py-2.5 px-3 align-top;
+    border: none;
+    color: hsl(var(--foreground));
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
   .prose tbody tr {
     border-bottom: 1px solid hsl(var(--border) / 0.2);
   }
@@ -218,25 +216,12 @@
     border-bottom: none;
   }
 
-  .prose td {
-    @apply py-3 px-4 align-top;
-    border: none;
-    color: hsl(var(--foreground));
-    font-size: 13px;
-    line-height: 1.5;
-  }
-
-  .prose td:first-child {
-    @apply font-medium;
-  }
-
-  /* Inline code - muted styling, not red */
+  /* Inline code in tables */
   .prose td code,
   .prose th code {
     @apply text-xs px-1.5 py-0.5 rounded font-mono;
     background-color: hsl(var(--muted) / 0.5);
     color: hsl(var(--muted-foreground));
-    word-break: break-word;
   }
 
   .dark .prose td code,
@@ -245,12 +230,6 @@
     color: hsl(var(--foreground) / 0.85);
   }
 
-  /* Formula cells - clean monospace display */
-  .prose td:last-child code {
-    @apply block whitespace-pre-wrap text-[11px];
-    max-width: 100%;
-    overflow-x: auto;
-  }
 }
 
 @layer components {

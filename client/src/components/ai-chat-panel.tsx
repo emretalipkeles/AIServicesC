@@ -11,6 +11,20 @@ import type { Agent } from "@shared/schema";
 import { parseStructuredBlocks, removeStructuredBlocks, hasStructuredBlocks } from "@/lib/structured-output-parser";
 import { useOptionalTabContext } from "@/contexts/tab-context";
 import { queryClient } from "@/lib/queryClient";
+import { Children, isValidElement, ReactNode } from "react";
+
+function extractTextFromChildren(children: ReactNode): string {
+  if (typeof children === 'string') return children;
+  if (typeof children === 'number') return String(children);
+  if (children == null || typeof children === 'boolean') return '';
+  if (Array.isArray(children)) {
+    return children.map(extractTextFromChildren).join('');
+  }
+  if (isValidElement(children)) {
+    return extractTextFromChildren(children.props?.children);
+  }
+  return '';
+}
 
 interface PackageInfo {
   packageId: string;
@@ -847,9 +861,9 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                                 <p className="min-w-0 max-w-full break-words">{children}</p>
                               ),
                               table: ({ children }) => (
-                                <div className="my-4 rounded-lg border border-border/40 bg-muted/10 dark:bg-muted/5 overflow-hidden">
-                                  <div className="max-h-[400px] overflow-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                                    <table className="w-full text-sm border-collapse min-w-max">{children}</table>
+                                <div className="my-4 rounded-lg border border-border/40 bg-muted/10 dark:bg-muted/5 overflow-hidden chat-table-container">
+                                  <div className="overflow-x-auto overflow-y-auto max-h-[400px] scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                                    <table className="w-full text-sm border-collapse" style={{ minWidth: 'max-content' }}>{children}</table>
                                   </div>
                                 </div>
                               ),
@@ -857,11 +871,15 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                                 <thead className="bg-gradient-to-r from-primary/10 to-primary/5 dark:from-primary/15 dark:to-primary/10 sticky top-0 z-10">{children}</thead>
                               ),
                               th: ({ children }) => (
-                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-primary/80 dark:text-primary/90 border-b-2 border-primary/20 whitespace-nowrap">{children}</th>
+                                <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-primary/80 dark:text-primary/90 border-b-2 border-primary/20 whitespace-nowrap">{children}</th>
                               ),
-                              td: ({ children }) => (
-                                <td className="px-4 py-3 text-foreground/90 border-b border-border/20 dark:border-border/15 whitespace-normal min-w-[120px] max-w-[300px]">{children}</td>
-                              ),
+                              td: ({ children }) => {
+                                const text = extractTextFromChildren(children);
+                                const isLongContent = text.length > 30;
+                                return (
+                                  <td className={`px-3 py-2.5 text-foreground/90 border-b border-border/20 dark:border-border/15 align-top ${isLongContent ? 'whitespace-normal min-w-[160px] max-w-[280px]' : 'whitespace-nowrap'}`}>{children}</td>
+                                );
+                              },
                               tr: ({ children }) => (
                                 <tr className="hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors">{children}</tr>
                               ),
