@@ -107,7 +107,11 @@ export class RunAnalysisCommandHandler {
               doc.rawContent!,
               doc.filename,
               doc.id,
-              { runId: options?.runId, onTokenUsage: options?.onTokenUsage }
+              { 
+                runId: options?.runId, 
+                onTokenUsage: options?.onTokenUsage,
+                documentType: doc.documentType,
+              }
             );
 
             for (const extracted of extractionResult.events) {
@@ -145,11 +149,19 @@ export class RunAnalysisCommandHandler {
             result.documentsProcessed++;
 
             if (extractionResult.events.length > 0) {
+              const certaintySuffix = extractionResult.delayIsCertain 
+                ? ' (high confidence - definite delays)' 
+                : ' (requires verification)';
               progress.report({
                 stage: 'extracting_events',
-                message: `Found ${extractionResult.events.length} delay events in ${doc.filename}`,
+                message: `Found ${extractionResult.events.length} delay events in ${doc.filename}${certaintySuffix}`,
                 percentage: docProgress,
-                details: { current: i + 1, total: fieldReports.length },
+                details: { 
+                  current: i + 1, 
+                  total: fieldReports.length,
+                  strategyUsed: extractionResult.strategyUsed,
+                  baseConfidence: extractionResult.baseConfidence,
+                },
               });
             }
           } catch (error) {

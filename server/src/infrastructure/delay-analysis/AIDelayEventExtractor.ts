@@ -1,34 +1,20 @@
 import type { IDelayEventExtractor, ExtractionResult, ExtractedDelayEvent, ExtractionOptions } from '../../domain/delay-analysis/interfaces/IDelayEventExtractor';
 import type { DelayEventCategory } from '../../domain/delay-analysis/entities/ContractorDelayEvent';
 import type { IAIClient } from '../../domain/interfaces/IAIClient';
+import type { IDocumentExtractionStrategyFactory } from '../../domain/delay-analysis/interfaces/IDocumentExtractionStrategyFactory';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 import { ModelId } from '../../domain/value-objects/ModelId';
-
-const EXTRACTION_PROMPT = `You are an expert construction delay analyst. Analyze the following Inspector Daily Report (IDR) and extract any contractor-caused delay events.
-
-Look specifically for:
-1. CODE_CIE tags or entries (Contractor Initiated Events)
-2. Delays caused by contractor actions or inaction
-3. Work stoppages due to contractor issues
-4. Material or equipment delays from contractor
-5. Subcontractor coordination failures
-6. Quality issues requiring rework
-
-For each delay event found, extract:
-- eventDescription: Clear description of the delay event
-- eventCategory: One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other
-- eventDate: The date of the event if mentioned (YYYY-MM-DD format)
-- impactDurationHours: Estimated hours of impact if mentioned
-- sourceReference: The section/paragraph where this was found
-- extractedFromCode: The exact CODE_CIE or delay code if present
-
-Return a JSON array of extracted events. If no delays are found, return an empty array.
-
-Document content:
-`;
+import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
 
 export class AIDelayEventExtractor implements IDelayEventExtractor {
-  constructor(private readonly aiClient: IAIClient) {}
+  private readonly strategyFactory: IDocumentExtractionStrategyFactory;
+
+  constructor(
+    private readonly aiClient: IAIClient,
+    strategyFactory?: IDocumentExtractionStrategyFactory
+  ) {
+    this.strategyFactory = strategyFactory ?? new DocumentExtractionStrategyFactory();
+  }
 
   async extractDelayEvents(
     documentContent: string,
@@ -36,14 +22,20 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
     documentId: string,
     options?: ExtractionOptions
   ): Promise<ExtractionResult> {
-    const truncatedContent = documentContent.slice(0, 30000);
+    const documentType = options?.documentType ?? 'other';
+    const strategy = this.strategyFactory.getStrategy(documentType);
     
-    const prompt = EXTRACTION_PROMPT + truncatedContent;
+    const strategyResult = strategy.buildExtractionPrompt({
+      documentContent,
+      documentFilename,
+      documentId,
+      documentType,
+    });
 
     try {
       const response = await this.aiClient.chat({
         model: ModelId.gpt52(),
-        messages: [AIMessage.user(prompt)],
+        messages: [AIMessage.user(strategyResult.prompt)],
         maxTokens: 4000,
         temperature: 0.1,
       });
@@ -55,16 +47,24 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
           model: response.model,
           inputTokens: response.inputTokens,
           outputTokens: response.outputTokens,
-          metadata: { documentFilename, documentId },
+          metadata: { 
+            documentFilename, 
+            documentId,
+            documentType,
+            strategyUsed: strategy.strategyName,
+          },
         });
       }
 
-      const events = this.parseExtractionResponse(response.content);
+      const events = this.parseExtractionResponse(response.content, strategyResult.baseConfidence);
 
       return {
         events,
         documentId,
         totalEventsFound: events.length,
+        strategyUsed: strategy.strategyName,
+        baseConfidence: strategyResult.baseConfidence,
+        delayIsCertain: strategyResult.delayIsCertain,
       };
     } catch (error) {
       console.error('Error extracting delay events:', error);
@@ -72,11 +72,14 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
         events: [],
         documentId,
         totalEventsFound: 0,
+        strategyUsed: strategy.strategyName,
+        baseConfidence: strategyResult.baseConfidence,
+        delayIsCertain: strategyResult.delayIsCertain,
       };
     }
   }
 
-  private parseExtractionResponse(response: string): ExtractedDelayEvent[] {
+  private parseExtractionResponse(response: string, baseConfidence: number): ExtractedDelayEvent[] {
     try {
       const jsonMatch = response.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
@@ -94,14 +97,45 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
         eventDate: this.parseDate(item.eventDate || item.date),
         impactDurationHours: typeof item.impactDurationHours === 'number' 
           ? item.impactDurationHours 
-          : null,
+          : this.parseNumber(item.impactDurationHours),
         sourceReference: String(item.sourceReference || item.source || ''),
-        extractedFromCode: String(item.extractedFromCode || item.code || 'CODE_CIE'),
+        extractedFromCode: String(item.extractedFromCode || item.code || 'GENERAL'),
+        confidenceScore: this.parseConfidenceScore(item.confidenceScore, baseConfidence),
+        responsibilityConfirmed: typeof item.responsibilityConfirmed === 'boolean' 
+          ? item.responsibilityConfirmed 
+          : undefined,
+        reworkDescription: item.reworkDescription 
+          ? String(item.reworkDescription) 
+          : undefined,
       })).filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0);
     } catch (error) {
       console.error('Error parsing extraction response:', error);
       return [];
     }
+  }
+
+  private parseConfidenceScore(value: unknown, baseConfidence: number): number {
+    if (typeof value === 'number' && value >= 0 && value <= 1) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+        return parsed;
+      }
+    }
+    return baseConfidence;
+  }
+
+  private parseNumber(value: unknown): number | null {
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? null : parsed;
+    }
+    return null;
   }
 
   private parseCategory(value: unknown): DelayEventCategory | null {

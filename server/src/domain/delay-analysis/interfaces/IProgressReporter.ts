@@ -24,6 +24,8 @@ export interface ProgressEvent {
     total?: number;
     batchNumber?: number;
     totalBatches?: number;
+    strategyUsed?: string;
+    baseConfidence?: number;
   };
 }
 
