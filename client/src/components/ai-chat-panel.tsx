@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Sparkles, Bot, User, Paperclip, MoreHorizontal, Loader2, Package, ExternalLink, Upload, PanelLeftClose } from "lucide-react";
+import { Send, Sparkles, Bot, User, Paperclip, MoreHorizontal, Loader2, Package, ExternalLink, Upload, PanelLeftClose, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AgentSelector } from "./agent-selector";
 import { StructuredOutputCard } from "./structured-output-card";
@@ -10,6 +10,66 @@ import type { Agent } from "@shared/schema";
 import { parseStructuredBlocks, removeStructuredBlocks, hasStructuredBlocks } from "@/lib/structured-output-parser";
 import { useOptionalTabContext } from "@/contexts/tab-context";
 import { queryClient } from "@/lib/queryClient";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+function downloadTableAsCSV(tableElement: HTMLTableElement | null, filename: string = 'table-data') {
+  if (!tableElement) return;
+  
+  const rows: string[][] = [];
+  const headerRow = tableElement.querySelector('thead tr');
+  if (headerRow) {
+    const headers = Array.from(headerRow.querySelectorAll('th')).map(th => th.textContent?.trim() || '');
+    rows.push(headers);
+  }
+  
+  const bodyRows = tableElement.querySelectorAll('tbody tr');
+  bodyRows.forEach(tr => {
+    const cells = Array.from(tr.querySelectorAll('td')).map(td => td.textContent?.trim() || '');
+    rows.push(cells);
+  });
+  
+  const csvContent = rows.map(row => 
+    row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')
+  ).join('\n');
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${filename}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function TableWithDownload({ children }: { children: React.ReactNode }) {
+  const tableRef = useRef<HTMLTableElement>(null);
+  
+  return (
+    <div className="my-3 overflow-hidden rounded-lg shadow-md border border-blue-200/60 dark:border-blue-700/40 bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-800 dark:to-slate-900 group relative">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => downloadTableAsCSV(tableRef.current)}
+              className="absolute top-2 right-2 z-10 p-1.5 rounded-md bg-white/80 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 dark:hover:bg-blue-900/30"
+              aria-label="Download as CSV"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p>Download CSV</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <div className="max-h-[480px] overflow-y-auto overflow-x-auto discreet-scroll">
+        <table ref={tableRef} className="min-w-full">{children}</table>
+      </div>
+    </div>
+  );
+}
 
 interface PackageInfo {
   packageId: string;
@@ -746,7 +806,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
       </div>
 
       {/* Messages region - scrollable, takes remaining space */}
-      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-2 sm:px-3">
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-2 sm:px-3 discreet-scroll">
         <div className="py-3 space-y-3 w-full min-w-0 max-w-full">
           {messages.map((message, index) => {
             const isUser = message.role === "user";
@@ -841,7 +901,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                               },
                               pre: ({ children }) => (
                                 <div className="my-3 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
-                                  <div className="max-h-[400px] overflow-y-auto overflow-x-auto bg-slate-900">
+                                  <div className="max-h-[400px] overflow-y-auto overflow-x-auto bg-slate-900 discreet-scroll">
                                     <pre className="p-3 text-sm text-slate-100 font-mono whitespace-pre">{children}</pre>
                                   </div>
                                 </div>
@@ -849,13 +909,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                               blockquote: ({ children }) => (
                                 <blockquote className="border-l-4 border-primary/50 pl-3 py-1 my-2 bg-muted/30 rounded-r">{children}</blockquote>
                               ),
-                              table: ({ children }) => (
-                                <div className="my-3 overflow-hidden rounded-lg shadow-md border border-blue-200/60 dark:border-blue-700/40 bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-800 dark:to-slate-900">
-                                  <div className="max-h-[480px] overflow-y-auto overflow-x-auto">
-                                    <table className="min-w-full">{children}</table>
-                                  </div>
-                                </div>
-                              ),
+                              table: ({ children }) => <TableWithDownload>{children}</TableWithDownload>,
                               thead: ({ children }) => (
                                 <thead className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 dark:from-blue-700 dark:via-blue-600 dark:to-blue-700 sticky top-0">{children}</thead>
                               ),

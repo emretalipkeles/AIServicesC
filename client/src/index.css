@@ -309,15 +309,19 @@
     animation: ai-thinking-pulse 1.5s ease-in-out infinite;
   }
 
-  /* Discreet scrollbar styling */
+  /* Discreet scrollbar styling - ultra thin, appears on hover */
   .discreet-scroll {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+    scrollbar-color: transparent transparent;
+  }
+
+  .discreet-scroll:hover {
+    scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
   }
 
   .discreet-scroll::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 4px;
+    height: 4px;
   }
 
   .discreet-scroll::-webkit-scrollbar-track {
@@ -325,12 +329,17 @@
   }
 
   .discreet-scroll::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.3);
-    border-radius: 3px;
+    background: transparent;
+    border-radius: 2px;
+    transition: background 0.2s ease;
+  }
+
+  .discreet-scroll:hover::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.25);
   }
 
   .discreet-scroll::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
+    background: hsl(var(--muted-foreground) / 0.4);
   }
 
   /* Thin scrollbar utility class */
