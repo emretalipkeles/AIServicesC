@@ -715,7 +715,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
 
   return (
     <div 
-      className="flex flex-col h-full w-full bg-sidebar theme-transition overflow-hidden relative"
+      className="chat-container bg-sidebar theme-transition relative"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -734,17 +734,18 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
           <p className="text-sm text-muted-foreground mt-1" data-testid="text-drop-format">ZIP files only</p>
         </div>
       )}
-      <div className="flex items-center justify-between px-4 h-12 border-b border-sidebar-border flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary/10">
+      
+      {/* Header region - fixed */}
+      <div className="chat-header flex items-center justify-between px-3 sm:px-4 h-12 border-b border-sidebar-border">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-md bg-primary/10">
             <Sparkles className="w-3.5 h-3.5 text-primary" />
           </div>
-          <div>
-            <h2 className="text-sm font-semibold text-sidebar-foreground leading-tight" data-testid="text-chat-title">AI Assistant</h2>
-            <p className="text-xs text-muted-foreground leading-tight" data-testid="text-chat-subtitle"></p>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-sidebar-foreground leading-tight truncate" data-testid="text-chat-title">AI Assistant</h2>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex-shrink-0 flex items-center gap-1">
           <Button variant="ghost" size="icon" data-testid="button-chat-options">
             <MoreHorizontal className="w-4 h-4" />
           </Button>
@@ -762,16 +763,18 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-3 discreet-scroll overflow-x-hidden" ref={scrollAreaRef}>
-        <div className="py-3 space-y-3 min-w-0 w-full overflow-hidden">
+      {/* Messages region - scrollable, takes remaining space */}
+      <ScrollArea className="chat-messages px-2 sm:px-3 discreet-scroll" ref={scrollAreaRef}>
+        <div className="py-3 space-y-3">
           {messages.map((message, index) => {
             const isUser = message.role === "user";
             return (
               <div
                 key={message.id}
-                className={`flex gap-2 animate-fade-in min-w-0 ${isUser ? 'flex-row-reverse' : ''}`}
+                className={`chat-message-row animate-fade-in ${isUser ? 'user' : ''}`}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
+                {/* Avatar */}
                 <div
                   className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center overflow-hidden ${
                     isUser
@@ -789,7 +792,10 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                     <Bot className="w-3 h-3 text-primary" />
                   )}
                 </div>
-                <div className={`flex-1 min-w-0 overflow-hidden ${isUser ? 'flex flex-col items-end' : ''}`}>
+                
+                {/* Message content */}
+                <div className={`chat-message-content ${isUser ? 'flex flex-col items-end' : ''}`}>
+                  {/* Message header: name + timestamp */}
                   <div className={`flex items-center gap-1.5 mb-0.5 ${isUser ? 'flex-row-reverse' : ''}`}>
                     <span className="text-[11px] font-medium text-sidebar-foreground" data-testid={`text-message-role-${message.id}`}>
                       {isUser ? "You" : (message.agentName || "AI Assistant")}
@@ -804,9 +810,11 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                       </span>
                     )}
                   </div>
+                  
+                  {/* Message bubble */}
                   {message.isStreaming && !message.content ? (
                     <div 
-                      className="inline-block px-2.5 py-1.5 assistant-message"
+                      className="chat-bubble px-2.5 py-1.5 assistant-message"
                       data-testid={`text-message-${message.id}`}
                     >
                       <div className="flex items-center gap-1.5">
@@ -817,7 +825,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                     </div>
                   ) : (
                   <div 
-                    className={`max-w-full px-2.5 py-1.5 overflow-hidden ${
+                    className={`chat-bubble px-2.5 py-1.5 ${
                       isUser 
                         ? 'user-message' 
                         : 'assistant-message'
@@ -825,12 +833,12 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                     data-testid={`text-message-${message.id}`}
                   >
                     {isUser ? (
-                      <p className="text-[13px] leading-snug whitespace-pre-wrap break-all text-primary-foreground">
+                      <p className="text-[13px] leading-snug whitespace-pre-wrap break-words text-primary-foreground">
                         {message.content}
                       </p>
                     ) : (
                       <>
-                        <div className="text-[13px] leading-snug text-foreground prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 w-full min-w-0 max-w-full overflow-hidden break-words [&_*]:min-w-0 [&_*]:max-w-full">
+                        <div className="chat-prose text-[13px] leading-snug text-foreground prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2">
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
                             components={{
@@ -853,17 +861,30 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                                 );
                               },
                               pre: ({ children }) => (
-                                <pre className="code-block">
-                                  {children}
-                                </pre>
+                                <div className="chat-code-wrapper">
+                                  <div className="chat-code-scroll">
+                                    <pre className="code-block">
+                                      {children}
+                                    </pre>
+                                  </div>
+                                </div>
+                              ),
+                              blockquote: ({ children }) => (
+                                <blockquote className="chat-blockquote">{children}</blockquote>
+                              ),
+                              ul: ({ children }) => (
+                                <ul className="chat-list list-disc">{children}</ul>
+                              ),
+                              ol: ({ children }) => (
+                                <ol className="chat-list list-decimal">{children}</ol>
                               ),
                               p: ({ children }) => (
                                 <p className="min-w-0 max-w-full break-words">{children}</p>
                               ),
                               table: ({ children }) => (
-                                <div className="my-4 rounded-lg border border-border/40 bg-muted/10 dark:bg-muted/5 w-full max-w-full min-w-0 overflow-hidden">
-                                  <div className="w-full max-w-full min-w-0 overflow-x-auto overflow-y-auto max-h-[400px] scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                                    <table className="text-sm border-collapse w-max min-w-full">{children}</table>
+                                <div className="chat-table-wrapper border border-border/40 bg-muted/10 dark:bg-muted/5">
+                                  <div className="chat-table-scroll scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                                    <table className="chat-table">{children}</table>
                                   </div>
                                 </div>
                               ),
@@ -934,18 +955,18 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
           })}
           
           {isLoading && !messages.some(m => m.isStreaming) && (
-            <div className="flex gap-2 animate-fade-in" data-testid="ai-thinking-indicator">
+            <div className="chat-message-row animate-fade-in" data-testid="ai-thinking-indicator">
               <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center overflow-hidden ai-thinking-indicator">
                 <Sparkles className="w-3 h-3 text-primary" />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="chat-message-content">
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <span className="text-[11px] font-medium text-sidebar-foreground">
                     {selectedAgent?.name || "AI Assistant"}
                   </span>
                   <span className="text-[10px] text-muted-foreground">thinking...</span>
                 </div>
-                <div className="inline-block px-2.5 py-1.5 assistant-message">
+                <div className="chat-bubble px-2.5 py-1.5 assistant-message">
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce-dot" style={{ animationDelay: '0ms' }} />
                     <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce-dot" style={{ animationDelay: '150ms' }} />
@@ -958,7 +979,8 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
         </div>
       </ScrollArea>
 
-      <div className="p-3 border-t border-sidebar-border">
+      {/* Input region - fixed at bottom */}
+      <div className="chat-input p-2 sm:p-3 border-t border-sidebar-border">
         <div
           className={`rounded-lg border-2 theme-transition bg-muted/50 dark:bg-muted/30 ${
             isFocused
@@ -974,12 +996,12 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
             onBlur={() => setIsFocused(false)}
             onKeyDown={handleKeyDown}
             placeholder={selectedAgent ? `Message ${selectedAgent.name}...` : "Message AI Assistant..."}
-            className="ai-input w-full px-4 py-3 text-[13px] bg-transparent resize-none focus:outline-none text-sidebar-foreground placeholder:text-muted-foreground"
-            style={{ minHeight: "80px", maxHeight: "200px" }}
+            className="ai-input w-full px-3 sm:px-4 py-2 sm:py-3 text-[13px] bg-transparent resize-none focus:outline-none text-sidebar-foreground placeholder:text-muted-foreground"
+            style={{ minHeight: "60px", maxHeight: "200px" }}
             rows={2}
             data-testid="input-ai-message"
           />
-          <div className="flex items-center justify-between px-2 py-2 border-t border-muted-foreground/10">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-2 border-t border-muted-foreground/10">
             <AgentSelector
               selectedAgentId={selectedAgent?.id || null}
               onAgentSelect={setSelectedAgent}
@@ -1014,7 +1036,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
             </div>
           </div>
         </div>
-        <p className="mt-2 text-xs text-center text-muted-foreground" data-testid="text-input-hint">
+        <p className="mt-2 text-xs text-center text-muted-foreground hidden sm:block" data-testid="text-input-hint">
           Press Enter to send, Shift + Enter for new line
         </p>
       </div>

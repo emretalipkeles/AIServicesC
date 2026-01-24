@@ -365,6 +365,72 @@
     background: transparent;
   }
 
+  /* ===== Chat Panel Architecture =====
+   * Three-region flex layout:
+   * 1. Header (fixed)
+   * 2. Messages (scrollable, flex-1)
+   * 3. Input (fixed at bottom)
+   */
+
+  /* Root chat container - three-region flex column */
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* Fixed header region */
+  .chat-header {
+    flex-shrink: 0;
+  }
+
+  /* Scrollable messages region - takes remaining space */
+  .chat-messages {
+    flex: 1 1 0%;
+    min-height: 0;
+    min-width: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* Fixed input region */
+  .chat-input {
+    flex-shrink: 0;
+  }
+
+  /* Message row container */
+  .chat-message-row {
+    display: flex;
+    gap: 0.5rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .chat-message-row.user {
+    flex-direction: row-reverse;
+  }
+
+  /* Message content wrapper - prevents expansion */
+  .chat-message-content {
+    flex: 1 1 0%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  /* Message bubble - constrained width with natural sizing */
+  .chat-bubble {
+    display: inline-block;
+    max-width: min(75ch, 100%);
+    min-width: 0;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
   /* User message bubble styling */
   .user-message {
     background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.85) 100%);
@@ -381,6 +447,83 @@
     border-radius: 1rem 1rem 1rem 0.25rem;
     word-break: break-word;
     overflow-wrap: anywhere;
+  }
+
+  /* Prose container for markdown content */
+  .chat-prose {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .chat-prose * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Table container with independent scroll */
+  .chat-table-wrapper {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    margin: 1rem 0;
+  }
+
+  .chat-table-scroll {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 400px;
+  }
+
+  .chat-table {
+    min-width: 100%;
+    width: max-content;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  /* Code block with scroll */
+  .chat-code-wrapper {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    margin: 0.5rem 0;
+  }
+
+  .chat-code-scroll {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  /* Blockquote styling */
+  .chat-blockquote {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding-left: 1rem;
+    border-left: 3px solid hsl(var(--primary) / 0.5);
+    margin: 0.5rem 0;
+    font-style: italic;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* List styling */
+  .chat-list {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding-left: 1.5rem;
   }
 
   /* Code block styling for AI responses */
