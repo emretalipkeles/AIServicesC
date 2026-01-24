@@ -18,6 +18,7 @@ import { AgentExecutor } from "./orchestration/AgentExecutor";
 import { ResponseSynthesizer } from "./orchestration/ResponseSynthesizer";
 import { FallbackResponseGenerator } from "./orchestration/FallbackResponseGenerator";
 import { AIConversationSummarizer } from "./orchestration/AIConversationSummarizer";
+import { DelayEventsAgentContextProvider } from "./delay-analysis/DelayEventsAgentContextProvider";
 import { PretToolRegistry } from "./pret/PretToolRegistry";
 import { PretOrchestrator } from "../application/pret/services/PretOrchestrator";
 import { InMemoryBuildContextRepository } from "./pret/repositories/InMemoryBuildContextRepository";
@@ -312,6 +313,7 @@ export function createAppContainer(): AppContainer {
   executor.setPackageAnalysisCache(packageAnalysisCache);
   executor.setSessionMemoryRepository(sessionMemoryRepository);
   executor.setPretCommandExecutor(pretCommandExecutor);
+  executor.setDelayEventsContextProvider(new DelayEventsAgentContextProvider(contractorDelayEventRepository));
   
   const synthesizer = aiClient ? new ResponseSynthesizer(aiClient) : null;
   const fallbackGenerator = aiClient ? new FallbackResponseGenerator(aiClient) : null;

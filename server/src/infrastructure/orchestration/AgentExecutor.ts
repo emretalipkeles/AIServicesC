@@ -1,4 +1,4 @@
-import type { IAgentExecutor, AgentExecutionResult } from '../../domain/interfaces/IAgentExecutor';
+import type { IAgentExecutor, AgentExecutionResult, AgentExecutionContext } from '../../domain/interfaces/IAgentExecutor';
 import type { ExecutionStep } from '../../domain/value-objects/ExecutionPlan';
 import type { IAgentRepository } from '../../domain/repositories/IAgentRepository';
 import type { IChunkRepository } from '../../domain/repositories/IChunkRepository';
@@ -8,6 +8,7 @@ import type { PretCommandExecutor } from '../../application/pret/services/PretCo
 import type { IConversationContextRepository } from '../../domain/orchestration/interfaces/IConversationContextRepository';
 import type { ISessionMemoryRepository } from '../../domain/interfaces/ISessionMemoryRepository';
 import type { IPackageAnalysisCache } from '../../domain/pret';
+import type { IDelayEventsAgentContextProvider } from '../../domain/interfaces/IDelayEventsAgentContextProvider';
 import type { Agent } from '../../domain/entities/Agent';
 import { ModelId } from '../../domain/value-objects/ModelId';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
@@ -18,6 +19,7 @@ export class AgentExecutor implements IAgentExecutor {
   private conversationContextRepository: IConversationContextRepository | null = null;
   private sessionMemoryRepository: ISessionMemoryRepository | null = null;
   private packageAnalysisCache: IPackageAnalysisCache | null = null;
+  private delayEventsContextProvider: IDelayEventsAgentContextProvider | null = null;
 
   private static readonly STREAM_CHUNK_SIZE = 8;
   private static readonly STREAM_DELAY_MS = 10;
@@ -74,15 +76,24 @@ export class AgentExecutor implements IAgentExecutor {
     this.sessionMemoryRepository = repository;
   }
 
+  setDelayEventsContextProvider(provider: IDelayEventsAgentContextProvider): void {
+    this.delayEventsContextProvider = provider;
+  }
+
   private isPretAgent(agentType?: string): boolean {
     return agentType === 'pret' || agentType === 'PRET';
+  }
+
+  private isDelayEventsAgent(agentType?: string): boolean {
+    return agentType === 'delay-events';
   }
 
   async execute(
     step: ExecutionStep,
     tenantId: string,
     previousResults?: Map<string, AgentExecutionResult>,
-    conversationId?: string
+    conversationId?: string,
+    context?: AgentExecutionContext
   ): Promise<AgentExecutionResult> {
     try {
       const agent = await this.agentRepository.findById(step.agentId, tenantId);
@@ -99,6 +110,10 @@ export class AgentExecutor implements IAgentExecutor {
 
       if (this.isPretAgent(agent.agentType) && this.pretOrchestrator) {
         return this.executePretAgent(step, tenantId, agent, conversationId);
+      }
+
+      if (this.isDelayEventsAgent(agent.agentType)) {
+        return this.executeDelayEventsAgent(step, tenantId, agent, context);
       }
 
       const chunks = await this.chunkRepository.findByAgentId(step.agentId, tenantId);
@@ -264,7 +279,8 @@ export class AgentExecutor implements IAgentExecutor {
     tenantId: string,
     onChunk: (chunk: string) => void,
     previousResults?: Map<string, AgentExecutionResult>,
-    conversationId?: string
+    conversationId?: string,
+    context?: AgentExecutionContext
   ): Promise<AgentExecutionResult> {
     try {
       const agent = await this.agentRepository.findById(step.agentId, tenantId);
@@ -281,6 +297,10 @@ export class AgentExecutor implements IAgentExecutor {
 
       if (this.isPretAgent(agent.agentType) && this.pretOrchestrator) {
         return this.executePretAgentStream(step, tenantId, agent, onChunk, conversationId);
+      }
+
+      if (this.isDelayEventsAgent(agent.agentType)) {
+        return this.executeDelayEventsAgentStream(step, tenantId, agent, onChunk, context);
       }
 
       const chunks = await this.chunkRepository.findByAgentId(step.agentId, tenantId);
@@ -479,6 +499,161 @@ export class AgentExecutor implements IAgentExecutor {
         response: '',
         success: false,
         error: error instanceof Error ? error.message : 'PRET stream execution error',
+      };
+    }
+  }
+
+  private async executeDelayEventsAgent(
+    step: ExecutionStep,
+    tenantId: string,
+    agent: Agent,
+    context?: AgentExecutionContext
+  ): Promise<AgentExecutionResult> {
+    if (!this.delayEventsContextProvider) {
+      return {
+        agentId: step.agentId,
+        agentName: step.agentName,
+        response: '',
+        success: false,
+        error: 'Delay events context provider not configured',
+      };
+    }
+
+    if (!context?.activeDelayAnalysisProjectId) {
+      return {
+        agentId: step.agentId,
+        agentName: step.agentName,
+        response: "I can analyze delay events, but I need you to open a delay analysis project first. Please navigate to a project in the Delay Analysis section, then ask me your question.",
+        success: true,
+      };
+    }
+
+    try {
+      const delayContext = await this.delayEventsContextProvider.getContext(
+        context.activeDelayAnalysisProjectId,
+        tenantId
+      );
+
+      const systemPrompt = agent.systemPrompt + delayContext.systemPromptAddition;
+      const model = ModelId.fromString(agent.model);
+      const aiClient = this.aiClientFactory.getClientForModel(model);
+
+      if (!aiClient) {
+        return {
+          agentId: step.agentId,
+          agentName: step.agentName,
+          response: '',
+          success: false,
+          error: `No AI client configured for model: ${agent.model}`,
+        };
+      }
+
+      const response = await aiClient.chat({
+        model,
+        systemPrompt,
+        messages: [AIMessage.user(step.refinedPrompt)],
+        maxTokens: 2048,
+        temperature: 0.7,
+      });
+
+      return {
+        agentId: step.agentId,
+        agentName: step.agentName,
+        response: response.content,
+        success: true,
+      };
+    } catch (error) {
+      return {
+        agentId: step.agentId,
+        agentName: step.agentName,
+        response: '',
+        success: false,
+        error: error instanceof Error ? error.message : 'Delay events agent execution error',
+      };
+    }
+  }
+
+  private async executeDelayEventsAgentStream(
+    step: ExecutionStep,
+    tenantId: string,
+    agent: Agent,
+    onChunk: (chunk: string) => void,
+    context?: AgentExecutionContext
+  ): Promise<AgentExecutionResult> {
+    if (!this.delayEventsContextProvider) {
+      const errorMsg = 'Delay events context provider not configured';
+      await this.streamResponse(errorMsg, onChunk);
+      return {
+        agentId: step.agentId,
+        agentName: step.agentName,
+        response: errorMsg,
+        success: false,
+        error: errorMsg,
+      };
+    }
+
+    if (!context?.activeDelayAnalysisProjectId) {
+      const msg = "I can analyze delay events, but I need you to open a delay analysis project first. Please navigate to a project in the Delay Analysis section, then ask me your question.";
+      await this.streamResponse(msg, onChunk);
+      return {
+        agentId: step.agentId,
+        agentName: step.agentName,
+        response: msg,
+        success: true,
+      };
+    }
+
+    try {
+      const delayContext = await this.delayEventsContextProvider.getContext(
+        context.activeDelayAnalysisProjectId,
+        tenantId
+      );
+
+      const systemPrompt = agent.systemPrompt + delayContext.systemPromptAddition;
+      const model = ModelId.fromString(agent.model);
+      const aiClient = this.aiClientFactory.getClientForModel(model);
+
+      if (!aiClient) {
+        return {
+          agentId: step.agentId,
+          agentName: step.agentName,
+          response: '',
+          success: false,
+          error: `No AI client configured for model: ${agent.model}`,
+        };
+      }
+
+      let fullResponse = '';
+
+      await aiClient.streamChat(
+        {
+          model,
+          systemPrompt,
+          messages: [AIMessage.user(step.refinedPrompt)],
+          maxTokens: 2048,
+          temperature: 0.7,
+        },
+        (streamChunk) => {
+          if (streamChunk.type === 'content' && streamChunk.content) {
+            fullResponse += streamChunk.content;
+            onChunk(streamChunk.content);
+          }
+        }
+      );
+
+      return {
+        agentId: step.agentId,
+        agentName: step.agentName,
+        response: fullResponse,
+        success: true,
+      };
+    } catch (error) {
+      return {
+        agentId: step.agentId,
+        agentName: step.agentName,
+        response: '',
+        success: false,
+        error: error instanceof Error ? error.message : 'Delay events stream execution error',
       };
     }
   }

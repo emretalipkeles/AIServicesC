@@ -92,7 +92,7 @@ export class OrchestratorController {
       return;
     }
 
-    const { message, conversationId: clientConversationId } = parseResult.data;
+    const { message, conversationId: clientConversationId, context } = parseResult.data;
     const tenantId = (req as any).tenantId || 'default';
 
     console.log('[OrchestratorController] streamOrchestrate called with conversationId:', clientConversationId, 'message:', message.substring(0, 50));
@@ -165,7 +165,7 @@ export class OrchestratorController {
         content: message,
       }, tenantId);
 
-      const command = new OrchestrateCommand(tenantId, message, conversationHistory, conversationId);
+      const command = new OrchestrateCommand(tenantId, message, conversationHistory, conversationId, context);
 
       let fullAssistantResponse = '';
       let currentAgentResponses: Map<string, { name: string; content: string }> = new Map();

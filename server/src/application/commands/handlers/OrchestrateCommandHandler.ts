@@ -68,10 +68,14 @@ export class OrchestrateCommandHandler {
 
       const results = new Map<string, AgentExecutionResult>();
 
+      const executionContext = command.context ? {
+        activeDelayAnalysisProjectId: command.context.activeDelayAnalysisProjectId
+      } : undefined;
+
       if (plan.strategy === 'parallel') {
-        await this.executeParallel(command.tenantId, plan, results, onProgress, command.conversationId);
+        await this.executeParallel(command.tenantId, plan, results, onProgress, command.conversationId, executionContext);
       } else {
-        await this.executeSequential(command.tenantId, plan, results, onProgress, command.conversationId);
+        await this.executeSequential(command.tenantId, plan, results, onProgress, command.conversationId, executionContext);
       }
 
       const successfulResults = Array.from(results.values()).filter(r => r.success);
@@ -115,7 +119,8 @@ export class OrchestrateCommandHandler {
     plan: ExecutionPlan,
     results: Map<string, AgentExecutionResult>,
     onProgress: (progress: OrchestrationProgress) => void,
-    conversationId?: string
+    conversationId?: string,
+    context?: { activeDelayAnalysisProjectId?: string }
   ): Promise<void> {
     const promises = plan.steps.map(async (step) => {
       onProgress({ type: 'agent-start', agentId: step.agentId, agentName: step.agentName });
@@ -127,7 +132,8 @@ export class OrchestrateCommandHandler {
           onProgress({ type: 'agent-chunk', agentId: step.agentId, agentName: step.agentName, content: chunk });
         },
         undefined,
-        conversationId
+        conversationId,
+        context
       );
 
       results.set(step.agentId, result);
@@ -154,7 +160,8 @@ export class OrchestrateCommandHandler {
     plan: ExecutionPlan,
     results: Map<string, AgentExecutionResult>,
     onProgress: (progress: OrchestrationProgress) => void,
-    conversationId?: string
+    conversationId?: string,
+    context?: { activeDelayAnalysisProjectId?: string }
   ): Promise<void> {
     for (const step of plan.steps) {
       onProgress({ type: 'agent-start', agentId: step.agentId, agentName: step.agentName });
@@ -166,7 +173,8 @@ export class OrchestrateCommandHandler {
           onProgress({ type: 'agent-chunk', agentId: step.agentId, agentName: step.agentName, content: chunk });
         },
         results,
-        conversationId
+        conversationId,
+        context
       );
 
       results.set(step.agentId, result);

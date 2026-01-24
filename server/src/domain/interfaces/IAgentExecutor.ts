@@ -14,12 +14,17 @@ export interface AgentExecutionResult {
   metadata?: AgentExecutionResultMetadata;
 }
 
+export interface AgentExecutionContext {
+  activeDelayAnalysisProjectId?: string;
+}
+
 export interface IAgentExecutor {
   execute(
     step: ExecutionStep,
     tenantId: string,
     previousResults?: Map<string, AgentExecutionResult>,
-    conversationId?: string
+    conversationId?: string,
+    context?: AgentExecutionContext
   ): Promise<AgentExecutionResult>;
 
   executeStream(
@@ -27,6 +32,7 @@ export interface IAgentExecutor {
     tenantId: string,
     onChunk: (chunk: string) => void,
     previousResults?: Map<string, AgentExecutionResult>,
-    conversationId?: string
+    conversationId?: string,
+    context?: AgentExecutionContext
   ): Promise<AgentExecutionResult>;
 }

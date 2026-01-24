@@ -116,9 +116,13 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
         ? `/api/agents/${selectedAgent.id}/chat/stream`
         : '/api/ai/orchestrate/stream';
       
+      const orchestrationContext = tabContext?.activeDelayAnalysisProjectId 
+        ? { activeDelayAnalysisProjectId: tabContext.activeDelayAnalysisProjectId }
+        : undefined;
+
       const streamBody = selectedAgent
         ? { messages: [...conversationHistory, { role: 'user', content: inputValue }] }
-        : { message: inputValue, conversationId };
+        : { message: inputValue, conversationId, context: orchestrationContext };
 
       console.log('[AIChatPanel] Sending message with conversationId:', conversationId);
 

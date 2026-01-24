@@ -7,15 +7,18 @@ export interface Tab {
   icon: LucideIcon;
   type: "static" | "package" | "delay-analysis";
   packageId?: string;
+  delayAnalysisProjectId?: string;
 }
 
 interface TabContextType {
   tabs: Tab[];
   activeTab: string;
+  activeDelayAnalysisProjectId: string | null;
   addTab: (tab: Tab) => void;
   setActiveTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   openPackageTab: (packageId: string, packageName: string) => void;
+  setActiveDelayAnalysisProject: (projectId: string | null) => void;
 }
 
 const TabContext = createContext<TabContextType | null>(null);
@@ -39,6 +42,11 @@ interface TabProviderProps {
 export function TabProvider({ children }: TabProviderProps) {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTab, setActiveTab] = useState("");
+  const [activeDelayAnalysisProjectId, setActiveDelayAnalysisProjectId] = useState<string | null>(null);
+
+  const setActiveDelayAnalysisProject = useCallback((projectId: string | null) => {
+    setActiveDelayAnalysisProjectId(projectId);
+  }, []);
 
   const addTab = useCallback((tab: Tab) => {
     setTabs((prev) => {
@@ -82,10 +90,12 @@ export function TabProvider({ children }: TabProviderProps) {
       value={{
         tabs,
         activeTab,
+        activeDelayAnalysisProjectId,
         addTab,
         setActiveTab,
         closeTab,
         openPackageTab,
+        setActiveDelayAnalysisProject,
       }}
     >
       {children}
