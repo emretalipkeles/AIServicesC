@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Sparkles, Bot, User, Paperclip, MoreHorizontal, Loader2, Package, ExternalLink, Upload, PanelLeftClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { AgentSelector } from "./agent-selector";
 import { StructuredOutputCard } from "./structured-output-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -81,10 +80,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
 
   useEffect(() => {
     if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
   }, [messages]);
 
@@ -750,8 +746,8 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
       </div>
 
       {/* Messages region - scrollable, takes remaining space */}
-      <ScrollArea className="chat-messages px-2 sm:px-3 discreet-scroll" ref={scrollAreaRef}>
-        <div className="py-3 space-y-3 w-full min-w-0 max-w-full overflow-hidden">
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-2 sm:px-3">
+        <div className="py-3 space-y-3 w-full min-w-0 max-w-full">
           {messages.map((message, index) => {
             const isUser = message.role === "user";
             return (
@@ -945,7 +941,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Input region - fixed at bottom */}
       <div className="chat-input p-2 sm:p-3 border-t border-sidebar-border">
