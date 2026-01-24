@@ -1,0 +1,127 @@
+Based on the document, here's the difference between NCRs and IDRs and how your AI should handle them:
+Inspector Daily Reports (IDRs)
+What they are:
+
+Daily field observations written by inspectors
+Capture what's happening on site day-to-day
+Starting around July 2025, inspectors flag potential contractor delays with code "CODE_CIE"
+Broader scope - includes observations, progress notes, incidents, problems
+
+Characteristics:
+
+Volume: High - daily reports across entire project
+Specificity: Variable - some days have clear delay incidents, others are routine observations
+Delay indicator: Inspector's judgment call using CODE_CIE flag
+Causation: May require interpretation (inspector suspects contractor issue)
+
+Example IDR entry:
+"Paving crew arrived 2 hours late due to equipment breakdown. CODE_CIE - Activity 1.2.3"
+
+Non-Conformance Reports (NCRs)
+What they are:
+
+Formal documentation of quality failures or work that doesn't meet specifications
+Triggers mandatory rework or corrective action
+Referenced in the scope as "Poor workmanship requiring rework that is already or can be an NCR"
+
+Characteristics:
+
+Volume: Lower - only issued when work fails inspection
+Specificity: High - documents specific defect with corrective action required
+Delay indicator: Almost certain delay (rework takes time)
+Causation: Definitively contractor-caused (quality failure)
+
+Example NCR:
+"NCR-045: Curb ramp does not meet ADA slope requirements. Contractor to remove and rebuild per specification."
+
+How Your AI Should Treat Them Differently
+For IDRs (CODE_CIE entries):
+
+Parse for incident narratives
+
+Look for descriptions of problems, delays, issues
+Extract: what happened, when, why work stopped/slowed
+
+
+Confidence scoring is critical
+
+Inspector observations may be subjective
+AI needs to assess: "Is this really a delay event?"
+Some CODE_CIE entries might be false positives
+
+
+Estimate delay impact
+
+IDRs often describe incidents without stating exact delay duration
+AI needs to infer: "Equipment breakdown = X hours delay"
+
+
+Verify responsibility
+
+Just because inspector flagged CODE_CIE doesn't guarantee it's contractor-caused
+AI should analyze the narrative to confirm responsibility
+
+For NCRs:
+
+Treat as definitive delay events
+
+NCR = work failed = rework required = delay
+Higher confidence that delay occurred
+
+
+Extract rework scope
+
+What failed inspection?
+What corrective action is required?
+This helps estimate delay duration
+
+
+Delay duration estimation
+
+Rework time = removal + redo + re-inspection
+More predictable than incident-based delays
+
+
+Responsibility is clearer
+
+NCRs are issued for quality failures
+Almost always contractor-caused (unless it's design defect)
+
+Key Differences for AI Processing
+AspectIDRs (CODE_CIE)NCRsDelay CertaintyPossible delay - needs analysisDefinite delay - rework requiredAI ConfidenceLower - verify incident is real delayHigher - NCR = documented failureDuration ExtractionOften implicit - requires estimationExplicit or estimable from rework scopeResponsibilityVerify from narrativePresumed contractor (unless proven otherwise)Matching ComplexityModerate - incident may affect multiple activitiesEasier - NCR references specific work element
+
+Unified AI Agent Workflow
+Despite differences, both feed into same pipeline:
+
+Document Classification Agent - "Is this IDR or NCR?"
+Incident Extraction Agent
+
+IDR path: Extract narrative, assess if real delay
+NCR path: Extract defect + rework requirements
+
+Delay Estimator Agent
+
+IDR path: Estimate from incident description
+NCR path: Estimate from rework scope
+
+
+Rest of pipeline is same (WBS matching, responsibility verification, concurrency detection)
+
+
+Training Data Strategy (from your doc)
+Your methodology says:
+
+"The IDR-based 'CODE_CIE' entries and NCR records will form the backbone of the initial dataset used to train the AI system"
+
+Why this is smart:
+
+Both have pre-identified contractor issues (CODE_CIE flag or NCR issuance)
+Gives AI clearer training examples
+Reduces false positives during initial training
+
+Later expansion:
+
+Field Memos (broader, less structured)
+Rejected DSC claims (contractor tried to blame owner, but SDOT said no)
+
+This phased approach lets you validate AI accuracy on "easy" cases (NCRs, flagged IDRs) before tackling harder ones (unflagged IDRs, memos).

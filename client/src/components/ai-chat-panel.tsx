@@ -806,7 +806,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
       </div>
 
       {/* Messages region - scrollable, takes remaining space */}
-      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-1 discreet-scroll">
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto discreet-scroll">
         <div className="py-3 space-y-3 w-full min-w-0 max-w-full">
           {messages.map((message, index) => {
             const isUser = message.role === "user";
@@ -867,7 +867,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                     </div>
                   ) : (
                   <div 
-                    className={`chat-bubble rounded-2xl px-3 py-2 max-w-[85%] min-w-0 ${
+                    className={`chat-bubble rounded-2xl px-3 py-2 max-w-[95%] min-w-0 ${
                       isUser 
                         ? 'user-message' 
                         : 'assistant-message bg-muted/50 dark:bg-muted/30 border border-border/30'
