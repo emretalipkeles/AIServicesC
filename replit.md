@@ -1,8 +1,8 @@
-# Construction Delay Analyzer
+# Construction Delay Interpreter
 
 ## Overview
 
-Construction Delay Analyzer is an AI-powered platform for interpreting contractor-caused delays in construction projects. It provides a split-screen interface featuring an AI chat panel and a tabbed content area. The platform processes project documents (IDRs, NCRs, Field Memos) to extract delay events and matches them to CPM schedule activities. It uses LLM-based analysis with real-time SSE streaming to help users understand and analyze construction delays.
+Construction Delay Interpreter is an AI-powered platform for interpreting contractor-caused delays in construction projects. It provides a split-screen interface featuring an AI chat panel and a tabbed content area. The platform processes project documents (IDRs, NCRs, Field Memos) to extract delay events and matches them to CPM schedule activities. It uses LLM-based interpretation with real-time SSE streaming to help users understand and interpret construction delays.
 
 ## User Preferences
 
@@ -58,7 +58,7 @@ Key entities include `delay_analysis_projects`, `delay_analysis_documents`, `sch
 - **Component Library**: shadcn/ui with custom theme.
 
 ### Feature Specifications
-- **Delay Analysis**: AI-powered construction delay analysis. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes.
+- **Delay Interpretation**: AI-powered construction delay interpretation. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes.
 - **Document Processing**: Upload and parse construction documents (PDF) to extract delay-related information including dates, causes, responsible parties, and impacts.
 - **Schedule Integration**: Upload CPM schedules (CSV/Excel) with activity IDs, WBS codes, descriptions, and dates. Link delay events to specific schedule activities.
 - **AI Chat Assistant**: Guardrailed AI assistant that only answers questions about construction delays, schedule activities, and project timeline analysis. Refuses off-topic requests.

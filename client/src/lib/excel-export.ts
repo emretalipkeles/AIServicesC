@@ -39,10 +39,10 @@ export async function exportDelayEventsToExcel(
   documentNameMap?: Map<string, string>
 ): Promise<void> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Data First - Delay Analysis';
+  workbook.creator = 'Construction Delay Interpreter';
   workbook.created = new Date();
 
-  const worksheet = workbook.addWorksheet('Delay Analysis Results', {
+  const worksheet = workbook.addWorksheet('Delay Interpretation Results', {
     views: [{ state: 'frozen', ySplit: 1 }],
   });
 

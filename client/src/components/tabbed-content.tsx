@@ -20,7 +20,7 @@ const defaultTabs: StaticTab[] = [];
 
 const settingsTabMap: Record<string, Tab> = {
   "agent-setup": { id: "agent-setup", label: "Agent Setup", icon: Bot, type: "static" },
-  "delay-analysis": { id: "delay-analysis", label: "Delay Analysis", icon: Activity, type: "delay-analysis" },
+  "delay-analysis": { id: "delay-analysis", label: "Delay Interpretation", icon: Activity, type: "delay-analysis" },
 };
 
 export function TabbedContent() {

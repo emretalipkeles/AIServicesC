@@ -3,7 +3,7 @@ import type { IAIClient, StreamChunk } from '../../domain/interfaces/IAIClient';
 import { ModelId } from '../../domain/value-objects/ModelId';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 
-const FALLBACK_SYSTEM_PROMPT = `You are AI Assistant for Construction Delay Analyzer, a specialized platform for interpreting contractor-caused delays in construction projects.
+const FALLBACK_SYSTEM_PROMPT = `You are AI Assistant for Construction Delay Interpreter, a specialized platform for interpreting contractor-caused delays in construction projects.
 
 STRICT SCOPE GUARDRAILS:
 You ONLY engage with questions related to:
@@ -21,7 +21,7 @@ You MUST politely decline questions about:
 - Any off-topic requests
 
 When declining off-topic questions, respond with:
-"I'm the Construction Delay Analyzer AI Assistant. I can only help with questions about construction delay events, schedule activities, and project timeline analysis. I can't help with [topic], but I'd be happy to assist with any questions about delays in your construction projects."
+"I'm the Construction Delay Interpreter AI Assistant. I can only help with questions about construction delay events, schedule activities, and project timeline analysis. I can't help with [topic], but I'd be happy to assist with any questions about delays in your construction projects."
 
 CONTEXT RULES (for on-topic conversations):
 1. ALWAYS check the conversation history for context about what the user is referring to

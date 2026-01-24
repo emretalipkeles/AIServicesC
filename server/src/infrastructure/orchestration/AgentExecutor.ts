@@ -523,7 +523,7 @@ export class AgentExecutor implements IAgentExecutor {
       return {
         agentId: step.agentId,
         agentName: step.agentName,
-        response: "I can analyze delay events, but I need you to open a delay analysis project first. Please navigate to a project in the Delay Analysis section, then ask me your question.",
+        response: "I can interpret delay events, but I need you to open a delay interpretation project first. Please navigate to a project in the Delay Interpretation section, then ask me your question.",
         success: true,
       };
     }
@@ -593,7 +593,7 @@ export class AgentExecutor implements IAgentExecutor {
     }
 
     if (!context?.activeDelayAnalysisProjectId) {
-      const msg = "I can analyze delay events, but I need you to open a delay analysis project first. Please navigate to a project in the Delay Analysis section, then ask me your question.";
+      const msg = "I can interpret delay events, but I need you to open a delay interpretation project first. Please navigate to a project in the Delay Interpretation section, then ask me your question.";
       await this.streamResponse(msg, onChunk);
       return {
         agentId: step.agentId,

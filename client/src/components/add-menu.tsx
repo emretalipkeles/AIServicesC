@@ -17,8 +17,8 @@ interface AddMenuItem {
 const menuItems: AddMenuItem[] = [
   {
     id: "delay-analysis",
-    label: "Delay Analysis",
-    description: "Analyze contractor-caused delays from construction documentation",
+    label: "Delay Interpretation",
+    description: "Interpret contractor-caused delays from construction documentation",
     icon: Activity,
   },
 ];
