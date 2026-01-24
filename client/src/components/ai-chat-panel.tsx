@@ -11,20 +11,6 @@ import type { Agent } from "@shared/schema";
 import { parseStructuredBlocks, removeStructuredBlocks, hasStructuredBlocks } from "@/lib/structured-output-parser";
 import { useOptionalTabContext } from "@/contexts/tab-context";
 import { queryClient } from "@/lib/queryClient";
-import { Children, isValidElement, ReactNode } from "react";
-
-function extractTextFromChildren(children: ReactNode): string {
-  if (typeof children === 'string') return children;
-  if (typeof children === 'number') return String(children);
-  if (children == null || typeof children === 'boolean') return '';
-  if (Array.isArray(children)) {
-    return children.map(extractTextFromChildren).join('');
-  }
-  if (isValidElement(children)) {
-    return extractTextFromChildren(children.props?.children);
-  }
-  return '';
-}
 
 interface PackageInfo {
   packageId: string;
@@ -825,10 +811,10 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                     </div>
                   ) : (
                   <div 
-                    className={`chat-bubble px-2.5 py-1.5 ${
+                    className={`chat-bubble rounded-2xl px-3 py-2 max-w-[85%] min-w-0 ${
                       isUser 
                         ? 'user-message' 
-                        : 'assistant-message'
+                        : 'assistant-message bg-muted/50 dark:bg-muted/30 border border-border/30'
                     }`}
                     data-testid={`text-message-${message.id}`}
                   >
@@ -838,71 +824,53 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                       </p>
                     ) : (
                       <>
-                        <div className="chat-prose text-[13px] leading-snug text-foreground prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2">
+                        <div className="text-[13px] leading-snug text-foreground prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-headings:break-words">
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
                             components={{
+                              h1: ({ children }) => <h1 className="text-lg font-bold break-words">{children}</h1>,
+                              h2: ({ children }) => <h2 className="text-base font-bold break-words">{children}</h2>,
+                              h3: ({ children }) => <h3 className="text-sm font-bold break-words">{children}</h3>,
+                              p: ({ children }) => <p className="break-words">{children}</p>,
                               code: ({ className, children, ...props }) => {
                                 const isInline = !className;
                                 if (isInline) {
                                   return (
-                                    <code 
-                                      className="inline-code-block"
-                                      {...props}
-                                    >
+                                    <code className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono" {...props}>
                                       {children}
                                     </code>
                                   );
                                 }
-                                return (
-                                  <code className={`${className} font-mono block min-w-0`} {...props}>
-                                    {children}
-                                  </code>
-                                );
+                                return <code className={`${className} font-mono block`} {...props}>{children}</code>;
                               },
                               pre: ({ children }) => (
-                                <div className="chat-code-wrapper">
-                                  <div className="chat-code-scroll">
-                                    <pre className="code-block">
-                                      {children}
-                                    </pre>
+                                <div className="my-3 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                                  <div className="max-h-[400px] overflow-y-auto overflow-x-auto bg-slate-900">
+                                    <pre className="p-3 text-sm text-slate-100 font-mono whitespace-pre">{children}</pre>
                                   </div>
                                 </div>
                               ),
                               blockquote: ({ children }) => (
-                                <blockquote className="chat-blockquote">{children}</blockquote>
-                              ),
-                              ul: ({ children }) => (
-                                <ul className="chat-list list-disc">{children}</ul>
-                              ),
-                              ol: ({ children }) => (
-                                <ol className="chat-list list-decimal">{children}</ol>
-                              ),
-                              p: ({ children }) => (
-                                <p className="min-w-0 max-w-full break-words">{children}</p>
+                                <blockquote className="border-l-4 border-primary/50 pl-3 py-1 my-2 bg-muted/30 rounded-r">{children}</blockquote>
                               ),
                               table: ({ children }) => (
-                                <div className="chat-table-wrapper border border-border/40 bg-muted/10 dark:bg-muted/5">
-                                  <div className="chat-table-scroll scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                                    <table className="chat-table">{children}</table>
+                                <div className="my-3 overflow-hidden rounded-lg shadow-md border border-blue-200/60 dark:border-blue-700/40 bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-800 dark:to-slate-900">
+                                  <div className="max-h-[480px] overflow-y-auto overflow-x-auto">
+                                    <table className="min-w-full">{children}</table>
                                   </div>
                                 </div>
                               ),
                               thead: ({ children }) => (
-                                <thead className="bg-gradient-to-r from-primary/10 to-primary/5 dark:from-primary/15 dark:to-primary/10 sticky top-0 z-10">{children}</thead>
+                                <thead className="bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 dark:from-blue-700 dark:via-blue-600 dark:to-blue-700 sticky top-0">{children}</thead>
                               ),
                               th: ({ children }) => (
-                                <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-primary/80 dark:text-primary/90 border-b-2 border-primary/20 whitespace-nowrap">{children}</th>
+                                <th className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider whitespace-nowrap border-b-2 border-blue-400/30 text-left">{children}</th>
                               ),
-                              td: ({ children }) => {
-                                const text = extractTextFromChildren(children);
-                                const isLongContent = text.length > 30;
-                                return (
-                                  <td className={`px-3 py-2.5 text-foreground/90 border-b border-border/20 dark:border-border/15 align-top ${isLongContent ? 'whitespace-normal min-w-[160px] max-w-[280px]' : 'whitespace-nowrap'}`}>{children}</td>
-                                );
-                              },
+                              td: ({ children }) => (
+                                <td className="px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 whitespace-nowrap border-b border-slate-100 dark:border-slate-700/50">{children}</td>
+                              ),
                               tr: ({ children }) => (
-                                <tr className="hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors">{children}</tr>
+                                <tr className="hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors even:bg-slate-50/80 dark:even:bg-slate-800/30">{children}</tr>
                               ),
                             }}
                           >
