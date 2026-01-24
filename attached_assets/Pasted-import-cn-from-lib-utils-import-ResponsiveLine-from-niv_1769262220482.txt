@@ -1,0 +1,932 @@
+import { cn } from "@/lib/utils";
+import { ResponsiveLine } from "@nivo/line";
+import { ResponsiveBar } from "@nivo/bar";
+import { ResponsivePie } from "@nivo/pie";
+
+interface McpTextFormatterProps {
+  text: string;
+  className?: string;
+}
+
+interface ChartDataPoint {
+  x: string;
+  y: number;
+}
+
+interface ParsedChartData {
+  title: string;
+  data: ChartDataPoint[];
+}
+
+interface PieChartDataPoint {
+  id: string;
+  label: string;
+  value: number;
+  percentage: number;
+}
+
+interface ParsedPieChartData {
+  title: string;
+  data: PieChartDataPoint[];
+}
+
+// Check if a code block contains an ASCII LINE chart pattern
+function isAsciiLineChart(codeContent: string): boolean {
+  const lines = codeContent.split('\n');
+  // Look for patterns typical of ASCII line charts:
+  // - Lines with | followed by numbers or symbols
+  // - Y-axis labels like (+40k), (-10k), (0)
+  // - Contains * or / or \ for line plotting
+  const hasAxisPattern = lines.some(line => /^\s*\([+-]?\d+[k]?\s*\)\s*\|/.test(line));
+  const hasPlotSymbols = codeContent.includes('*') || codeContent.includes('/') || codeContent.includes('\\');
+  const hasHorizontalAxis = lines.some(line => /\|[—\-]+/.test(line));
+  
+  return hasAxisPattern && hasPlotSymbols && hasHorizontalAxis;
+}
+
+// Check if a code block contains an ASCII BAR chart pattern
+function isAsciiBarChart(codeContent: string): boolean {
+  // Look for horizontal bar patterns with █ blocks
+  // Pattern: Label  value  | ████████
+  const hasBarBlocks = codeContent.includes('█');
+  const hasBarPattern = /\|\s*█+/.test(codeContent);
+  const hasTitleLine = codeContent.toLowerCase().includes('bar') || codeContent.toLowerCase().includes('chart');
+  
+  return hasBarBlocks && hasBarPattern;
+}
+
+// Check if text contains an ASCII PIE chart pattern (bullet points with percentages and █ blocks)
+// Pattern: - Label Value (XX.X%)  ████████
+function isAsciiPieChart(textContent: string): boolean {
+  // Look for bullet points with percentages and █ blocks
+  // Pattern: - Label 123,456.78 (12.7%)  █████
+  // Use unicode-aware pattern to match Albanian diacritics (ë, ç, etc.)
+  const piePattern = /[-•]\s*[\p{L}\p{M}]+\s+[\d,]+\.?\d*\s*\(\d+\.?\d*%\)\s*█+/u;
+  const hasPiePattern = piePattern.test(textContent);
+  const hasMultipleEntries = (textContent.match(/\(\d+\.?\d*%\)/g) || []).length >= 3;
+  
+  return hasPiePattern && hasMultipleEntries;
+}
+
+// Parse pie chart data from bullet points
+// Pattern: - Label Value (XX.X%)  ████████
+function parsePieChartFromText(textContent: string): PieChartDataPoint[] {
+  const dataPoints: PieChartDataPoint[] = [];
+  
+  // Match patterns like: - Korrik 112,534.67 (12.7%)  █████
+  // or with ** for bold values: - Korrik **112,534.67** (12.7%)  █████
+  // Use unicode-aware pattern to match Albanian diacritics (Nëntor, Dhjetor, etc.)
+  const piePattern = /[-•]\s*([\p{L}\p{M}]+)\s+\*?\*?([\d,]+\.?\d*)\*?\*?\s*\((\d+\.?\d*)%\)/gu;
+  
+  let match;
+  while ((match = piePattern.exec(textContent)) !== null) {
+    const label = match[1];
+    const valueStr = match[2].replace(/,/g, '');
+    const percentageStr = match[3];
+    const value = parseFloat(valueStr);
+    const percentage = parseFloat(percentageStr);
+    
+    if (!isNaN(value) && !isNaN(percentage)) {
+      dataPoints.push({
+        id: label,
+        label: label,
+        value: value,
+        percentage: percentage
+      });
+    }
+  }
+  
+  return dataPoints;
+}
+
+// Extract pie chart title from surrounding text
+function extractPieChartTitle(textContent: string): string {
+  // Look for "pie chart" mention with context
+  const pieMatch = textContent.match(/(?:pie chart|pie)\s*(?:\([^)]+\))?\s*(?:për|for|of|:)?\s*([^,:\n]+)/i);
+  if (pieMatch && pieMatch[1]) {
+    return pieMatch[1].trim();
+  }
+  // Default title
+  return "Distribution";
+}
+
+// Extract chart title from the first line of code block
+function extractChartTitle(codeContent: string): string {
+  const lines = codeContent.split('\n').filter(l => l.trim());
+  if (lines.length > 0) {
+    // First line is usually the title
+    const firstLine = lines[0].trim();
+    // Remove common prefixes like "Δ" and clean up
+    return firstLine;
+  }
+  return "Chart";
+}
+
+// Parse MoM data from bullet points in preceding text
+// Looks for patterns like: "- Jan → Shk: **-3,251.39**" or "Jan → Shk: **-3,251.39**"
+function parseMoMDataFromText(textBeforeChart: string): ChartDataPoint[] {
+  const dataPoints: ChartDataPoint[] = [];
+  
+  // Match patterns like: Label → Label: **value** or Label → Label: value
+  const momPattern = /[-•]\s*(\w+)\s*→\s*(\w+):\s*\*?\*?([+-]?[\d,]+\.?\d*)\*?\*?/g;
+  
+  let match;
+  while ((match = momPattern.exec(textBeforeChart)) !== null) {
+    const label = `${match[1]}→${match[2]}`;
+    const valueStr = match[3].replace(/,/g, '');
+    const value = parseFloat(valueStr);
+    
+    if (!isNaN(value)) {
+      dataPoints.push({ x: label, y: value });
+    }
+  }
+  
+  return dataPoints;
+}
+
+// Render a Nivo line chart from parsed data
+function renderLineChart(chartData: ParsedChartData, chartIndex: number): React.ReactNode {
+  if (chartData.data.length === 0) {
+    return null;
+  }
+
+  const nivoData = [{
+    id: "MoM Change",
+    color: "hsl(174, 70%, 45%)",
+    data: chartData.data
+  }];
+
+  // Calculate min/max for Y axis with padding
+  const values = chartData.data.map(d => d.y);
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  const padding = Math.abs(maxVal - minVal) * 0.15 || 5000;
+
+  return (
+    <div 
+      key={`chart-${chartIndex}`}
+      className="my-5 rounded-xl shadow-lg border border-teal-200/60 dark:border-teal-700/40 bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-800 dark:to-slate-900 p-4"
+    >
+      <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 text-center">
+        {chartData.title}
+      </div>
+      <div className="h-[280px]">
+        <ResponsiveLine
+          data={nivoData}
+          margin={{ top: 20, right: 30, bottom: 60, left: 70 }}
+          xScale={{ type: 'point' }}
+          yScale={{
+            type: 'linear',
+            min: minVal - padding,
+            max: maxVal + padding,
+            stacked: false,
+          }}
+          curve="monotoneX"
+          axisTop={null}
+          axisRight={null}
+          axisBottom={{
+            tickSize: 5,
+            tickPadding: 5,
+            tickRotation: -25,
+            legendOffset: 50,
+            legendPosition: 'middle',
+            truncateTickAt: 0
+          }}
+          axisLeft={{
+            tickSize: 5,
+            tickPadding: 5,
+            tickRotation: 0,
+            format: (value) => {
+              if (Math.abs(value) >= 1000) {
+                return `${(value / 1000).toFixed(1)}k`;
+              }
+              return value.toString();
+            },
+            legendOffset: -55,
+            legendPosition: 'middle'
+          }}
+          colors={['#14b8a6']}
+          lineWidth={3}
+          pointSize={10}
+          pointColor={{ theme: 'background' }}
+          pointBorderWidth={3}
+          pointBorderColor={{ from: 'serieColor' }}
+          pointLabelYOffset={-12}
+          enableArea={true}
+          areaOpacity={0.15}
+          areaBaselineValue={0}
+          useMesh={true}
+          enableGridX={false}
+          gridYValues={5}
+          theme={{
+            axis: {
+              ticks: {
+                text: {
+                  fill: '#64748b',
+                  fontSize: 11
+                }
+              }
+            },
+            grid: {
+              line: {
+                stroke: '#e2e8f0',
+                strokeWidth: 1
+              }
+            },
+            crosshair: {
+              line: {
+                stroke: '#14b8a6',
+                strokeWidth: 2
+              }
+            }
+          }}
+          markers={[
+            {
+              axis: 'y',
+              value: 0,
+              lineStyle: { stroke: '#94a3b8', strokeWidth: 2, strokeDasharray: '4 4' },
+            }
+          ]}
+          tooltip={({ point }) => (
+            <div className="bg-white dark:bg-slate-800 shadow-lg rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600">
+              <div className="text-xs text-gray-500 dark:text-gray-400">{point.data.xFormatted}</div>
+              <div className={cn(
+                "font-bold text-sm",
+                Number(point.data.y) >= 0 ? "text-green-600" : "text-red-600"
+              )}>
+                {Number(point.data.y) >= 0 ? '+' : ''}{Number(point.data.y).toLocaleString()}
+              </div>
+            </div>
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Render a Nivo horizontal bar chart from parsed data
+function renderBarChart(chartData: ParsedChartData, chartIndex: number): React.ReactNode {
+  if (chartData.data.length === 0) {
+    return null;
+  }
+
+  // Transform data for Nivo bar chart - needs array of objects with id and value
+  const nivoData = chartData.data.map(d => ({
+    label: d.x,
+    value: d.y,
+    color: d.y >= 0 ? '#10b981' : '#ef4444' // green for positive, red for negative
+  }));
+
+  // Calculate min/max for axis with padding
+  const values = chartData.data.map(d => d.y);
+  const minVal = Math.min(...values, 0);
+  const maxVal = Math.max(...values, 0);
+  const absMax = Math.max(Math.abs(minVal), Math.abs(maxVal));
+  const padding = absMax * 0.1 || 5000;
+
+  return (
+    <div 
+      key={`barchart-${chartIndex}`}
+      className="my-5 rounded-xl shadow-lg border border-teal-200/60 dark:border-teal-700/40 bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-800 dark:to-slate-900 p-4"
+    >
+      <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 text-center">
+        {chartData.title}
+      </div>
+      <div className="h-[280px]">
+        <ResponsiveBar
+          data={nivoData}
+          keys={['value']}
+          indexBy="label"
+          layout="horizontal"
+          margin={{ top: 10, right: 30, bottom: 40, left: 100 }}
+          padding={0.3}
+          valueScale={{ type: 'linear', min: minVal - padding, max: maxVal + padding }}
+          indexScale={{ type: 'band', round: true }}
+          colors={({ data }) => data.color as string}
+          borderRadius={4}
+          borderColor={{ from: 'color', modifiers: [['darker', 0.3]] }}
+          axisTop={null}
+          axisRight={null}
+          axisBottom={{
+            tickSize: 5,
+            tickPadding: 5,
+            tickRotation: 0,
+            format: (value) => {
+              if (Math.abs(Number(value)) >= 1000) {
+                return `${(Number(value) / 1000).toFixed(0)}k`;
+              }
+              return String(value);
+            }
+          }}
+          axisLeft={{
+            tickSize: 5,
+            tickPadding: 5,
+            tickRotation: 0,
+          }}
+          enableGridY={false}
+          enableGridX={true}
+          gridXValues={5}
+          labelSkipWidth={40}
+          labelSkipHeight={12}
+          label={d => {
+            const val = Number(d.value);
+            if (Math.abs(val) >= 1000) {
+              return `${(val / 1000).toFixed(1)}k`;
+            }
+            return val.toLocaleString();
+          }}
+          labelTextColor="#ffffff"
+          theme={{
+            axis: {
+              ticks: {
+                text: {
+                  fill: '#64748b',
+                  fontSize: 11
+                }
+              }
+            },
+            grid: {
+              line: {
+                stroke: '#e2e8f0',
+                strokeWidth: 1
+              }
+            }
+          }}
+          markers={[
+            {
+              axis: 'x',
+              value: 0,
+              lineStyle: { stroke: '#94a3b8', strokeWidth: 2, strokeDasharray: '4 4' },
+            }
+          ]}
+          tooltip={({ data, value }) => (
+            <div className="bg-white dark:bg-slate-800 shadow-lg rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600">
+              <div className="text-xs text-gray-500 dark:text-gray-400">{data.label}</div>
+              <div className={cn(
+                "font-bold text-sm",
+                Number(value) >= 0 ? "text-green-600" : "text-red-600"
+              )}>
+                {Number(value) >= 0 ? '+' : ''}{Number(value).toLocaleString()}
+              </div>
+            </div>
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Teal gradient color palette for pie chart (matches AI theme)
+const PIE_COLORS = [
+  '#0d9488', // teal-600
+  '#14b8a6', // teal-500
+  '#2dd4bf', // teal-400
+  '#5eead4', // teal-300
+  '#99f6e4', // teal-200
+  '#06b6d4', // cyan-500
+  '#22d3ee', // cyan-400
+  '#67e8f9', // cyan-300
+  '#0891b2', // cyan-600
+  '#0e7490', // cyan-700
+  '#115e59', // teal-800
+  '#134e4a', // teal-900
+];
+
+// Render a Nivo pie chart from parsed data
+function renderPieChart(chartData: ParsedPieChartData, chartIndex: number): React.ReactNode {
+  if (chartData.data.length === 0) {
+    return null;
+  }
+
+  // Transform data for Nivo pie chart
+  const nivoData = chartData.data.map((d, idx) => ({
+    id: d.id,
+    label: d.label,
+    value: d.value,
+    percentage: d.percentage,
+    color: PIE_COLORS[idx % PIE_COLORS.length]
+  }));
+
+  return (
+    <div 
+      key={`piechart-${chartIndex}`}
+      className="my-5 rounded-xl shadow-lg border border-teal-200/60 dark:border-teal-700/40 bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-800 dark:to-slate-900 p-4"
+    >
+      <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 text-center">
+        {chartData.title}
+      </div>
+      <div className="h-[320px]">
+        <ResponsivePie
+          data={nivoData}
+          margin={{ top: 20, right: 120, bottom: 20, left: 20 }}
+          innerRadius={0.5}
+          padAngle={0.7}
+          cornerRadius={4}
+          activeOuterRadiusOffset={8}
+          colors={{ datum: 'data.color' }}
+          borderWidth={1}
+          borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
+          enableArcLinkLabels={false}
+          arcLabelsSkipAngle={10}
+          arcLabelsTextColor="#ffffff"
+          arcLabel={d => `${d.data.percentage.toFixed(1)}%`}
+          legends={[
+            {
+              anchor: 'right',
+              direction: 'column',
+              justify: false,
+              translateX: 100,
+              translateY: 0,
+              itemsSpacing: 2,
+              itemWidth: 90,
+              itemHeight: 20,
+              itemTextColor: '#64748b',
+              itemDirection: 'left-to-right',
+              itemOpacity: 1,
+              symbolSize: 12,
+              symbolShape: 'circle',
+            }
+          ]}
+          theme={{
+            labels: {
+              text: {
+                fontSize: 11,
+                fontWeight: 600
+              }
+            }
+          }}
+          tooltip={({ datum }) => (
+            <div className="bg-white dark:bg-slate-800 shadow-lg rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-600">
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: datum.color }}
+                />
+                <span className="text-xs text-gray-500 dark:text-gray-400">{datum.label}</span>
+              </div>
+              <div className="font-bold text-sm text-teal-600 dark:text-teal-400">
+                {datum.value.toLocaleString()} ({datum.data.percentage.toFixed(1)}%)
+              </div>
+            </div>
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Helper function to detect and style monetary amounts only
+function styleNumbers(text: string, keyPrefix: string = ""): React.ReactNode[] {
+  // Match monetary amounts: numbers with commas OR decimals
+  // Also match percentages with + or - prefix
+  // Examples: 1,234, 1,234.56, 123.45, -1,234.56, +65.77%, -5.23%
+  const amountRegex = /([+-]?\d{1,3}(?:,\d{3})+(?:\.\d+)?%?|[+-]?\d+\.\d+%?)/g;
+  
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = amountRegex.exec(text)) !== null) {
+    const beforeText = text.substring(lastIndex, match.index);
+    
+    // Skip if this number is part of a date (has dashes around it)
+    const charBefore = match.index > 0 ? text[match.index - 1] : '';
+    const charAfter = match.index + match[0].length < text.length ? text[match.index + match[0].length] : '';
+    const isPartOfDate = charBefore === '-' || charAfter === '-';
+    
+    // Add text before the number
+    if (match.index > lastIndex) {
+      parts.push(beforeText);
+    }
+
+    const numberStr = match[0];
+    
+    if (isPartOfDate) {
+      parts.push(numberStr);
+    } else {
+      const isNegative = numberStr.startsWith('-');
+      const isPositive = numberStr.startsWith('+');
+      
+      parts.push(
+        <span
+          key={`${keyPrefix}num-${match.index}`}
+          className={cn(
+            "font-bold",
+            isNegative ? "text-red-600 dark:text-red-400" : 
+            isPositive ? "text-green-600 dark:text-green-400" :
+            "text-green-600 dark:text-green-400"
+          )}
+        >
+          {numberStr}
+        </span>
+      );
+    }
+
+    lastIndex = match.index + numberStr.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
+}
+
+// Helper function to parse markdown bold (**text**) and apply number styling
+function parseMarkdownBold(text: string, keyPrefix: string = ""): React.ReactNode[] {
+  const boldRegex = /\*\*(.+?)\*\*/g;
+  
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+  let matchIndex = 0;
+
+  while ((match = boldRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      const beforeText = text.substring(lastIndex, match.index);
+      parts.push(...styleNumbers(beforeText, `${keyPrefix}pre-${matchIndex}-`));
+    }
+
+    const boldContent = match[1];
+    const styledBoldContent = styleNumbers(boldContent, `${keyPrefix}bold-${matchIndex}-`);
+    
+    parts.push(
+      <strong key={`${keyPrefix}bold-${matchIndex}`} className="font-semibold">
+        {styledBoldContent}
+      </strong>
+    );
+
+    lastIndex = match.index + match[0].length;
+    matchIndex++;
+  }
+
+  if (lastIndex < text.length) {
+    const remainingText = text.substring(lastIndex);
+    parts.push(...styleNumbers(remainingText, `${keyPrefix}post-`));
+  }
+
+  if (parts.length === 0) {
+    return styleNumbers(text, keyPrefix);
+  }
+
+  return parts;
+}
+
+// Parse a markdown table row into cells
+function parseTableRow(row: string): string[] {
+  // Remove leading/trailing pipes and split by |
+  const trimmed = row.trim();
+  const withoutOuterPipes = trimmed.startsWith('|') ? trimmed.slice(1) : trimmed;
+  const cleaned = withoutOuterPipes.endsWith('|') ? withoutOuterPipes.slice(0, -1) : withoutOuterPipes;
+  return cleaned.split('|').map(cell => cell.trim());
+}
+
+// Determine column alignment from separator row (e.g., |---:|:---:|---| )
+function parseAlignments(separatorRow: string): ('left' | 'right' | 'center')[] {
+  const cells = parseTableRow(separatorRow);
+  return cells.map(cell => {
+    const trimmed = cell.trim();
+    const leftColon = trimmed.startsWith(':');
+    const rightColon = trimmed.endsWith(':');
+    
+    if (leftColon && rightColon) return 'center';
+    if (rightColon) return 'right';
+    return 'left';
+  });
+}
+
+// Check if a line is a table separator row (contains only |, -, :, and spaces)
+function isTableSeparator(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('|')) return false;
+  // Match separator pattern: | followed by combinations of -, :, |, and spaces
+  return /^\|[\s\-:|]+\|?$/.test(trimmed);
+}
+
+// Check if a line is a table row (starts with |)
+function isTableRow(line: string): boolean {
+  return line.trim().startsWith('|');
+}
+
+interface TableData {
+  headers: string[];
+  alignments: ('left' | 'right' | 'center')[];
+  rows: string[][];
+}
+
+// Render a parsed table as styled HTML
+function renderTable(table: TableData, tableIndex: number): React.ReactNode {
+  return (
+    <div 
+      key={`table-${tableIndex}`} 
+      className="my-5 overflow-hidden rounded-xl shadow-lg border border-teal-200/60 dark:border-teal-700/40 bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-800 dark:to-slate-900"
+    >
+      <div className="max-h-[480px] overflow-y-auto overflow-x-auto">
+        <table className="min-w-full">
+          <thead className="bg-gradient-to-r from-teal-600 via-cyan-500 to-teal-600 dark:from-teal-700 dark:via-cyan-600 dark:to-teal-700 sticky top-0">
+            <tr>
+              {table.headers.map((header, colIndex) => (
+                <th
+                  key={`header-${colIndex}`}
+                  className={cn(
+                    "px-4 py-3.5 text-xs font-bold text-white uppercase tracking-wider whitespace-nowrap border-b-2 border-teal-400/30",
+                    table.alignments[colIndex] === 'right' ? 'text-right' :
+                    table.alignments[colIndex] === 'center' ? 'text-center' : 'text-left'
+                  )}
+                >
+                  {parseMarkdownBold(header, `table-${tableIndex}-header-${colIndex}-`)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+            {table.rows.map((row, rowIndex) => (
+              <tr 
+                key={`row-${rowIndex}`}
+                className={cn(
+                  "hover:bg-teal-50/50 dark:hover:bg-teal-900/20 transition-colors duration-150",
+                  rowIndex % 2 === 0 
+                    ? "bg-white dark:bg-slate-800/60" 
+                    : "bg-slate-50/80 dark:bg-slate-800/30"
+                )}
+              >
+                {row.map((cell, colIndex) => (
+                  <td
+                    key={`cell-${rowIndex}-${colIndex}`}
+                    className={cn(
+                      "px-4 py-3 text-sm text-slate-700 dark:text-slate-200 whitespace-nowrap",
+                      table.alignments[colIndex] === 'right' ? 'text-right' :
+                      table.alignments[colIndex] === 'center' ? 'text-center' : 'text-left',
+                      colIndex === 0 && "font-medium text-slate-800 dark:text-slate-100"
+                    )}
+                  >
+                    {parseMarkdownBold(cell, `table-${tableIndex}-row-${rowIndex}-col-${colIndex}-`)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// Parse markdown heading (### text, ## text, # text)
+function parseHeading(line: string): { level: number; text: string } | null {
+  const match = line.match(/^(#{1,6})\s+(.+)$/);
+  if (match) {
+    return { level: match[1].length, text: match[2] };
+  }
+  return null;
+}
+
+// Render a heading with appropriate styling
+function renderHeading(heading: { level: number; text: string }, index: number): React.ReactNode {
+  const baseClasses = "font-semibold text-gray-900 dark:text-gray-100 mt-4 first:mt-0";
+  
+  switch (heading.level) {
+    case 1:
+      return (
+        <h1 key={index} className={cn(baseClasses, "text-xl")}>
+          {parseMarkdownBold(heading.text, `heading-${index}-`)}
+        </h1>
+      );
+    case 2:
+      return (
+        <h2 key={index} className={cn(baseClasses, "text-lg")}>
+          {parseMarkdownBold(heading.text, `heading-${index}-`)}
+        </h2>
+      );
+    case 3:
+    default:
+      return (
+        <h3 key={index} className={cn(baseClasses, "text-base")}>
+          {parseMarkdownBold(heading.text, `heading-${index}-`)}
+        </h3>
+      );
+  }
+}
+
+// Process a regular line (bullet, sub-bullet, or text)
+function processLine(line: string, index: number): React.ReactNode {
+  // Handle empty lines as spacing
+  if (line.trim().length === 0) {
+    return <div key={index} className="h-2" />;
+  }
+
+  // Check for nested/sub-bullet (starts with spaces then dash)
+  const nestedBulletMatch = line.match(/^(\s{2,})-\s*(.+)$/);
+  if (nestedBulletMatch) {
+    const content = nestedBulletMatch[2];
+    return (
+      <div key={index} className="flex items-start gap-2 pl-8">
+        <span className="text-gray-500 dark:text-gray-400 mt-0.5 text-sm">○</span>
+        <span className="flex-1 text-gray-700 dark:text-gray-300">
+          {parseMarkdownBold(content, `line-${index}-`)}
+        </span>
+      </div>
+    );
+  }
+
+  // Check for main bullet point (starts with dash)
+  const mainBulletMatch = line.match(/^-\s*(.+)$/);
+  if (mainBulletMatch) {
+    const content = mainBulletMatch[1];
+    return (
+      <div key={index} className="flex items-start gap-2 pl-2">
+        <span className="text-gray-700 dark:text-gray-300 mt-0.5">•</span>
+        <span className="flex-1 text-gray-900 dark:text-gray-100">
+          {parseMarkdownBold(content, `line-${index}-`)}
+        </span>
+      </div>
+    );
+  }
+
+  // Regular text line
+  return (
+    <div key={index} className="text-gray-800 dark:text-gray-200">
+      {parseMarkdownBold(line, `line-${index}-`)}
+    </div>
+  );
+}
+
+export function McpTextFormatter({ text, className }: McpTextFormatterProps) {
+  if (!text || text.trim().length === 0) {
+    return null;
+  }
+
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+  let tableCount = 0;
+  let chartCount = 0;
+  
+  // Track text before code blocks for data extraction
+  let textBeforeCodeBlock = "";
+
+  while (i < lines.length) {
+    const line = lines[i];
+    
+    // Check for code block start (```)
+    if (line.trim().startsWith('```')) {
+      // Collect all lines in the code block
+      const codeLines: string[] = [];
+      i++; // Skip opening ```
+      
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++; // Skip closing ```
+      
+      const codeContent = codeLines.join('\n');
+      
+      // Check if this is an ASCII BAR chart first (more specific pattern)
+      if (isAsciiBarChart(codeContent)) {
+        // Parse data from the text before this code block
+        const dataPoints = parseMoMDataFromText(textBeforeCodeBlock);
+        const title = extractChartTitle(codeContent);
+        
+        if (dataPoints.length > 0) {
+          const chart = renderBarChart({ title, data: dataPoints }, chartCount);
+          if (chart) {
+            elements.push(chart);
+            chartCount++;
+            // Reset text buffer after successful chart render
+            textBeforeCodeBlock = "";
+            continue;
+          }
+        }
+      }
+      
+      // Check if this is an ASCII LINE chart
+      if (isAsciiLineChart(codeContent)) {
+        // Parse data from the text before this code block
+        const dataPoints = parseMoMDataFromText(textBeforeCodeBlock);
+        const title = extractChartTitle(codeContent);
+        
+        if (dataPoints.length > 0) {
+          const chart = renderLineChart({ title, data: dataPoints }, chartCount);
+          if (chart) {
+            elements.push(chart);
+            chartCount++;
+            // Reset text buffer after successful chart render to prevent data leaking to subsequent charts
+            textBeforeCodeBlock = "";
+            continue;
+          }
+        }
+      }
+      
+      // Reset text buffer after any code block to isolate chart data
+      textBeforeCodeBlock = "";
+      
+      // If not an ASCII chart or couldn't parse data, render as code block
+      elements.push(
+        <pre 
+          key={`code-${i}`} 
+          className="my-3 p-3 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm font-mono overflow-x-auto whitespace-pre text-slate-700 dark:text-slate-300"
+        >
+          {codeContent}
+        </pre>
+      );
+      continue;
+    }
+    
+    // Check for markdown heading
+    const heading = parseHeading(line);
+    if (heading) {
+      elements.push(renderHeading(heading, i));
+      textBeforeCodeBlock += line + '\n';
+      i++;
+      continue;
+    }
+
+    // Check if this is the start of a table
+    if (isTableRow(line)) {
+      // Collect all consecutive table rows
+      const tableLines: string[] = [];
+      while (i < lines.length && (isTableRow(lines[i]) || isTableSeparator(lines[i]))) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+
+      // Parse the table if we have at least header + separator + 1 data row
+      if (tableLines.length >= 3) {
+        const headerRow = tableLines[0];
+        const separatorRow = tableLines[1];
+        const dataRows = tableLines.slice(2);
+
+        if (isTableSeparator(separatorRow)) {
+          const headers = parseTableRow(headerRow);
+          const alignments = parseAlignments(separatorRow);
+          const rows = dataRows
+            .filter(row => !isTableSeparator(row))
+            .map(row => parseTableRow(row));
+
+          elements.push(renderTable({ headers, alignments, rows }, tableCount));
+          tableCount++;
+          continue;
+        }
+      }
+
+      // If not a valid table structure, process lines normally
+      tableLines.forEach((tableLine, idx) => {
+        elements.push(processLine(tableLine, i - tableLines.length + idx));
+        textBeforeCodeBlock += tableLine + '\n';
+      });
+      continue;
+    }
+
+    // Check if this line is a pie chart data line (bullet with percentage and █ blocks)
+    // Pattern: - Label 123,456.78 (12.7%)  █████
+    // Use unicode-aware pattern to match Albanian diacritics (Nëntor, Dhjetor, etc.)
+    const pieLinePattern = /^[-•]\s*[\p{L}\p{M}]+\s+[\d,]+\.?\d*\s*\(\d+\.?\d*%\)\s*█+/u;
+    if (pieLinePattern.test(line)) {
+      // Collect all consecutive pie chart lines
+      const pieLines: string[] = [];
+      const startIdx = i;
+      
+      while (i < lines.length && pieLinePattern.test(lines[i])) {
+        pieLines.push(lines[i]);
+        i++;
+      }
+      
+      // If we have at least 3 pie slices, render as pie chart
+      if (pieLines.length >= 3) {
+        const pieData = parsePieChartFromText(pieLines.join('\n'));
+        
+        if (pieData.length >= 3) {
+          // Get title from text before the pie data
+          const title = extractPieChartTitle(textBeforeCodeBlock);
+          const chart = renderPieChart({ title, data: pieData }, chartCount);
+          if (chart) {
+            elements.push(chart);
+            chartCount++;
+            // Reset text buffer
+            textBeforeCodeBlock = "";
+            continue;
+          }
+        }
+      }
+      
+      // If not enough data for pie chart, process as regular lines
+      pieLines.forEach((pieLine, idx) => {
+        elements.push(processLine(pieLine, startIdx + idx));
+        textBeforeCodeBlock += pieLine + '\n';
+      });
+      continue;
+    }
+
+    // Process regular line
+    elements.push(processLine(line, i));
+    textBeforeCodeBlock += line + '\n';
+    i++;
+  }
+
+  return (
+    <div className={cn("space-y-2", className)}>
+      {elements}
+    </div>
+  );
+}
