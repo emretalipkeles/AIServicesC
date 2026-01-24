@@ -847,21 +847,23 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                                 <p className="min-w-0 max-w-full break-words">{children}</p>
                               ),
                               table: ({ children }) => (
-                                <div className="my-3 overflow-x-auto">
-                                  <table className="w-full text-sm">{children}</table>
+                                <div className="my-4 rounded-lg border border-border/40 bg-muted/10 dark:bg-muted/5 overflow-hidden">
+                                  <div className="max-h-[400px] overflow-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                                    <table className="w-full text-sm border-collapse min-w-max">{children}</table>
+                                  </div>
                                 </div>
                               ),
                               thead: ({ children }) => (
-                                <thead className="bg-muted/30 dark:bg-muted/20">{children}</thead>
+                                <thead className="bg-gradient-to-r from-primary/10 to-primary/5 dark:from-primary/15 dark:to-primary/10 sticky top-0 z-10">{children}</thead>
                               ),
                               th: ({ children }) => (
-                                <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground border-b border-border/30">{children}</th>
+                                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-primary/80 dark:text-primary/90 border-b-2 border-primary/20 whitespace-nowrap">{children}</th>
                               ),
                               td: ({ children }) => (
-                                <td className="px-4 py-3 text-foreground border-b border-border/20 dark:border-border/15">{children}</td>
+                                <td className="px-4 py-3 text-foreground/90 border-b border-border/20 dark:border-border/15 whitespace-normal min-w-[120px] max-w-[300px]">{children}</td>
                               ),
                               tr: ({ children }) => (
-                                <tr>{children}</tr>
+                                <tr className="hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors">{children}</tr>
                               ),
                             }}
                           >
