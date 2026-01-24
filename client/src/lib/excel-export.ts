@@ -9,6 +9,8 @@ interface DelayEventData {
   eventStartDate?: string | null;
   impactDurationHours?: number | null;
   sourceReference?: string | null;
+  sourceDocumentId?: string | null;
+  extractedFromCode?: string | null;
   matchConfidence?: number | null;
   matchReasoning?: string | null;
   verificationStatus: string;
@@ -32,7 +34,10 @@ function formatCategory(category: string | null | undefined): string {
   return category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
-export async function exportDelayEventsToExcel(events: DelayEventData[]): Promise<void> {
+export async function exportDelayEventsToExcel(
+  events: DelayEventData[], 
+  documentNameMap?: Map<string, string>
+): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Data First - Delay Analysis';
   workbook.created = new Date();
@@ -49,6 +54,8 @@ export async function exportDelayEventsToExcel(events: DelayEventData[]): Promis
     { header: 'Category', key: 'category', width: 22 },
     { header: 'Date', key: 'date', width: 12 },
     { header: 'Duration (hrs)', key: 'duration', width: 14 },
+    { header: 'Source Document', key: 'sourceDoc', width: 30 },
+    { header: 'Extracted From Code', key: 'extractedCode', width: 18 },
     { header: 'Source Reference', key: 'sourceRef', width: 25 },
     { header: 'Confidence', key: 'confidence', width: 12 },
     { header: 'Match Reasoning', key: 'reasoning', width: 45 },
@@ -83,6 +90,8 @@ export async function exportDelayEventsToExcel(events: DelayEventData[]): Promis
       category: formatCategory(event.eventCategory),
       date: event.eventStartDate ? new Date(event.eventStartDate) : null,
       duration: event.impactDurationHours || null,
+      sourceDoc: event.sourceDocumentId && documentNameMap ? documentNameMap.get(event.sourceDocumentId) || '' : '',
+      extractedCode: event.extractedFromCode || '',
       sourceRef: event.sourceReference || '',
       confidence: event.matchConfidence ? `${event.matchConfidence}%` : '',
       reasoning: event.matchReasoning || '',
@@ -122,7 +131,7 @@ export async function exportDelayEventsToExcel(events: DelayEventData[]): Promis
         }
       }
 
-      if (colNumber === 9 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
+      if (colNumber === 11 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
         const confidence = event.matchConfidence;
         let bgColor: string;
         let textColor: string;
@@ -151,7 +160,7 @@ export async function exportDelayEventsToExcel(events: DelayEventData[]): Promis
 
   worksheet.autoFilter = {
     from: { row: 1, column: 1 },
-    to: { row: events.length + 1, column: 11 },
+    to: { row: events.length + 1, column: 13 },
   };
 
   const today = new Date();

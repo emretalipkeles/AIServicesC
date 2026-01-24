@@ -37,7 +37,7 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
   });
 
   const handleExport = async () => {
-    await exportDelayEventsToExcel(events);
+    await exportDelayEventsToExcel(events, documentNameMap);
   };
 
   const formatDate = (dateStr: string | null) => {

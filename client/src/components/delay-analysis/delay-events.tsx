@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Activity, Play, Download, Loader2, DollarSign, CheckCircle, AlertCircle, Clock, Zap } from "lucide-react";
 import { useDelayEvents, runAnalysisWithProgress, fetchRunTokenUsage } from "@/lib/analysis-api";
+import { useProjectDocuments } from "@/lib/project-documents-api";
 import { useUploadState } from "@/contexts/upload-state-context";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,7 +21,16 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: events = [], isLoading } = useDelayEvents(projectId);
+  const { data: documents = [] } = useProjectDocuments(projectId);
   const [filterText, setFilterText] = useState("");
+
+  const documentNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    documents.forEach(doc => {
+      map.set(doc.id, doc.filename);
+    });
+    return map;
+  }, [documents]);
   
   const {
     analysis,
@@ -82,7 +92,7 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
   };
 
   const handleExport = async () => {
-    await exportDelayEventsToExcel(events);
+    await exportDelayEventsToExcel(events, documentNameMap);
   };
 
   const formatDate = (dateStr: string | null) => {
