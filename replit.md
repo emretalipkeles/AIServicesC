@@ -74,8 +74,27 @@ The AI chat panel uses a three-region flex layout (like ChatGPT/Replit) for full
 - Message bubbles constrained to `max-width: min(75ch, 100%)`
 - Responsive breakpoints for padding, layout, and mobile adaptation
 
+### Document Extraction Strategy Pattern
+The AI analysis uses document-type-specific extraction strategies to optimize delay event extraction:
+
+**Strategy Architecture** (server/src/infrastructure/delay-analysis/extraction-strategies/):
+- **IDocumentExtractionStrategy**: Domain interface defining prompt generation and confidence metadata
+- **DocumentExtractionStrategyFactory**: Factory selecting appropriate strategy by document type
+
+**Document-Specific Strategies**:
+| Document Type | Strategy | Base Confidence | Delay Certainty | Key Focus |
+|---------------|----------|-----------------|-----------------|-----------|
+| IDR | IDRExtractionStrategy | 0.6 (moderate) | Uncertain | CODE_CIE tags, narrative verification, duration estimation |
+| NCR | NCRExtractionStrategy | 0.85 (high) | Certain | Rework scope, quality failures, corrective actions |
+| Field Memo | FieldMemoExtractionStrategy | 0.5 (low) | Uncertain | General delay indicators |
+| Other | DefaultExtractionStrategy | 0.5 (low) | Uncertain | Generic extraction |
+
+**Key Differences**:
+- **IDRs**: Daily observations requiring interpretation; not all CODE_CIE entries are real delays
+- **NCRs**: Formal quality failures; NCR = rework required = definite delay
+
 ### Feature Specifications
-- **Delay Interpretation**: AI-powered construction delay interpretation. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes.
+- **Delay Interpretation**: AI-powered construction delay interpretation. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Uses document-type-specific extraction strategies for optimized analysis. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes.
 - **Document Processing**: Upload and parse construction documents (PDF) to extract delay-related information including dates, causes, responsible parties, and impacts.
 - **Schedule Integration**: Upload CPM schedules (CSV/Excel) with activity IDs, WBS codes, descriptions, and dates. Link delay events to specific schedule activities.
 - **AI Chat Assistant**: Guardrailed AI assistant that only answers questions about construction delays, schedule activities, and project timeline analysis. Refuses off-topic requests.
