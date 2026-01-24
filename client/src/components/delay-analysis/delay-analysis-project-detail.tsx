@@ -12,12 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, Save, Calendar, Upload, BarChart3, Activity, 
-  AlertCircle, Loader2, CheckCircle2, FolderOpen
+  AlertCircle, Loader2, CheckCircle2, FolderOpen, MessageCircle
 } from "lucide-react";
 import { DocumentUpload } from "./document-upload";
 import { ScheduleUpload } from "./schedule-upload";
 import { DelayEvents } from "./delay-events";
 import { AnalysisResults } from "./analysis-results";
+import { DelayEventsChat } from "./delay-events-chat";
 import { HeroHeader, GlassCard, PremiumTabs } from "./ui/premium-components";
 
 interface DelayAnalysisProjectDetailProps {
@@ -30,6 +31,7 @@ const tabs = [
   { value: "documents", label: "Documents", icon: Upload },
   { value: "delays", label: "Delay Events", icon: Activity },
   { value: "results", label: "Results", icon: BarChart3 },
+  { value: "chat", label: "AI Assistant", icon: MessageCircle },
 ];
 
 export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisProjectDetailProps) {
@@ -231,6 +233,7 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
                 {activeTab === "schedule" && <ScheduleUpload projectId={projectId} />}
                 {activeTab === "delays" && <DelayEvents projectId={projectId} />}
                 {activeTab === "results" && <AnalysisResults projectId={projectId} />}
+                {activeTab === "chat" && <DelayEventsChat projectId={projectId} />}
               </motion.div>
             </AnimatePresence>
           </>

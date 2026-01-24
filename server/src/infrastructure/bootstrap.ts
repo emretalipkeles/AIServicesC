@@ -100,8 +100,10 @@ import { ScheduleParserFactory } from "./document-parsing/ScheduleParserFactory"
 import type { IScheduleParserFactory } from "../domain/delay-analysis/interfaces/IScheduleParserFactory";
 import { AIDelayEventExtractor } from "./delay-analysis/AIDelayEventExtractor";
 import { AIActivityMatcher } from "./delay-analysis/AIActivityMatcher";
+import { OpenAIDelayEventsChatService } from "./delay-analysis/OpenAIDelayEventsChatService";
 import type { IDelayEventExtractor } from "../domain/delay-analysis/interfaces/IDelayEventExtractor";
 import type { IActivityMatcher } from "../domain/delay-analysis/interfaces/IActivityMatcher";
+import type { IDelayEventsChatService } from "../domain/delay-analysis/interfaces/IDelayEventsChatService";
 
 import { DrizzleDelayAnalysisProjectRepository } from "./database/repositories/delay-analysis/DrizzleDelayAnalysisProjectRepository";
 import { DrizzleProjectDocumentRepository } from "./database/repositories/delay-analysis/DrizzleProjectDocumentRepository";
@@ -170,6 +172,7 @@ export interface AppContainer {
     scheduleParserFactory: IScheduleParserFactory;
     delayEventExtractor: IDelayEventExtractor | null;
     activityMatcher: IActivityMatcher | null;
+    delayEventsChatService: IDelayEventsChatService | null;
   };
 }
 
@@ -199,6 +202,7 @@ export function createAppContainer(): AppContainer {
 
   let delayEventExtractor: IDelayEventExtractor | null = null;
   let activityMatcher: IActivityMatcher | null = null;
+  let delayEventsChatService: IDelayEventsChatService | null = null;
   let scheduleParserFactory: IScheduleParserFactory;
 
   let pretPackageStorage: IPretPackageStorage | null = null;
@@ -277,6 +281,7 @@ export function createAppContainer(): AppContainer {
     responseNarrator = new AIPretResponseNarrator(aiClient);
     delayEventExtractor = new AIDelayEventExtractor(aiClient);
     activityMatcher = new AIActivityMatcher(aiClient);
+    delayEventsChatService = new OpenAIDelayEventsChatService(aiClient);
     
     const excelParser = new ExcelScheduleParserV2();
     const pdfParser = new PdfScheduleParser(aiClient);
@@ -480,6 +485,7 @@ export function createAppContainer(): AppContainer {
       scheduleParserFactory,
       delayEventExtractor,
       activityMatcher,
+      delayEventsChatService,
     },
   };
 }

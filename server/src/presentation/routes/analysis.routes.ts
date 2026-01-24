@@ -7,7 +7,9 @@ import { RecordTokenUsageCommandHandler } from '../../application/delay-analysis
 import { GetTokenUsageByRunIdQuery } from '../../application/delay-analysis/queries/GetTokenUsageByRunIdQuery';
 import { SSEProgressReporter } from '../../infrastructure/document-parsing/SSEProgressReporter';
 import type { TokenUsageCallback, TokenUsageRecord } from '../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
-import { runAnalysisParamsSchema, runAnalysisBodySchema, listDelayEventsParamsSchema } from '../validators/analysisValidators';
+import { runAnalysisParamsSchema, runAnalysisBodySchema, listDelayEventsParamsSchema, delayEventsChatBodySchema } from '../validators/analysisValidators';
+import { SendDelayEventsChatQuery } from '../../application/delay-analysis/queries/SendDelayEventsChatQuery';
+import { SendDelayEventsChatQueryHandler } from '../../application/delay-analysis/queries/handlers/SendDelayEventsChatQueryHandler';
 import ExcelJS from 'exceljs';
 
 const DEFAULT_TENANT_ID = 'default';
@@ -387,6 +389,51 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
       } catch (error) {
         console.error('[TokenUsage] Failed to get run summary:', error);
         res.status(500).json({ success: false, error: 'Failed to get run token usage' });
+      }
+    }
+  );
+
+  app.post(
+    '/api/delay-analysis/projects/:projectId/chat',
+    async (req: Request, res: Response) => {
+      try {
+        const params = listDelayEventsParamsSchema.parse(req.params);
+        const body = delayEventsChatBodySchema.parse(req.body);
+
+        if (!container.services.delayEventsChatService) {
+          res.status(503).json({ 
+            success: false, 
+            error: 'Chat service not available - set OPEN_AI_KEY to enable' 
+          });
+          return;
+        }
+
+        const chatHandler = new SendDelayEventsChatQueryHandler(
+          container.repositories.contractorDelayEvent,
+          container.services.delayEventsChatService
+        );
+
+        const query = new SendDelayEventsChatQuery(
+          params.projectId,
+          DEFAULT_TENANT_ID,
+          body.message,
+          body.conversationHistory
+        );
+
+        const result = await chatHandler.handle(query);
+
+        res.json({ 
+          success: true, 
+          data: result 
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === 'ZodError') {
+          res.status(400).json({ success: false, error: 'Invalid request' });
+          return;
+        }
+
+        console.error('[DelayEventsChat] Error:', error);
+        res.status(500).json({ success: false, error: 'Failed to process chat request' });
       }
     }
   );

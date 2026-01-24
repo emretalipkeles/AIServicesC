@@ -116,6 +116,36 @@ export interface AnalysisProgressEvent {
   result?: AnalysisResult;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface DelayEventsChatResponse {
+  response: string;
+  isRefusal: boolean;
+}
+
+export async function sendDelayEventsChat(
+  projectId: string,
+  message: string,
+  conversationHistory: ChatMessage[] = []
+): Promise<DelayEventsChatResponse> {
+  const response = await fetch(`/api/delay-analysis/projects/${projectId}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, conversationHistory }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to send chat message");
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
 export function runAnalysisWithProgress(
   projectId: string,
   options: { extractFromDocuments?: boolean; matchToActivities?: boolean } = {},
