@@ -861,9 +861,9 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                                 <p className="min-w-0 max-w-full break-words">{children}</p>
                               ),
                               table: ({ children }) => (
-                                <div className="my-4 rounded-lg border border-border/40 bg-muted/10 dark:bg-muted/5 overflow-hidden chat-table-container">
-                                  <div className="overflow-x-auto overflow-y-auto max-h-[400px] scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                                    <table className="w-full text-sm border-collapse" style={{ minWidth: 'max-content' }}>{children}</table>
+                                <div className="my-4 rounded-lg border border-border/40 bg-muted/10 dark:bg-muted/5 w-full max-w-full min-w-0 overflow-hidden">
+                                  <div className="w-full max-w-full min-w-0 overflow-x-auto overflow-y-auto max-h-[400px] scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                                    <table className="text-sm border-collapse w-max min-w-full">{children}</table>
                                   </div>
                                 </div>
                               ),
