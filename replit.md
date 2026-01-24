@@ -1,8 +1,8 @@
-# Data First V3 - Intelligent Orchestrator
+# Construction Delay Analyzer
 
 ## Overview
 
-Data First V3 is an intelligent orchestrator platform designed to assist Prophix implementation teams working with FP&A Plus. It provides a split-screen interface featuring an AI chat panel and a tabbed content area. The platform dynamically discovers agents, uses LLM-based planning for execution strategies, and synthesizes unified responses with real-time SSE streaming. The project aims to streamline complex financial planning and analysis processes by leveraging AI to enhance efficiency and accuracy in Prophix implementations.
+Construction Delay Analyzer is an AI-powered platform for interpreting contractor-caused delays in construction projects. It provides a split-screen interface featuring an AI chat panel and a tabbed content area. The platform processes project documents (IDRs, NCRs, Field Memos) to extract delay events and matches them to CPM schedule activities. It uses LLM-based analysis with real-time SSE streaming to help users understand and analyze construction delays.
 
 ## User Preferences
 
@@ -33,7 +33,7 @@ Preferred communication style: Simple, everyday language.
 - **Multi-tenancy**: All repository methods enforce `tenantId`
 - **Input Validation**: Zod schemas at API boundaries
 
-### Backend Folder Structure (New Features)
+### Backend Folder Structure
 - `server/src/domain/`: Entities, value objects, repository interfaces, events
 - `server/src/application/`: Commands, queries, handlers, DTOs, services
 - `server/src/presentation/`: Controllers, middleware, validators
@@ -46,10 +46,10 @@ API routes are organized by feature in `server/src/presentation/routes/`, with e
 - **ORM**: Drizzle ORM with PostgreSQL dialect
 - **Schema**: `shared/schema.ts` (shared)
 - **Validation**: Zod schemas generated from Drizzle
-- **Storage**: In-memory storage with interface for future database integration
+- **Storage**: PostgreSQL database for production
 
 ### Database Schema
-Key entities include `users`, `clients`, `journeys`, and `chatMessages`.
+Key entities include `delay_analysis_projects`, `delay_analysis_documents`, `schedule_activities`, `delay_events`, and `agents`.
 
 ### UI/UX Design
 - **Primary Brand Color**: Professional Blue (#3B82F6)
@@ -58,13 +58,15 @@ Key entities include `users`, `clients`, `journeys`, and `chatMessages`.
 - **Component Library**: shadcn/ui with custom theme.
 
 ### Feature Specifications
-- **PRET Package Management**: Upload, validate, and store PRET packages (ZIP files with `package.yaml`). Supports AI-generated feedback. Includes a Package Editor page and an API to create OtherDimensions in packages via AI.
-- **AI Infrastructure**: Multi-provider support (AWS Bedrock, OpenAI) with dynamic model selection. Default orchestrator uses OpenAI (gpt-5.2).
-- **Delay Analysis Feature**: AI-powered construction delay analysis. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes (both for schedule uploads and delay analysis runs). Uses UploadStateContext (client/src/contexts/upload-state-context.tsx) for persistent state that survives tab switches - tracks schedule uploads (purple indicator), document uploads (blue indicator), and analysis runs (amber indicator) with compact circular progress indicators displayed in the tabs bar.
+- **Delay Analysis**: AI-powered construction delay analysis. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes.
+- **Document Processing**: Upload and parse construction documents (PDF) to extract delay-related information including dates, causes, responsible parties, and impacts.
+- **Schedule Integration**: Upload CPM schedules (CSV/Excel) with activity IDs, WBS codes, descriptions, and dates. Link delay events to specific schedule activities.
+- **AI Chat Assistant**: Guardrailed AI assistant that only answers questions about construction delays, schedule activities, and project timeline analysis. Refuses off-topic requests.
+- **Upload State Tracking**: Uses UploadStateContext for persistent state that survives tab switches - tracks schedule uploads (purple indicator), document uploads (blue indicator), and analysis runs (amber indicator) with compact circular progress indicators.
 - **Reusable UI Components** (client/src/components/delay-analysis/ui/premium-components.tsx):
-  - **SmartPopover**: Viewport-aware tooltip with auto-positioning (top/bottom), scroll repositioning, max-height scrolling, portal rendering, and AnimatePresence exit animations
-  - **DetailDrawer**: Right-side panel for long-form content with spring slide-in animation, backdrop blur, Escape/click-outside close, and body scroll lock
-  - **TruncatedTextWithTooltip**: Combines SmartPopover for hover preview and "View Full" button triggering DetailDrawer for text >500 chars
+  - **SmartPopover**: Viewport-aware tooltip with auto-positioning
+  - **DetailDrawer**: Right-side panel for long-form content
+  - **TruncatedTextWithTooltip**: Hover preview with expandable detail drawer
 
 ## External Dependencies
 
@@ -75,11 +77,9 @@ Key entities include `users`, `clients`, `journeys`, and `chatMessages`.
 ### UI Libraries
 - **Radix UI**: Primitive components
 - **Lucide React**: Icons
-- **Embla Carousel**: Carousel
-- **React Day Picker**: Date picker
+- **Framer Motion**: Animations
 - **Recharts**: Charting
 - **Vaul**: Drawer
-- **CMDK**: Command palette
 
 ### Form & Validation
 - **React Hook Form**: Form state
@@ -92,12 +92,6 @@ Key entities include `users`, `clients`, `journeys`, and `chatMessages`.
 - **Drizzle Kit**: Database migration
 - **tsx**: TypeScript execution for development
 
-### Replit-Specific Tools
-- **@replit/vite-plugin-runtime-error-modal**
-- **@replit/vite-plugin-cartographer**
-- **@replit/vite-plugin-dev-banner**
-
 ### Cloud Services
-- **AWS S3**: For PRET package storage (`S3_AUTH_KEY`, `S3_AUTH_SECRET`, `S3_BUCKET_NAME`, `S3_REGION`)
 - **AWS Bedrock**: AI client provider
 - **OpenAI**: AI client provider (`OPEN_AI_KEY`)
