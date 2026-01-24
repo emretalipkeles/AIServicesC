@@ -57,6 +57,23 @@ Key entities include `delay_analysis_projects`, `delay_analysis_documents`, `sch
 - **Layout**: Split-screen (340px fixed AI chat, flexible content), tabbed navigation, responsive design.
 - **Component Library**: shadcn/ui with custom theme.
 
+### AI Chat Panel Architecture
+The AI chat panel uses a three-region flex layout (like ChatGPT/Replit) for full responsiveness:
+
+**CSS Utility Classes** (client/src/index.css):
+- `.chat-container`: Root flex column with min-w-0/min-h-0 constraints
+- `.chat-header`: Fixed header region
+- `.chat-messages`: Scrollable messages region (flex: 1)
+- `.chat-input`: Fixed input region at bottom
+- `.chat-message-row`, `.chat-message-content`, `.chat-bubble`: Message structure
+- `.chat-prose`, `.chat-table-wrapper`, `.chat-code-wrapper`, `.chat-blockquote`, `.chat-list`: Rich content containers
+
+**Key Principles**:
+- Width containment at every nested level (min-w-0, max-w-full)
+- Tables/code blocks scroll independently within their containers
+- Message bubbles constrained to `max-width: min(75ch, 100%)`
+- Responsive breakpoints for padding, layout, and mobile adaptation
+
 ### Feature Specifications
 - **Delay Interpretation**: AI-powered construction delay interpretation. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes.
 - **Document Processing**: Upload and parse construction documents (PDF) to extract delay-related information including dates, causes, responsible parties, and impacts.
