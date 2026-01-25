@@ -1,4 +1,5 @@
 import type { ContractorDelayEvent } from '../entities/ContractorDelayEvent';
+import type { DocumentContentSummary } from './IDocumentContentProvider';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -11,6 +12,7 @@ export interface DelayEventsChatRequest {
   userMessage: string;
   conversationHistory: ChatMessage[];
   delayEvents: ContractorDelayEvent[];
+  sourceDocuments?: Map<string, DocumentContentSummary>;
 }
 
 export interface DelayEventsChatResponse {

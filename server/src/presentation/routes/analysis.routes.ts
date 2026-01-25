@@ -410,7 +410,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
 
         const chatHandler = new SendDelayEventsChatQueryHandler(
           container.repositories.contractorDelayEvent,
-          container.services.delayEventsChatService
+          container.services.delayEventsChatService,
+          container.services.documentContentProvider
         );
 
         const query = new SendDelayEventsChatQuery(

@@ -102,9 +102,11 @@ import type { IScheduleParserFactory } from "../domain/delay-analysis/interfaces
 import { AIDelayEventExtractor } from "./delay-analysis/AIDelayEventExtractor";
 import { AIActivityMatcher } from "./delay-analysis/AIActivityMatcher";
 import { OpenAIDelayEventsChatService } from "./delay-analysis/OpenAIDelayEventsChatService";
+import { DocumentContentProvider } from "./delay-analysis/DocumentContentProvider";
 import type { IDelayEventExtractor } from "../domain/delay-analysis/interfaces/IDelayEventExtractor";
 import type { IActivityMatcher } from "../domain/delay-analysis/interfaces/IActivityMatcher";
 import type { IDelayEventsChatService } from "../domain/delay-analysis/interfaces/IDelayEventsChatService";
+import type { IDocumentContentProvider } from "../domain/delay-analysis/interfaces/IDocumentContentProvider";
 
 import { DrizzleDelayAnalysisProjectRepository } from "./database/repositories/delay-analysis/DrizzleDelayAnalysisProjectRepository";
 import { DrizzleProjectDocumentRepository } from "./database/repositories/delay-analysis/DrizzleProjectDocumentRepository";
@@ -174,6 +176,7 @@ export interface AppContainer {
     delayEventExtractor: IDelayEventExtractor | null;
     activityMatcher: IActivityMatcher | null;
     delayEventsChatService: IDelayEventsChatService | null;
+    documentContentProvider: IDocumentContentProvider;
   };
 }
 
@@ -488,6 +491,7 @@ export function createAppContainer(): AppContainer {
       delayEventExtractor,
       activityMatcher,
       delayEventsChatService,
+      documentContentProvider: new DocumentContentProvider(),
     },
   };
 }

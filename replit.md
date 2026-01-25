@@ -97,7 +97,10 @@ The AI analysis uses document-type-specific extraction strategies to optimize de
 - **Delay Interpretation**: AI-powered construction delay interpretation. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Uses document-type-specific extraction strategies for optimized analysis. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes.
 - **Document Processing**: Upload and parse construction documents (PDF) to extract delay-related information including dates, causes, responsible parties, and impacts.
 - **Schedule Integration**: Upload CPM schedules (CSV/Excel) with activity IDs, WBS codes, descriptions, and dates. Link delay events to specific schedule activities.
-- **AI Chat Assistant**: Guardrailed AI assistant that only answers questions about construction delays, schedule activities, and project timeline analysis. Refuses off-topic requests.
+- **AI Chat Assistant**: Guardrailed AI assistant that only answers questions about construction delays, schedule activities, and project timeline analysis. Enhanced with:
+  - **Duration Interpretation Methodology**: Explains how delay durations were estimated from source documents (IDR narrative interpretation vs NCR rework scope calculation)
+  - **Document Content Access**: Can reference original document content to explain how delays were extracted
+  - **Source Document Linking**: Links delay events to their source documents for contextual explanations
 - **Upload State Tracking**: Uses UploadStateContext for persistent state that survives tab switches - tracks schedule uploads (purple indicator), document uploads (blue indicator), and analysis runs (amber indicator) with compact circular progress indicators.
 - **Reusable UI Components** (client/src/components/delay-analysis/ui/premium-components.tsx):
   - **SmartPopover**: Viewport-aware tooltip with auto-positioning
