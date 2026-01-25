@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 export default function Home() {
   const [panelWidth, setPanelWidth] = useState(450);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const isDraggingRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
 
