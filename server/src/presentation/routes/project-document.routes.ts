@@ -31,7 +31,8 @@ export function registerProjectDocumentRoutes(app: Express, container: AppContai
   const uploadHandler = new UploadDocumentsCommandHandler(
     container.repositories.delayAnalysisProject,
     container.repositories.projectDocument,
-    container.services.documentParserFactory
+    container.services.documentParserFactory,
+    container.services.documentHashService
   );
 
   const listHandler = new ListProjectDocumentsQueryHandler(

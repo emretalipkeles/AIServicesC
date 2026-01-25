@@ -63,6 +63,25 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
     return result.map(row => this.mapRowToEntity(row));
   }
 
+  async findByContentHash(
+    projectId: string,
+    tenantId: string,
+    contentHash: string
+  ): Promise<ProjectDocument | null> {
+    const result = await db
+      .select()
+      .from(projectDocuments)
+      .where(and(
+        eq(projectDocuments.projectId, projectId),
+        eq(projectDocuments.tenantId, tenantId),
+        eq(projectDocuments.contentHash, contentHash)
+      ))
+      .limit(1);
+
+    if (result.length === 0) return null;
+    return this.mapRowToEntity(result[0]);
+  }
+
   async save(document: ProjectDocument): Promise<void> {
     await db.insert(projectDocuments).values({
       id: document.id,
@@ -71,6 +90,7 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
       filename: document.filename,
       contentType: document.contentType,
       documentType: document.documentType,
+      contentHash: document.contentHash,
       rawContent: document.rawContent,
       reportDate: document.reportDate,
       status: document.status,
@@ -91,6 +111,7 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
         filename: doc.filename,
         contentType: doc.contentType,
         documentType: doc.documentType,
+        contentHash: doc.contentHash,
         rawContent: doc.rawContent,
         reportDate: doc.reportDate,
         status: doc.status,
@@ -105,6 +126,7 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
     await db
       .update(projectDocuments)
       .set({
+        contentHash: document.contentHash,
         rawContent: document.rawContent,
         reportDate: document.reportDate,
         status: document.status,
@@ -164,6 +186,7 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
       filename: row.filename,
       contentType: row.contentType,
       documentType: row.documentType as ProjectDocumentType,
+      contentHash: row.contentHash,
       rawContent: row.rawContent,
       reportDate: row.reportDate,
       status: row.status as DocumentProcessingStatus,

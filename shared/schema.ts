@@ -264,6 +264,7 @@ export const projectDocuments = pgTable("project_documents", {
   filename: text("filename").notNull(),
   contentType: text("content_type").notNull(),
   documentType: text("document_type").notNull(),
+  contentHash: varchar("content_hash", { length: 64 }),
   rawContent: text("raw_content"),
   reportDate: timestamp("report_date"),
   status: text("status").notNull().default("pending"),

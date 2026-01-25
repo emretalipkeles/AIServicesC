@@ -11,6 +11,7 @@ export type ProgressStage =
   // Analysis-specific stages
   | 'loading_documents'
   | 'extracting_events'
+  | 'deduplicating_events'
   | 'loading_activities'
   | 'matching_events'
   | 'saving_events';

@@ -243,7 +243,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
     container.repositories.scheduleActivity,
     container.repositories.contractorDelayEvent,
     container.services.delayEventExtractor!,
-    container.services.activityMatcher!
+    container.services.activityMatcher!,
+    container.services.delayEventDeduplicationService
   );
 
   const createTokenCallback = (projectId: string): TokenUsageCallback => {

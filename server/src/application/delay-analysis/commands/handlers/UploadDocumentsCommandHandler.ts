@@ -3,6 +3,7 @@ import type { UploadDocumentsCommand } from '../UploadDocumentsCommand';
 import type { IProjectDocumentRepository } from '../../../../domain/delay-analysis/repositories/IProjectDocumentRepository';
 import type { IDelayAnalysisProjectRepository } from '../../../../domain/delay-analysis/repositories/IDelayAnalysisProjectRepository';
 import type { IDocumentParserFactory } from '../../../../domain/delay-analysis/interfaces/IDocumentParserFactory';
+import type { IDocumentHashService } from '../../../../domain/delay-analysis/interfaces/IDocumentHashService';
 import { ProjectDocument } from '../../../../domain/delay-analysis/entities/ProjectDocument';
 
 export interface UploadDocumentsResult {
@@ -15,13 +16,19 @@ export interface UploadDocumentsResult {
     filename: string;
     error: string;
   }>;
+  skipped: Array<{
+    filename: string;
+    reason: string;
+    existingDocumentId: string;
+  }>;
 }
 
 export class UploadDocumentsCommandHandler {
   constructor(
     private readonly projectRepository: IDelayAnalysisProjectRepository,
     private readonly documentRepository: IProjectDocumentRepository,
-    private readonly parserFactory: IDocumentParserFactory
+    private readonly parserFactory: IDocumentParserFactory,
+    private readonly hashService: IDocumentHashService
   ) {}
 
   async execute(command: UploadDocumentsCommand): Promise<UploadDocumentsResult> {
@@ -32,6 +39,7 @@ export class UploadDocumentsCommandHandler {
 
     const uploaded: UploadDocumentsResult['uploaded'] = [];
     const failed: UploadDocumentsResult['failed'] = [];
+    const skipped: UploadDocumentsResult['skipped'] = [];
     const documentsToSave: ProjectDocument[] = [];
     const documentsWithBuffers: Array<{ document: ProjectDocument; buffer: Buffer }> = [];
 
@@ -41,6 +49,23 @@ export class UploadDocumentsCommandHandler {
           failed.push({
             filename: file.filename,
             error: `Unsupported file type: ${file.contentType}`,
+          });
+          continue;
+        }
+
+        const contentHash = this.hashService.computeHash(file.buffer);
+
+        const existingDocument = await this.documentRepository.findByContentHash(
+          command.projectId,
+          command.tenantId,
+          contentHash
+        );
+
+        if (existingDocument) {
+          skipped.push({
+            filename: file.filename,
+            reason: 'This document was already uploaded',
+            existingDocumentId: existingDocument.id,
           });
           continue;
         }
@@ -55,6 +80,7 @@ export class UploadDocumentsCommandHandler {
           filename: file.filename,
           contentType: file.contentType,
           documentType: file.documentType,
+          contentHash,
           rawContent: null,
           reportDate: null,
           status: 'pending',
@@ -87,7 +113,7 @@ export class UploadDocumentsCommandHandler {
       }
     }
 
-    return { uploaded, failed };
+    return { uploaded, failed, skipped };
   }
 
   private async parseDocumentAsync(document: ProjectDocument, buffer: Buffer): Promise<void> {

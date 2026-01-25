@@ -8,6 +8,7 @@ export interface ProjectDocumentProps {
   filename: string;
   contentType: string;
   documentType: ProjectDocumentType;
+  contentHash?: string | null;
   rawContent?: string | null;
   reportDate?: Date | null;
   status: DocumentProcessingStatus;
@@ -23,6 +24,7 @@ export class ProjectDocument {
   readonly filename: string;
   readonly contentType: string;
   readonly documentType: ProjectDocumentType;
+  readonly contentHash: string | null;
   readonly rawContent: string | null;
   readonly reportDate: Date | null;
   readonly status: DocumentProcessingStatus;
@@ -37,6 +39,7 @@ export class ProjectDocument {
     this.filename = props.filename;
     this.contentType = props.contentType;
     this.documentType = props.documentType;
+    this.contentHash = props.contentHash ?? null;
     this.rawContent = props.rawContent ?? null;
     this.reportDate = props.reportDate ?? null;
     this.status = props.status;
@@ -76,6 +79,14 @@ export class ProjectDocument {
     return new ProjectDocument({
       ...this,
       rawContent,
+      updatedAt: new Date(),
+    });
+  }
+
+  withContentHash(contentHash: string): ProjectDocument {
+    return new ProjectDocument({
+      ...this,
+      contentHash,
       updatedAt: new Date(),
     });
   }

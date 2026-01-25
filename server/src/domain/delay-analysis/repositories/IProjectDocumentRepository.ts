@@ -5,6 +5,7 @@ export interface IProjectDocumentRepository {
   findByProjectId(projectId: string, tenantId: string): Promise<ProjectDocument[]>;
   findByProjectIdAndType(projectId: string, tenantId: string, documentType: ProjectDocumentType): Promise<ProjectDocument[]>;
   findByStatus(projectId: string, tenantId: string, status: DocumentProcessingStatus): Promise<ProjectDocument[]>;
+  findByContentHash(projectId: string, tenantId: string, contentHash: string): Promise<ProjectDocument | null>;
   save(document: ProjectDocument): Promise<void>;
   saveBatch(documents: ProjectDocument[]): Promise<void>;
   update(document: ProjectDocument): Promise<void>;

@@ -4,10 +4,14 @@ import type { IDelayAnalysisProjectRepository } from '../../../../domain/delay-a
 import type { IProjectDocumentRepository } from '../../../../domain/delay-analysis/repositories/IProjectDocumentRepository';
 import type { IScheduleActivityRepository } from '../../../../domain/delay-analysis/repositories/IScheduleActivityRepository';
 import type { IContractorDelayEventRepository } from '../../../../domain/delay-analysis/repositories/IContractorDelayEventRepository';
-import type { IDelayEventExtractor } from '../../../../domain/delay-analysis/interfaces/IDelayEventExtractor';
+import type { IDelayEventExtractor, ExtractedDelayEvent } from '../../../../domain/delay-analysis/interfaces/IDelayEventExtractor';
 import type { IActivityMatcher } from '../../../../domain/delay-analysis/interfaces/IActivityMatcher';
 import type { IProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import type { TokenUsageCallback } from '../../../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
+import type { 
+  IDelayEventDeduplicationService,
+  ExtractedEventWithSource 
+} from '../../../../domain/delay-analysis/interfaces/IDelayEventDeduplicationService';
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 
@@ -24,6 +28,7 @@ export interface RunAnalysisOptions {
   onTokenUsage?: TokenUsageCallback;
 }
 
+
 export class RunAnalysisCommandHandler {
   constructor(
     private readonly projectRepository: IDelayAnalysisProjectRepository,
@@ -31,7 +36,8 @@ export class RunAnalysisCommandHandler {
     private readonly scheduleRepository: IScheduleActivityRepository,
     private readonly eventRepository: IContractorDelayEventRepository,
     private readonly extractor: IDelayEventExtractor,
-    private readonly matcher: IActivityMatcher
+    private readonly matcher: IActivityMatcher,
+    private readonly deduplicationService: IDelayEventDeduplicationService
   ) {}
 
   async execute(command: RunAnalysisCommand, options?: RunAnalysisOptions): Promise<RunAnalysisResult> {
@@ -91,9 +97,11 @@ export class RunAnalysisCommandHandler {
           details: { total: fieldReports.length },
         });
 
+        const allExtractedEvents: ExtractedEventWithSource[] = [];
+
         for (let i = 0; i < fieldReports.length; i++) {
           const doc = fieldReports[i];
-          const docProgress = 10 + Math.floor((i / fieldReports.length) * 40);
+          const docProgress = 10 + Math.floor((i / fieldReports.length) * 30);
 
           progress.report({
             stage: 'extracting_events',
@@ -115,35 +123,10 @@ export class RunAnalysisCommandHandler {
             );
 
             for (const extracted of extractionResult.events) {
-              const now = new Date();
-              const event = new ContractorDelayEvent({
-                id: randomUUID(),
-                projectId: command.projectId,
-                tenantId: command.tenantId,
+              allExtractedEvents.push({
+                event: extracted,
                 sourceDocumentId: doc.id,
-                matchedActivityId: null,
-                wbs: null,
-                cpmActivityId: null,
-                cpmActivityDescription: null,
-                eventDescription: extracted.eventDescription,
-                eventCategory: extracted.eventCategory,
-                eventStartDate: extracted.eventDate,
-                eventFinishDate: null,
-                impactDurationHours: extracted.impactDurationHours,
-                sourceReference: extracted.sourceReference,
-                extractedFromCode: extracted.extractedFromCode,
-                matchConfidence: null,
-                matchReasoning: null,
-                verificationStatus: 'pending',
-                verifiedBy: null,
-                verifiedAt: null,
-                metadata: null,
-                createdAt: now,
-                updatedAt: now,
               });
-
-              await this.eventRepository.save(event);
-              result.eventsExtracted++;
             }
 
             result.documentsProcessed++;
@@ -167,6 +150,63 @@ export class RunAnalysisCommandHandler {
           } catch (error) {
             result.errors.push(`Failed to extract from ${doc.filename}: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
+        }
+
+        progress.report({
+          stage: 'deduplicating_events',
+          message: `Deduplicating ${allExtractedEvents.length} extracted events...`,
+          percentage: 42,
+        });
+
+        const deduplicatedEvents = this.deduplicationService.deduplicateWithSources(allExtractedEvents);
+
+        const duplicatesRemoved = allExtractedEvents.length - deduplicatedEvents.length;
+        if (duplicatesRemoved > 0) {
+          progress.report({
+            stage: 'deduplicating_events',
+            message: `Removed ${duplicatesRemoved} duplicate events (same delay mentioned in multiple documents)`,
+            percentage: 45,
+          });
+        }
+
+        progress.report({
+          stage: 'saving_events',
+          message: `Saving ${deduplicatedEvents.length} unique delay events...`,
+          percentage: 47,
+        });
+
+        for (const deduped of deduplicatedEvents) {
+          const now = new Date();
+          const event = new ContractorDelayEvent({
+            id: randomUUID(),
+            projectId: command.projectId,
+            tenantId: command.tenantId,
+            sourceDocumentId: deduped.primarySourceDocumentId,
+            matchedActivityId: null,
+            wbs: null,
+            cpmActivityId: null,
+            cpmActivityDescription: null,
+            eventDescription: deduped.event.eventDescription,
+            eventCategory: deduped.event.eventCategory,
+            eventStartDate: deduped.event.eventDate,
+            eventFinishDate: null,
+            impactDurationHours: deduped.event.impactDurationHours,
+            sourceReference: deduped.event.sourceReference,
+            extractedFromCode: deduped.event.extractedFromCode,
+            matchConfidence: null,
+            matchReasoning: null,
+            verificationStatus: 'pending',
+            verifiedBy: null,
+            verifiedAt: null,
+            metadata: deduped.sourceDocumentIds.length > 1 
+              ? { allSourceDocumentIds: deduped.sourceDocumentIds } 
+              : null,
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          await this.eventRepository.save(event);
+          result.eventsExtracted++;
         }
       }
     }

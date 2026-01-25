@@ -95,7 +95,9 @@ The AI analysis uses document-type-specific extraction strategies to optimize de
 
 ### Feature Specifications
 - **Delay Interpretation**: AI-powered construction delay interpretation. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Uses document-type-specific extraction strategies for optimized analysis. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes.
-- **Document Processing**: Upload and parse construction documents (PDF) to extract delay-related information including dates, causes, responsible parties, and impacts.
+- **Document Processing**: Upload and parse construction documents (PDF) to extract delay-related information including dates, causes, responsible parties, and impacts. Features:
+  - **Duplicate Document Detection**: SHA-256 content hash prevents uploading the same document twice
+  - **Delay Event Deduplication**: Consolidates duplicate events across documents by matching reference numbers (NCR-001, etc.) and similar descriptions
 - **Schedule Integration**: Upload CPM schedules (CSV/Excel) with activity IDs, WBS codes, descriptions, and dates. Link delay events to specific schedule activities.
 - **AI Chat Assistant**: Guardrailed AI assistant that only answers questions about construction delays, schedule activities, and project timeline analysis. Enhanced with:
   - **Duration Interpretation Methodology**: Explains how delay durations were estimated from source documents (IDR narrative interpretation vs NCR rework scope calculation)

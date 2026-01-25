@@ -103,10 +103,14 @@ import { AIDelayEventExtractor } from "./delay-analysis/AIDelayEventExtractor";
 import { AIActivityMatcher } from "./delay-analysis/AIActivityMatcher";
 import { OpenAIDelayEventsChatService } from "./delay-analysis/OpenAIDelayEventsChatService";
 import { DocumentContentProvider } from "./delay-analysis/DocumentContentProvider";
+import { SHA256DocumentHashService } from "./delay-analysis/SHA256DocumentHashService";
+import { DelayEventDeduplicationService } from "./delay-analysis/DelayEventDeduplicationService";
 import type { IDelayEventExtractor } from "../domain/delay-analysis/interfaces/IDelayEventExtractor";
 import type { IActivityMatcher } from "../domain/delay-analysis/interfaces/IActivityMatcher";
 import type { IDelayEventsChatService } from "../domain/delay-analysis/interfaces/IDelayEventsChatService";
 import type { IDocumentContentProvider } from "../domain/delay-analysis/interfaces/IDocumentContentProvider";
+import type { IDocumentHashService } from "../domain/delay-analysis/interfaces/IDocumentHashService";
+import type { IDelayEventDeduplicationService } from "../domain/delay-analysis/interfaces/IDelayEventDeduplicationService";
 
 import { DrizzleDelayAnalysisProjectRepository } from "./database/repositories/delay-analysis/DrizzleDelayAnalysisProjectRepository";
 import { DrizzleProjectDocumentRepository } from "./database/repositories/delay-analysis/DrizzleProjectDocumentRepository";
@@ -177,6 +181,8 @@ export interface AppContainer {
     activityMatcher: IActivityMatcher | null;
     delayEventsChatService: IDelayEventsChatService | null;
     documentContentProvider: IDocumentContentProvider;
+    documentHashService: IDocumentHashService;
+    delayEventDeduplicationService: IDelayEventDeduplicationService;
   };
 }
 
@@ -492,6 +498,8 @@ export function createAppContainer(): AppContainer {
       activityMatcher,
       delayEventsChatService,
       documentContentProvider: new DocumentContentProvider(),
+      documentHashService: new SHA256DocumentHashService(),
+      delayEventDeduplicationService: new DelayEventDeduplicationService(),
     },
   };
 }
