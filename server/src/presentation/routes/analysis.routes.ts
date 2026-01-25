@@ -10,6 +10,8 @@ import type { TokenUsageCallback, TokenUsageRecord } from '../../domain/delay-an
 import { runAnalysisParamsSchema, runAnalysisBodySchema, listDelayEventsParamsSchema, delayEventsChatBodySchema } from '../validators/analysisValidators';
 import { SendDelayEventsChatQuery } from '../../application/delay-analysis/queries/SendDelayEventsChatQuery';
 import { SendDelayEventsChatQueryHandler } from '../../application/delay-analysis/queries/handlers/SendDelayEventsChatQueryHandler';
+import type { StreamingChatEvent } from '../../domain/delay-analysis/interfaces/IStreamingDelayEventsChatService';
+import { GetDocumentContentTool } from '../../infrastructure/delay-analysis/tools/GetDocumentContentTool';
 import ExcelJS from 'exceljs';
 
 const DEFAULT_TENANT_ID = 'default';
@@ -436,6 +438,88 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
 
         console.error('[DelayEventsChat] Error:', error);
         res.status(500).json({ success: false, error: 'Failed to process chat request' });
+      }
+    }
+  );
+
+  app.post(
+    '/api/delay-analysis/projects/:projectId/chat/stream',
+    async (req: Request, res: Response) => {
+      try {
+        const params = listDelayEventsParamsSchema.parse(req.params);
+        const body = delayEventsChatBodySchema.parse(req.body);
+
+        if (!container.services.getDocumentContentQueryHandler) {
+          res.status(503).json({ 
+            success: false, 
+            error: 'Streaming chat service not available' 
+          });
+          return;
+        }
+
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+
+        const delayEvents = await container.repositories.contractorDelayEvent.findByProjectId(
+          params.projectId,
+          DEFAULT_TENANT_ID
+        );
+
+        const sourceDocumentIds = delayEvents
+          .filter(e => e.sourceDocumentId)
+          .map(e => e.sourceDocumentId!);
+
+        let sourceDocuments: Map<string, any> | undefined;
+        if (sourceDocumentIds.length > 0) {
+          sourceDocuments = await container.services.documentContentProvider.getDocumentsByIds(
+            sourceDocumentIds,
+            DEFAULT_TENANT_ID
+          );
+        }
+
+        const toolExecutor = new GetDocumentContentTool(
+          container.services.getDocumentContentQueryHandler,
+          params.projectId,
+          DEFAULT_TENANT_ID
+        );
+
+        const sendEvent = (event: StreamingChatEvent) => {
+          res.write(`data: ${JSON.stringify(event)}\n\n`);
+        };
+
+        await container.services.streamingDelayEventsChatService.streamChat(
+          {
+            projectId: params.projectId,
+            tenantId: DEFAULT_TENANT_ID,
+            userMessage: body.message,
+            conversationHistory: body.conversationHistory,
+            delayEvents,
+            sourceDocuments,
+          },
+          sendEvent,
+          { toolExecutor }
+        );
+
+        res.write('data: [DONE]\n\n');
+        res.end();
+
+      } catch (error) {
+        if (error instanceof Error && error.name === 'ZodError') {
+          if (!res.headersSent) {
+            res.status(400).json({ success: false, error: 'Invalid request' });
+          }
+          return;
+        }
+
+        console.error('[StreamingDelayEventsChat] Error:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ success: false, error: 'Failed to process streaming chat request' });
+        } else {
+          res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream interrupted' })}\n\n`);
+          res.end();
+        }
       }
     }
   );

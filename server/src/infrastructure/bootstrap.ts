@@ -102,15 +102,19 @@ import type { IScheduleParserFactory } from "../domain/delay-analysis/interfaces
 import { AIDelayEventExtractor } from "./delay-analysis/AIDelayEventExtractor";
 import { AIActivityMatcher } from "./delay-analysis/AIActivityMatcher";
 import { OpenAIDelayEventsChatService } from "./delay-analysis/OpenAIDelayEventsChatService";
+import { StreamingOpenAIDelayEventsChatService } from "./delay-analysis/StreamingOpenAIDelayEventsChatService";
 import { DocumentContentProvider } from "./delay-analysis/DocumentContentProvider";
 import { SHA256DocumentHashService } from "./delay-analysis/SHA256DocumentHashService";
 import { DelayEventDeduplicationService } from "./delay-analysis/DelayEventDeduplicationService";
+import { GetDocumentContentTool } from "./delay-analysis/tools/GetDocumentContentTool";
 import type { IDelayEventExtractor } from "../domain/delay-analysis/interfaces/IDelayEventExtractor";
 import type { IActivityMatcher } from "../domain/delay-analysis/interfaces/IActivityMatcher";
 import type { IDelayEventsChatService } from "../domain/delay-analysis/interfaces/IDelayEventsChatService";
+import type { IStreamingDelayEventsChatService } from "../domain/delay-analysis/interfaces/IStreamingDelayEventsChatService";
 import type { IDocumentContentProvider } from "../domain/delay-analysis/interfaces/IDocumentContentProvider";
 import type { IDocumentHashService } from "../domain/delay-analysis/interfaces/IDocumentHashService";
 import type { IDelayEventDeduplicationService } from "../domain/delay-analysis/interfaces/IDelayEventDeduplicationService";
+import { GetDocumentContentQueryHandler } from "../application/delay-analysis/queries/handlers/GetDocumentContentQueryHandler";
 
 import { DrizzleDelayAnalysisProjectRepository } from "./database/repositories/delay-analysis/DrizzleDelayAnalysisProjectRepository";
 import { DrizzleProjectDocumentRepository } from "./database/repositories/delay-analysis/DrizzleProjectDocumentRepository";
@@ -180,9 +184,11 @@ export interface AppContainer {
     delayEventExtractor: IDelayEventExtractor | null;
     activityMatcher: IActivityMatcher | null;
     delayEventsChatService: IDelayEventsChatService | null;
+    streamingDelayEventsChatService: IStreamingDelayEventsChatService | null;
     documentContentProvider: IDocumentContentProvider;
     documentHashService: IDocumentHashService;
     delayEventDeduplicationService: IDelayEventDeduplicationService;
+    getDocumentContentQueryHandler: GetDocumentContentQueryHandler | null;
   };
 }
 
@@ -497,9 +503,14 @@ export function createAppContainer(): AppContainer {
       delayEventExtractor,
       activityMatcher,
       delayEventsChatService,
+      streamingDelayEventsChatService: new StreamingOpenAIDelayEventsChatService(),
       documentContentProvider: new DocumentContentProvider(),
       documentHashService: new SHA256DocumentHashService(),
       delayEventDeduplicationService: new DelayEventDeduplicationService(),
+      getDocumentContentQueryHandler: new GetDocumentContentQueryHandler(
+        new DocumentContentProvider(),
+        projectDocumentRepository
+      ),
     },
   };
 }

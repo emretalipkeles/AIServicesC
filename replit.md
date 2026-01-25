@@ -103,6 +103,36 @@ The AI analysis uses document-type-specific extraction strategies to optimize de
   - **Duration Interpretation Methodology**: Explains how delay durations were estimated from source documents (IDR narrative interpretation vs NCR rework scope calculation)
   - **Document Content Access**: Can reference original document content to explain how delays were extracted
   - **Source Document Linking**: Links delay events to their source documents for contextual explanations
+  - **Streaming Chat with Thinking Steps**: SSE streaming endpoint (`/api/delay-analysis/projects/:projectId/chat/stream`) with real-time progress events showing AI reasoning stages (analyzing, searching events, fetching documents, generating response). Uses hybrid document access strategy with 800-char excerpts upfront and tool-based full document retrieval on demand.
+
+### Streaming Chat Architecture
+The streaming delay events chat uses a hybrid document access strategy:
+
+**Domain Interfaces** (server/src/domain/delay-analysis/interfaces/):
+- **IChatToolExecutor**: Interface for AI function calling tools with `getAvailableTools()` and `execute()` methods
+- **IStreamingDelayEventsChatService**: Interface for streaming chat with progress events (content, done, progress, error)
+
+**Application Layer** (CQRS Pattern):
+- **GetDocumentContentQuery/Handler**: Query for fetching full document content with tenant/project authorization
+
+**Infrastructure Layer**:
+- **GetDocumentContentTool**: Wraps query handler for OpenAI function calling, providing `get_document_content` tool
+- **StreamingOpenAIDelayEventsChatService**: Implements streaming with document excerpts and tool calling
+
+**Progress Event Types**:
+| Event Type | Stage | Description |
+|------------|-------|-------------|
+| progress | analyzing | Initial question analysis |
+| progress | searching_events | Searching through delay events |
+| progress | fetching_document | Retrieving full document via tool |
+| progress | generating_response | Generating final response |
+| content | - | Streaming text chunk |
+| done | - | Stream complete |
+| error | - | Error occurred |
+
+**Frontend Components**:
+- **ThinkingSteps** (client/src/components/delay-analysis/chat/): Displays AI reasoning steps with icons and completion status
+- **AIChatPanel**: Updated to render thinking steps before message content
 - **Upload State Tracking**: Uses UploadStateContext for persistent state that survives tab switches - tracks schedule uploads (purple indicator), document uploads (blue indicator), and analysis runs (amber indicator) with compact circular progress indicators.
 - **Reusable UI Components** (client/src/components/delay-analysis/ui/premium-components.tsx):
   - **SmartPopover**: Viewport-aware tooltip with auto-positioning

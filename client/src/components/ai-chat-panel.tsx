@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Sparkles, Bot, User, Paperclip, MoreHorizontal, Loader2, Package, ExternalLink, Upload, PanelLeftClose, Download } from "lucide-react";
+import { Send, Sparkles, Bot, User, Paperclip, MoreHorizontal, Loader2, Package, ExternalLink, Upload, PanelLeftClose, Download, Brain, Search, FileText, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AgentSelector } from "./agent-selector";
 import { StructuredOutputCard } from "./structured-output-card";
@@ -77,6 +77,12 @@ interface PackageInfo {
   redirectUrl: string;
 }
 
+interface ThinkingStep {
+  stage: string;
+  message: string;
+  completed?: boolean;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -87,6 +93,7 @@ interface Message {
   isStreaming?: boolean;
   statusMessage?: string;
   packageInfo?: PackageInfo;
+  thinkingSteps?: ThinkingStep[];
 }
 
 interface OrchestrationProgress {
@@ -852,6 +859,43 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                       </span>
                     )}
                   </div>
+                  
+                  {/* Thinking steps display */}
+                  {message.thinkingSteps && message.thinkingSteps.length > 0 && (
+                    <div className="mb-2 space-y-1">
+                      {message.thinkingSteps.map((step, stepIndex) => {
+                        const isLastStep = stepIndex === message.thinkingSteps!.length - 1;
+                        const isActive = isLastStep && message.isStreaming && !message.content;
+                        const StepIcon = step.stage === 'analyzing' ? Brain
+                          : step.stage === 'searching_events' ? Search
+                          : step.stage === 'fetching_document' ? FileText
+                          : step.completed ? CheckCircle
+                          : Sparkles;
+                        
+                        return (
+                          <div
+                            key={`${step.stage}-${stepIndex}`}
+                            className={`flex items-center gap-2 text-xs ${
+                              step.completed || !isActive
+                                ? 'text-muted-foreground'
+                                : 'text-primary'
+                            }`}
+                          >
+                            {isActive && !step.completed ? (
+                              <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
+                            ) : (
+                              <StepIcon className={`w-3 h-3 flex-shrink-0 ${
+                                step.completed ? 'text-green-500' : ''
+                              }`} />
+                            )}
+                            <span className={isActive && !step.completed ? 'font-medium' : ''}>
+                              {step.message}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   
                   {/* Message bubble */}
                   {message.isStreaming && !message.content ? (
