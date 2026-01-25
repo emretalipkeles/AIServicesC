@@ -29,6 +29,13 @@ export interface RunAnalysisOptions {
 }
 
 
+function normalizeImpactDuration(value: unknown): number | null {
+  if (value == null) return null;
+  const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+  if (isNaN(num) || !isFinite(num)) return null;
+  return Math.round(num);
+}
+
 export class RunAnalysisCommandHandler {
   constructor(
     private readonly projectRepository: IDelayAnalysisProjectRepository,
@@ -190,7 +197,7 @@ export class RunAnalysisCommandHandler {
             eventCategory: deduped.event.eventCategory,
             eventStartDate: deduped.event.eventDate,
             eventFinishDate: null,
-            impactDurationHours: deduped.event.impactDurationHours,
+            impactDurationHours: normalizeImpactDuration(deduped.event.impactDurationHours),
             sourceReference: deduped.event.sourceReference,
             extractedFromCode: deduped.event.extractedFromCode,
             matchConfidence: null,
