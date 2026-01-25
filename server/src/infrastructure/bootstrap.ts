@@ -1,3 +1,4 @@
+import { warmDatabaseConnection } from "./database";
 import { InMemoryCommandBus } from "./messaging/InMemoryCommandBus";
 import { InMemoryQueryBus } from "./messaging/InMemoryQueryBus";
 import { bedrockClientProvider } from "./ai/AIClientProvider";
@@ -526,4 +527,8 @@ export function getAppContainer(): AppContainer {
 
 export function resetAppContainer(): void {
   container = null;
+}
+
+export async function initializeInfrastructure(): Promise<void> {
+  await warmDatabaseConnection();
 }
