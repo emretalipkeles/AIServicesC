@@ -18,7 +18,8 @@ const DEFAULT_TENANT_ID = 'default';
 
 export function registerAnalysisRoutes(app: Express, container: AppContainer): void {
   const listEventsHandler = new ListDelayEventsQueryHandler(
-    container.repositories.contractorDelayEvent
+    container.repositories.contractorDelayEvent,
+    container.repositories.scheduleActivity
   );
 
   const hasAiServices = !!(container.services.delayEventExtractor && container.services.activityMatcher);
@@ -79,6 +80,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
           { header: 'WBS', key: 'wbs', width: 12 },
           { header: 'Activity ID', key: 'activityId', width: 15 },
           { header: 'Activity Description', key: 'activityDesc', width: 35 },
+          { header: 'Critical Path', key: 'criticalPath', width: 12 },
+          { header: 'Total Float', key: 'totalFloat', width: 12 },
           { header: 'Delay Event', key: 'eventDesc', width: 40 },
           { header: 'Category', key: 'category', width: 22 },
           { header: 'Date', key: 'date', width: 12 },
@@ -121,11 +124,20 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
           'Subcontractor': { bg: 'FFCFFAFE', text: 'FF0891B2' },
         };
 
+        const formatCriticalPath = (value: string | null): string => {
+          if (!value || value === 'unknown') return '';
+          if (value === 'yes') return 'Yes';
+          if (value === 'no') return 'No';
+          return value;
+        };
+
         events.forEach((event, index) => {
           const rowData = {
             wbs: event.wbs || '',
             activityId: event.cpmActivityId || '',
             activityDesc: event.cpmActivityDescription || '',
+            criticalPath: formatCriticalPath(event.isCriticalPath),
+            totalFloat: event.totalFloat ?? null,
             eventDesc: event.eventDescription,
             category: event.eventCategory || '',
             date: event.eventStartDate ? new Date(event.eventStartDate) : null,
@@ -156,7 +168,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
               right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
             };
 
-            if (colNumber === 5 && event.eventCategory) {
+            if (colNumber === 7 && event.eventCategory) {
               const categoryKey = Object.keys(categoryColors).find(
                 k => event.eventCategory?.toLowerCase().includes(k.toLowerCase().split(' ')[0])
               );
@@ -171,7 +183,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
               }
             }
 
-            if (colNumber === 9 && event.matchConfidence) {
+            if (colNumber === 11 && event.matchConfidence) {
               const conf = event.matchConfidence;
               if (conf >= 80) {
                 cell.font = { color: { argb: 'FF16A34A' }, bold: true, size: 10 };
@@ -182,7 +194,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
               }
             }
 
-            if (colNumber === 6 && event.eventStartDate) {
+            if (colNumber === 8 && event.eventStartDate) {
               cell.numFmt = 'mm/dd/yyyy';
             }
           });
@@ -190,7 +202,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
 
         worksheet.autoFilter = {
           from: { row: 1, column: 1 },
-          to: { row: events.length + 1, column: 11 },
+          to: { row: events.length + 1, column: 13 },
         };
 
         const buffer = await workbook.xlsx.writeBuffer();

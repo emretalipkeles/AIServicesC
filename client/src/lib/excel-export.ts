@@ -4,6 +4,8 @@ interface DelayEventData {
   wbs?: string | null;
   cpmActivityId?: string | null;
   cpmActivityDescription?: string | null;
+  isCriticalPath?: string | null;
+  totalFloat?: number | null;
   eventDescription: string;
   eventCategory?: string | null;
   eventStartDate?: string | null;
@@ -34,6 +36,13 @@ function formatCategory(category: string | null | undefined): string {
   return category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
+function formatCriticalPath(value: string | null | undefined): string {
+  if (!value || value === 'unknown') return '';
+  if (value === 'yes') return 'Yes';
+  if (value === 'no') return 'No';
+  return value;
+}
+
 export async function exportDelayEventsToExcel(
   events: DelayEventData[], 
   documentNameMap?: Map<string, string>
@@ -50,6 +59,8 @@ export async function exportDelayEventsToExcel(
     { header: 'WBS', key: 'wbs', width: 12 },
     { header: 'Activity ID', key: 'activityId', width: 15 },
     { header: 'Activity Description', key: 'activityDesc', width: 35 },
+    { header: 'Critical Path', key: 'criticalPath', width: 12 },
+    { header: 'Total Float', key: 'totalFloat', width: 12 },
     { header: 'Delay Event', key: 'eventDesc', width: 40 },
     { header: 'Category', key: 'category', width: 22 },
     { header: 'Date', key: 'date', width: 12 },
@@ -86,6 +97,8 @@ export async function exportDelayEventsToExcel(
       wbs: event.wbs || '',
       activityId: event.cpmActivityId || '',
       activityDesc: event.cpmActivityDescription || '',
+      criticalPath: formatCriticalPath(event.isCriticalPath),
+      totalFloat: event.totalFloat ?? null,
       eventDesc: event.eventDescription,
       category: formatCategory(event.eventCategory),
       date: event.eventStartDate ? new Date(event.eventStartDate) : null,
@@ -118,7 +131,7 @@ export async function exportDelayEventsToExcel(
         right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
       };
 
-      if (colNumber === 5) {
+      if (colNumber === 7) {
         const formattedCategory = formatCategory(event.eventCategory);
         const colors = categoryColors[formattedCategory];
         if (colors) {
@@ -131,7 +144,7 @@ export async function exportDelayEventsToExcel(
         }
       }
 
-      if (colNumber === 11 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
+      if (colNumber === 13 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
         const confidence = event.matchConfidence;
         let bgColor: string;
         let textColor: string;
@@ -160,7 +173,7 @@ export async function exportDelayEventsToExcel(
 
   worksheet.autoFilter = {
     from: { row: 1, column: 1 },
-    to: { row: events.length + 1, column: 13 },
+    to: { row: events.length + 1, column: 15 },
   };
 
   const today = new Date();
