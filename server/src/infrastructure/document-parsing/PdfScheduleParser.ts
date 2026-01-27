@@ -206,6 +206,8 @@ Rules:
 - Look for Activity Name/Description which is descriptive text
 - WBS is usually hierarchical numbers or zone indicators
 - Original Duration (OD), Actual Duration (AD), Remaining Duration (RD) may be present
+- TF or Total Float is a numeric value representing float days (positive or negative integer)
+- LP indicates if activity is on critical path (checkbox or asterisk marker)
 - Only include activities where the actual date falls in ${options.targetMonth}/${options.targetYear}
 
 Lines to parse:
@@ -219,7 +221,8 @@ Return a JSON array of objects with these fields:
 - actualFinishDate: ISO date string or null (for dates with "A")
 - plannedStartDate: ISO date string or null
 - plannedFinishDate: ISO date string or null
-- isCriticalPath: "yes", "no", or "unknown"
+- isCriticalPath: "yes", "no", or "unknown" (look for LP column, asterisk markers, or TF=0)
+- totalFloat: number or null (TF column value in days, can be negative)
 
 Return ONLY the JSON array, no other text.`;
 
@@ -235,7 +238,7 @@ Return ONLY the JSON array, no other text.`;
         operation: batchNumber !== undefined 
           ? `schedule_parsing_batch_${batchNumber}` 
           : 'schedule_parsing',
-        model: modelId.value,
+        model: modelId.getValue(),
         inputTokens: response.inputTokens,
         outputTokens: response.outputTokens,
         runId,
@@ -258,6 +261,7 @@ Return ONLY the JSON array, no other text.`;
       plannedStartDate?: string | null;
       plannedFinishDate?: string | null;
       isCriticalPath?: string;
+      totalFloat?: number | null;
     }>;
 
     return parsed.map(item => ({
@@ -269,7 +273,22 @@ Return ONLY the JSON array, no other text.`;
       plannedStartDate: item.plannedStartDate ? new Date(item.plannedStartDate) : null,
       plannedFinishDate: item.plannedFinishDate ? new Date(item.plannedFinishDate) : null,
       isCriticalPath: item.isCriticalPath || 'unknown',
+      totalFloat: this.parseNumber(item.totalFloat),
     }));
+  }
+
+  private parseNumber(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    if (typeof value === 'number') {
+      return isNaN(value) ? null : value;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number(value.trim());
+      return isNaN(parsed) ? null : parsed;
+    }
+    return null;
   }
 
   private chunkArray<T>(array: T[], size: number): T[][] {
