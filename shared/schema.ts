@@ -298,6 +298,7 @@ export const scheduleActivities = pgTable("schedule_activities", {
   actualFinishDate: timestamp("actual_finish_date"),
   scheduleUpdateMonth: text("schedule_update_month"),
   isCriticalPath: text("is_critical_path").default("unknown"),
+  totalFloat: integer("total_float"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
 });

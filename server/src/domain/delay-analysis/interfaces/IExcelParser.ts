@@ -7,6 +7,7 @@ export interface ParsedScheduleRow {
   actualStartDate: Date | null;
   actualFinishDate: Date | null;
   isCriticalPath: string;
+  totalFloat: number | null;
 }
 
 export interface ExcelParseResult {

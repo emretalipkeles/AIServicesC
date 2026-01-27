@@ -158,6 +158,7 @@ export class UploadScheduleCommandHandler {
               actualFinishDate: row.actualFinishDate,
               scheduleUpdateMonth: scheduleMonth,
               isCriticalPath: row.isCriticalPath,
+              totalFloat: row.totalFloat,
               metadata: null,
               createdAt: existing.createdAt,
             });
@@ -181,6 +182,7 @@ export class UploadScheduleCommandHandler {
             actualFinishDate: row.actualFinishDate,
             scheduleUpdateMonth: scheduleMonth,
             isCriticalPath: row.isCriticalPath,
+            totalFloat: row.totalFloat,
             metadata: null,
             createdAt: now,
           });

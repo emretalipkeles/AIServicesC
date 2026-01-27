@@ -82,6 +82,7 @@ export class DrizzleScheduleActivityRepository implements IScheduleActivityRepos
       actualFinishDate: activity.actualFinishDate,
       scheduleUpdateMonth: activity.scheduleUpdateMonth,
       isCriticalPath: activity.isCriticalPath,
+      totalFloat: activity.totalFloat,
       metadata: activity.metadata,
       createdAt: activity.createdAt,
     });
@@ -105,6 +106,7 @@ export class DrizzleScheduleActivityRepository implements IScheduleActivityRepos
         actualFinishDate: activity.actualFinishDate,
         scheduleUpdateMonth: activity.scheduleUpdateMonth,
         isCriticalPath: activity.isCriticalPath,
+        totalFloat: activity.totalFloat,
         metadata: activity.metadata,
         createdAt: activity.createdAt,
       }))
@@ -144,6 +146,7 @@ export class DrizzleScheduleActivityRepository implements IScheduleActivityRepos
       actualFinishDate: row.actualFinishDate,
       scheduleUpdateMonth: row.scheduleUpdateMonth,
       isCriticalPath: row.isCriticalPath ?? 'unknown',
+      totalFloat: row.totalFloat,
       metadata: row.metadata as Record<string, unknown> | null,
       createdAt: row.createdAt ?? new Date(),
     });

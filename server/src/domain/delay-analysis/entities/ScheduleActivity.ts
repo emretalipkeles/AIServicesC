@@ -12,6 +12,7 @@ export interface ScheduleActivityProps {
   actualFinishDate?: Date | null;
   scheduleUpdateMonth?: string | null;
   isCriticalPath: string;
+  totalFloat?: number | null;
   metadata?: Record<string, unknown> | null;
   createdAt: Date;
 }
@@ -30,6 +31,7 @@ export class ScheduleActivity {
   readonly actualFinishDate: Date | null;
   readonly scheduleUpdateMonth: string | null;
   readonly isCriticalPath: string;
+  readonly totalFloat: number | null;
   readonly metadata: Record<string, unknown> | null;
   readonly createdAt: Date;
 
@@ -47,6 +49,7 @@ export class ScheduleActivity {
     this.actualFinishDate = props.actualFinishDate ?? null;
     this.scheduleUpdateMonth = props.scheduleUpdateMonth ?? null;
     this.isCriticalPath = props.isCriticalPath;
+    this.totalFloat = props.totalFloat ?? null;
     this.metadata = props.metadata ?? null;
     this.createdAt = props.createdAt;
     this.validate();

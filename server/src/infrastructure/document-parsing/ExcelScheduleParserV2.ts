@@ -15,6 +15,7 @@ interface ColumnMapping {
   actualStart: string[];
   actualFinish: string[];
   criticalPath: string[];
+  totalFloat: string[];
 }
 
 const COLUMN_MAPPINGS: ColumnMapping = {
@@ -25,7 +26,8 @@ const COLUMN_MAPPINGS: ColumnMapping = {
   plannedFinish: ['planned finish', 'planned_finish', 'finish date', 'early finish', 'bl finish', 'baseline finish'],
   actualStart: ['actual start', 'actual_start', 'as', 'start'],
   actualFinish: ['actual finish', 'actual_finish', 'af', 'finish'],
-  criticalPath: ['critical', 'critical path', 'is critical', 'cp', 'crit'],
+  criticalPath: ['critical', 'critical path', 'is critical', 'cp', 'crit', 'lp'],
+  totalFloat: ['tf', 'float', 'total float', 'total_float', 'totalfloat'],
 };
 
 export class ExcelScheduleParserV2 implements IScheduleParser {
@@ -135,6 +137,7 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
             actualStartDate,
             actualFinishDate,
             isCriticalPath: columnMap.criticalPath ? this.parseCriticalPath(row[columnMap.criticalPath]) : 'unknown',
+            totalFloat: columnMap.totalFloat ? this.parseNumber(row[columnMap.totalFloat]) : null,
           };
 
           rows.push(parsedRow);
@@ -213,6 +216,7 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
       actualStart: null,
       actualFinish: null,
       criticalPath: null,
+      totalFloat: null,
     };
 
     for (const header of headers) {
@@ -275,5 +279,22 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
     }
     
     return 'unknown';
+  }
+
+  private parseNumber(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+
+    if (typeof value === 'number') {
+      return isNaN(value) ? null : value;
+    }
+
+    if (typeof value === 'string') {
+      const str = value.trim();
+      if (str.length === 0) return null;
+      const parsed = parseFloat(str);
+      return isNaN(parsed) ? null : parsed;
+    }
+
+    return null;
   }
 }
