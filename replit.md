@@ -85,13 +85,13 @@ The AI analysis uses document-type-specific extraction strategies to optimize de
 | Document Type | Strategy | Base Confidence | Delay Certainty | Key Focus |
 |---------------|----------|-----------------|-----------------|-----------|
 | IDR | IDRExtractionStrategy | 0.6 (moderate) | Uncertain | CODE_CIE tags, narrative verification, duration estimation |
-| NCR | NCRExtractionStrategy | 0.85 (high) | Certain | Rework scope, quality failures, corrective actions |
+| NCR | NCRExtractionStrategy | 0.85 (high) | Certain | Rework scope, quality failures, corrective actions (duration only if explicitly stated) |
 | Field Memo | FieldMemoExtractionStrategy | 0.5 (low) | Uncertain | General delay indicators |
 | Other | DefaultExtractionStrategy | 0.5 (low) | Uncertain | Generic extraction |
 
 **Key Differences**:
-- **IDRs**: Daily observations requiring interpretation; not all CODE_CIE entries are real delays
-- **NCRs**: Formal quality failures; NCR = rework required = definite delay
+- **IDRs**: Daily observations requiring interpretation; not all CODE_CIE entries are real delays. Duration is estimated from narrative.
+- **NCRs**: Formal quality failures; NCR = rework required = definite delay. Duration is only captured if explicitly stated in the document (never estimated).
 
 ### Feature Specifications
 - **Delay Interpretation**: AI-powered construction delay interpretation. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Uses document-type-specific extraction strategies for optimized analysis. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes.

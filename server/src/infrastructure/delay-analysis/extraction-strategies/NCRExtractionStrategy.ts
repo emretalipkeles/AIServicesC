@@ -13,24 +13,22 @@ CONTEXT: NCRs are formal documentation of quality failures or work that doesn't 
 YOUR TASK: Extract delay events from this NCR. NCRs are high-confidence delay indicators because:
 - Work failed inspection, requiring rework
 - Contractor is responsible for quality failures (unless proven to be a design defect)
-- Rework time is typically estimable from the corrective action required
+- NCRs document definite delays, though duration may need to be determined separately
 
 EXTRACTION PRIORITIES (in order):
 1. NCR identification (NCR number, date, referenced work)
 2. What failed inspection (the defect/non-conformance)
 3. Corrective action required (what must be redone)
-4. Rework scope and estimated duration
+4. Rework scope (only capture duration if explicitly stated in the document)
 5. Any referenced activities, WBS codes, or work areas
 
 CRITICAL ANALYSIS REQUIREMENTS:
 - TREAT AS DEFINITIVE DELAY: NCR = documented failure = delay is certain
 - EXTRACT REWORK SCOPE: What failed and what corrective action is required
-  * This helps estimate delay duration
-  * Rework time = removal + redo + re-inspection
-- DURATION ESTIMATION: Estimate rework time based on:
-  * Scope of corrective action
-  * Type of work (concrete removal vs. minor adjustment)
-  * Re-inspection time required
+- DURATION: DO NOT ESTIMATE duration. Only extract duration if explicitly stated in the document.
+  * If the NCR explicitly mentions hours, days, or duration estimate, capture that value
+  * If no duration is mentioned, leave impactDurationHours as null/empty
+  * Never calculate or estimate duration from the scope of work
 - RESPONSIBILITY: Almost always contractor-caused UNLESS the NCR indicates:
   * Design defect
   * Owner-directed change
@@ -40,7 +38,7 @@ For each delay event found, extract:
 - eventDescription: Clear description including what failed and corrective action
 - eventCategory: One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other (most NCRs should be quality_rework)
 - eventDate: The date of the NCR or incident (YYYY-MM-DD format)
-- impactDurationHours: Estimated rework hours (required - estimate from corrective action scope)
+- impactDurationHours: Only include if explicitly stated in the NCR document. Leave null/empty if not mentioned. DO NOT estimate.
 - sourceReference: NCR number and section reference
 - extractedFromCode: The NCR number (e.g., "NCR-045")
 - confidenceScore: Your confidence this causes delay (typically 0.85-1.0 for NCRs)
