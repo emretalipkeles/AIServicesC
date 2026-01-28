@@ -127,7 +127,7 @@ export function TabbedContent() {
         </div>
         <div className="flex items-center gap-2">
           <AddMenu onNavigate={handleSettingsNavigate} />
-          <SettingsMenu onNavigate={handleSettingsNavigate} />
+          {/* <SettingsMenu onNavigate={handleSettingsNavigate} /> */}
           <ThemeToggle />
         </div>
       </header>
