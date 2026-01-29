@@ -97,7 +97,11 @@ export class UploadScheduleCommandHandler {
         }
       );
 
+      console.log(`[UploadScheduleHandler] Parse result: ${parseResult.rows.length} rows, ${parseResult.totalRowsProcessed} total processed, ${parseResult.filteredByMonth} filtered by month`);
+      console.log(`[UploadScheduleHandler] Parse errors: ${parseResult.errors.join('; ') || 'none'}`);
+
       if (parseResult.rows.length === 0) {
+        console.log(`[UploadScheduleHandler] No rows returned from parser, returning early`);
         const updatedDoc = document.withProcessingStatus(
           'completed',
           `No activities with actual dates found for ${command.targetMonth}/${command.targetYear}. ${parseResult.errors.join('; ')}`

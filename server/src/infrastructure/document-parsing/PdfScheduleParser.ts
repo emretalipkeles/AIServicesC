@@ -216,8 +216,13 @@ Return ONLY the JSON array, no other text.`;
 
     const responseText = response.content;
     
+    console.log(`[PdfScheduleParser] Batch ${batchNumber}: Sent ${lines.length} lines to AI`);
+    console.log(`[PdfScheduleParser] Batch ${batchNumber}: First 3 lines sample:`, lines.slice(0, 3));
+    
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
+      console.error(`[PdfScheduleParser] Batch ${batchNumber}: AI response did not contain valid JSON array`);
+      console.error(`[PdfScheduleParser] Batch ${batchNumber}: AI response was:`, responseText.substring(0, 500));
       throw new Error('AI response did not contain valid JSON array');
     }
 
@@ -232,6 +237,11 @@ Return ONLY the JSON array, no other text.`;
       isCriticalPath?: string;
       totalFloat?: number | null;
     }>;
+
+    console.log(`[PdfScheduleParser] Batch ${batchNumber}: AI returned ${parsed.length} activities for ${monthName} ${options.targetYear}`);
+    if (parsed.length > 0) {
+      console.log(`[PdfScheduleParser] Batch ${batchNumber}: First activity:`, parsed[0]);
+    }
 
     return parsed.map(item => ({
       activityId: item.activityId,
