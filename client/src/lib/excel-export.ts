@@ -64,13 +64,13 @@ export async function exportDelayEventsToExcel(
     { header: 'Delay Event', key: 'eventDesc', width: 40 },
     { header: 'Category', key: 'category', width: 22 },
     { header: 'Date', key: 'date', width: 12 },
-    { header: 'Duration (hrs)', key: 'duration', width: 14 },
+    { header: 'Delay Duration estimate (hrs)', key: 'duration', width: 22 },
     { header: 'Source Document', key: 'sourceDoc', width: 30 },
     { header: 'Extracted From Code', key: 'extractedCode', width: 18 },
     { header: 'Source Reference', key: 'sourceRef', width: 25 },
     { header: 'Confidence', key: 'confidence', width: 12 },
     { header: 'Match Reasoning', key: 'reasoning', width: 45 },
-    { header: 'Status', key: 'status', width: 14 },
+    { header: 'Reviewer Approval', key: 'status', width: 18 },
   ];
 
   const headerRow = worksheet.getRow(1);
@@ -130,6 +130,10 @@ export async function exportDelayEventsToExcel(
         left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
         right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
       };
+
+      if (colNumber === 4 || colNumber === 5 || colNumber === 9) {
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      }
 
       if (colNumber === 7) {
         const formattedCategory = formatCategory(event.eventCategory);

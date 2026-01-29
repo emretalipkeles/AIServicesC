@@ -263,6 +263,8 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                       <th className={cn(tableHeaderCellStyles, "min-w-[200px]")}>Description</th>
                       <th className={tableHeaderCellStyles}>Actual Start</th>
                       <th className={tableHeaderCellStyles}>Actual Finish</th>
+                      <th className={cn(tableHeaderCellStyles, "text-center")}>Critical Path</th>
+                      <th className={cn(tableHeaderCellStyles, "text-center")}>Total Float</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -291,6 +293,8 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                             </td>
                             <td className="p-3 text-sm">{formatDate(activity.actualStartDate)}</td>
                             <td className="p-3 text-sm">{formatDate(activity.actualFinishDate)}</td>
+                            <td className="p-3 text-sm text-center">{activity.isCriticalPath === 'yes' ? 'Yes' : activity.isCriticalPath === 'no' ? 'No' : '-'}</td>
+                            <td className="p-3 text-sm text-center">{activity.totalFloat !== null && activity.totalFloat !== undefined ? activity.totalFloat : '-'}</td>
                           </motion.tr>
                         ))}
                     </AnimatePresence>

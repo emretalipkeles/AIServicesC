@@ -11,6 +11,7 @@ export interface ScheduleActivityDto {
   actualFinishDate: string | null;
   scheduleUpdateMonth: string | null;
   isCriticalPath: string;
+  totalFloat: number | null;
   sourceDocumentId: string | null;
   createdAt: string;
 }
