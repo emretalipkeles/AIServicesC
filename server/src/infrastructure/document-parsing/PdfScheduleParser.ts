@@ -138,19 +138,14 @@ export class PdfScheduleParser implements IScheduleParser {
     const lines = text.split('\n');
     const filteredLines: string[] = [];
     
-    const targetMonthName = Object.entries(MONTH_NAMES)
-      .find(([_, num]) => num === options.targetMonth)?.[0] || '';
-    
-    const yearStr = String(options.targetYear).slice(-2);
-    const yearPattern = new RegExp(`(${targetMonthName}|${String(options.targetMonth).padStart(2, '0')})[^\\d]*${yearStr}\\s*A`, 'i');
-    const dateWithAPattern = /\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4}\s*A|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s*A/;
+    const dateWithAPattern = /\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4}\s*A|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s*A/i;
 
     for (const line of lines) {
       const trimmedLine = line.trim();
       if (trimmedLine.length < 10) continue;
       
       if (dateWithAPattern.test(trimmedLine)) {
-        if (yearPattern.test(trimmedLine) || this.lineContainsTargetMonth(trimmedLine, options)) {
+        if (this.lineContainsTargetMonth(trimmedLine, options)) {
           filteredLines.push(trimmedLine);
         }
       }
@@ -161,24 +156,31 @@ export class PdfScheduleParser implements IScheduleParser {
 
   private lineContainsTargetMonth(line: string, options: ScheduleParseOptions): boolean {
     const datePatterns = [
-      /(\d{1,2})[-/]([A-Za-z]{3})[-/](\d{2,4})\s*A/g,
+      /(\d{1,2})[-/]([A-Za-z]{3})[-/](\d{2,4})\s*A/gi,
       /(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})\s*A/g,
+      /([A-Za-z]{3})[-/](\d{1,2})[-/](\d{2,4})\s*A/gi,
     ];
 
     for (const pattern of datePatterns) {
+      pattern.lastIndex = 0;
       let match;
       while ((match = pattern.exec(line)) !== null) {
         let month: number | null = null;
         let year: number | null = null;
 
-        if (isNaN(parseInt(match[2]))) {
+        if (pattern.source.startsWith('([A-Za-z]')) {
+          month = MONTH_NAMES[match[1].toLowerCase().slice(0, 3)] || null;
+          const yearMatch = parseInt(match[3]);
+          year = yearMatch < 100 ? 2000 + yearMatch : yearMatch;
+        } else if (isNaN(parseInt(match[2]))) {
           month = MONTH_NAMES[match[2].toLowerCase().slice(0, 3)] || null;
+          const yearMatch = parseInt(match[3]);
+          year = yearMatch < 100 ? 2000 + yearMatch : yearMatch;
         } else {
           month = parseInt(match[2]);
+          const yearMatch = parseInt(match[3]);
+          year = yearMatch < 100 ? 2000 + yearMatch : yearMatch;
         }
-
-        const yearMatch = parseInt(match[3]);
-        year = yearMatch < 100 ? 2000 + yearMatch : yearMatch;
 
         if (month === options.targetMonth && year === options.targetYear) {
           return true;
