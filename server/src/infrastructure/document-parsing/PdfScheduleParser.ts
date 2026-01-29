@@ -51,25 +51,25 @@ export class PdfScheduleParser implements IScheduleParser {
 
       progress.report({
         stage: 'filtering_dates',
-        message: `Filtering for activities with actual dates in ${options.targetMonth}/${options.targetYear}...`,
+        message: `Identifying activity lines from PDF...`,
         percentage: 15,
       });
 
       const textToProcess = this.extractAllActivitiesSection(fullText);
-      const filteredLines = this.filterActualDateLines(textToProcess, options);
+      const filteredLines = this.filterActivityLines(textToProcess);
       
-      console.log(`[PdfScheduleParser] Filtered ${filteredLines.length} lines with actual dates for ${options.targetMonth}/${options.targetYear}`);
+      console.log(`[PdfScheduleParser] Found ${filteredLines.length} activity lines to send to AI for ${options.targetMonth}/${options.targetYear} filtering`);
 
       if (filteredLines.length === 0) {
         progress.report({
           stage: 'complete',
-          message: 'No activities with actual dates found for selected month',
+          message: 'No activity lines found in PDF',
           percentage: 100,
         });
         return {
           rows: [],
           scheduleUpdateMonth: `${options.targetYear}-${String(options.targetMonth).padStart(2, '0')}`,
-          errors: [`No activities with actual dates found for ${options.targetMonth}/${options.targetYear}`],
+          errors: [`No activity lines found in PDF. Expected activity IDs like "1-W-0036" or "3-PF-1526".`],
           totalRowsProcessed: 0,
           successfulRows: 0,
           filteredByMonth: 0,
@@ -134,61 +134,22 @@ export class PdfScheduleParser implements IScheduleParser {
     }
   }
 
-  private filterActualDateLines(text: string, options: ScheduleParseOptions): string[] {
+  private filterActivityLines(text: string): string[] {
     const lines = text.split('\n');
     const filteredLines: string[] = [];
     
-    const dateWithAPattern = /\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4}\s*A|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s*A/i;
+    const activityIdPattern = /\d+-[A-Za-z]+-\d+|\d+-[A-Za-z]{1,3}-\d+/;
 
     for (const line of lines) {
       const trimmedLine = line.trim();
-      if (trimmedLine.length < 10) continue;
+      if (trimmedLine.length < 15) continue;
       
-      if (dateWithAPattern.test(trimmedLine)) {
-        if (this.lineContainsTargetMonth(trimmedLine, options)) {
-          filteredLines.push(trimmedLine);
-        }
+      if (activityIdPattern.test(trimmedLine)) {
+        filteredLines.push(trimmedLine);
       }
     }
 
     return filteredLines;
-  }
-
-  private lineContainsTargetMonth(line: string, options: ScheduleParseOptions): boolean {
-    const datePatterns = [
-      /(\d{1,2})[-/]([A-Za-z]{3})[-/](\d{2,4})\s*A/gi,
-      /(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})\s*A/g,
-      /([A-Za-z]{3})[-/](\d{1,2})[-/](\d{2,4})\s*A/gi,
-    ];
-
-    for (const pattern of datePatterns) {
-      pattern.lastIndex = 0;
-      let match;
-      while ((match = pattern.exec(line)) !== null) {
-        let month: number | null = null;
-        let year: number | null = null;
-
-        if (pattern.source.startsWith('([A-Za-z]')) {
-          month = MONTH_NAMES[match[1].toLowerCase().slice(0, 3)] || null;
-          const yearMatch = parseInt(match[3]);
-          year = yearMatch < 100 ? 2000 + yearMatch : yearMatch;
-        } else if (isNaN(parseInt(match[2]))) {
-          month = MONTH_NAMES[match[2].toLowerCase().slice(0, 3)] || null;
-          const yearMatch = parseInt(match[3]);
-          year = yearMatch < 100 ? 2000 + yearMatch : yearMatch;
-        } else {
-          month = parseInt(match[2]);
-          const yearMatch = parseInt(match[3]);
-          year = yearMatch < 100 ? 2000 + yearMatch : yearMatch;
-        }
-
-        if (month === options.targetMonth && year === options.targetYear) {
-          return true;
-        }
-      }
-    }
-
-    return false;
   }
 
   private async parseWithAI(
@@ -198,33 +159,39 @@ export class PdfScheduleParser implements IScheduleParser {
     runId?: string,
     batchNumber?: number
   ): Promise<ParsedScheduleRow[]> {
+    const monthName = ['', 'January', 'February', 'March', 'April', 'May', 'June', 
+                       'July', 'August', 'September', 'October', 'November', 'December'][options.targetMonth];
+    
     const prompt = `You are parsing CPM schedule data from a PDF. Extract structured activity data from these lines.
 
-Target month/year: ${options.targetMonth}/${options.targetYear}
+CRITICAL FILTERING RULE:
+Only include activities where EITHER the Actual Start Date OR the Actual Finish Date falls in ${monthName} ${options.targetYear}.
+- Dates followed by "A" are ACTUAL dates (e.g., "29-Jul-25 A" means actual date July 29, 2025)
+- Dates may be in formats: DD-Mon-YY, DD/MM/YY, Mon-DD-YY, or with spaces instead of dashes
+- If an activity has no actual dates in ${monthName} ${options.targetYear}, do NOT include it
 
-Rules:
-- Activity ID is usually alphanumeric like "1-W-0036", "4-PF-1526", "3-WE-1111"
-- Dates with "A" suffix are ACTUAL dates (e.g., "04-Mar-25 A")
-- Look for Activity Name/Description which is descriptive text
-- WBS is usually hierarchical numbers or zone indicators
-- Original Duration (OD), Actual Duration (AD), Remaining Duration (RD) may be present
-- TF or Total Float is a numeric value representing float days (positive or negative integer)
-- LP indicates if activity is on critical path (checkbox or asterisk marker)
-- Only include activities where the actual date falls in ${options.targetMonth}/${options.targetYear}
+Activity ID formats: "1-W-0036", "4-PF-1526", "3-WE-1111", "3-W-1100"
+
+Other fields to extract:
+- Activity Name/Description: descriptive text about the work
+- WBS: hierarchical numbers or zone indicators (may be null)
+- TF (Total Float): numeric value in days, can be negative (may be null)
+- LP (Critical Path): look for checkbox markers, asterisks, or TF=0
 
 Lines to parse:
 ${lines.join('\n')}
 
-Return a JSON array of objects with these fields:
+Return a JSON array of objects. Only include activities with actual dates in ${monthName} ${options.targetYear}.
+Fields:
 - activityId: string (required)
 - activityDescription: string (required)
 - wbs: string or null
-- actualStartDate: ISO date string or null (for dates with "A")
-- actualFinishDate: ISO date string or null (for dates with "A")
+- actualStartDate: ISO date string or null (only dates marked with "A")
+- actualFinishDate: ISO date string or null (only dates marked with "A")
 - plannedStartDate: ISO date string or null
 - plannedFinishDate: ISO date string or null
-- isCriticalPath: "yes", "no", or "unknown" (look for LP column, asterisk markers, or TF=0)
-- totalFloat: number or null (TF column value in days, can be negative)
+- isCriticalPath: "yes", "no", or "unknown"
+- totalFloat: number or null
 
 Return ONLY the JSON array, no other text.`;
 
