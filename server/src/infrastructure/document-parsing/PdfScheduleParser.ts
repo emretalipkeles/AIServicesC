@@ -58,7 +58,7 @@ export class PdfScheduleParser implements IScheduleParser {
       const textToProcess = this.extractAllActivitiesSection(fullText);
       const filteredLines = this.filterActivityLines(textToProcess);
       
-      console.log(`[PdfScheduleParser] Found ${filteredLines.length} activity lines to send to AI for ${options.targetMonth}/${options.targetYear} filtering`);
+      console.log(`[PdfScheduleParser] Found ${filteredLines.length} activity lines`);
 
       if (filteredLines.length === 0) {
         progress.report({
@@ -75,6 +75,28 @@ export class PdfScheduleParser implements IScheduleParser {
           filteredByMonth: 0,
         };
       }
+      
+      const hasTargetMonthDates = this.quickCheckForTargetMonthDates(filteredLines, options);
+      if (!hasTargetMonthDates) {
+        const monthName = ['', 'January', 'February', 'March', 'April', 'May', 'June', 
+                           'July', 'August', 'September', 'October', 'November', 'December'][options.targetMonth];
+        progress.report({
+          stage: 'complete',
+          message: `No actual dates found for ${monthName} ${options.targetYear}`,
+          percentage: 100,
+        });
+        console.log(`[PdfScheduleParser] Quick check: No dates found for ${options.targetMonth}/${options.targetYear} in ${filteredLines.length} activity lines - skipping AI`);
+        return {
+          rows: [],
+          scheduleUpdateMonth: `${options.targetYear}-${String(options.targetMonth).padStart(2, '0')}`,
+          errors: [`No activities with actual dates found for ${monthName} ${options.targetYear}`],
+          totalRowsProcessed: 0,
+          successfulRows: 0,
+          filteredByMonth: 0,
+        };
+      }
+      
+      console.log(`[PdfScheduleParser] Found ${filteredLines.length} activity lines to send to AI for ${options.targetMonth}/${options.targetYear} filtering`);
 
       progress.report({
         stage: 'ai_processing',
@@ -132,6 +154,49 @@ export class PdfScheduleParser implements IScheduleParser {
         filteredByMonth: 0,
       };
     }
+  }
+
+  private quickCheckForTargetMonthDates(activityLines: string[], options: ScheduleParseOptions): boolean {
+    const monthAbbrevs = ['', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const monthAbbrev = monthAbbrevs[options.targetMonth];
+    const yearStr2 = String(options.targetYear).slice(-2);
+    const yearStr4 = String(options.targetYear);
+    const monthNum = String(options.targetMonth).padStart(2, '0');
+    
+    const patterns = [
+      new RegExp(`\\d{1,2}[-/\\s]${monthAbbrev}[-/\\s](${yearStr2}|${yearStr4})`, 'gi'),
+      new RegExp(`${monthAbbrev}[-/\\s]\\d{1,2}[-/\\s](${yearStr2}|${yearStr4})`, 'gi'),
+      new RegExp(`\\d{1,2}[-/]${monthNum}[-/](${yearStr2}|${yearStr4})`, 'gi'),
+      new RegExp(`${monthNum}[-/]\\d{1,2}[-/](${yearStr2}|${yearStr4})`, 'gi'),
+    ];
+    
+    let matchCount = 0;
+    const matchExamples: string[] = [];
+    
+    for (const line of activityLines) {
+      const hasActualMarker = /\bA\b/.test(line);
+      if (!hasActualMarker) continue;
+      
+      for (const pattern of patterns) {
+        pattern.lastIndex = 0;
+        if (pattern.test(line)) {
+          matchCount++;
+          if (matchExamples.length < 3) {
+            matchExamples.push(line.substring(0, 120));
+          }
+          break;
+        }
+      }
+      if (matchCount >= 3) break;
+    }
+    
+    if (matchCount > 0) {
+      console.log(`[PdfScheduleParser] Quick check found ${matchCount}+ lines with ${monthAbbrev}/${yearStr2} dates and 'A' marker`);
+      console.log(`[PdfScheduleParser] Examples:`, matchExamples);
+      return true;
+    }
+    
+    return false;
   }
 
   private filterActivityLines(text: string): string[] {
