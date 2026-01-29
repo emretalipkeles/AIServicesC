@@ -99,7 +99,7 @@ export class DrizzleScheduleActivityRepository implements IScheduleActivityRepos
       totalFloat: activity.totalFloat,
       metadata: activity.metadata,
       createdAt: activity.createdAt,
-    });
+    }).onConflictDoNothing();
   }
 
   async saveBatch(activities: ScheduleActivity[]): Promise<void> {
@@ -124,7 +124,7 @@ export class DrizzleScheduleActivityRepository implements IScheduleActivityRepos
         metadata: activity.metadata,
         createdAt: activity.createdAt,
       }))
-    );
+    ).onConflictDoNothing();
   }
 
   async deleteByProjectId(projectId: string, tenantId: string): Promise<void> {
