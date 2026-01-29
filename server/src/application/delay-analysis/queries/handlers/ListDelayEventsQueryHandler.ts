@@ -61,14 +61,14 @@ export class ListDelayEventsQueryHandler {
       return activityDataMap;
     }
 
-    for (const activityId of matchedActivityIds) {
-      const activity = await this.scheduleActivityRepository.findById(activityId, tenantId);
-      if (activity) {
-        activityDataMap.set(activityId, {
-          isCriticalPath: activity.isCriticalPath,
-          totalFloat: activity.totalFloat,
-        });
-      }
+    const uniqueActivityIds = Array.from(new Set(matchedActivityIds));
+    const activities = await this.scheduleActivityRepository.findByIds(uniqueActivityIds, tenantId);
+
+    for (const activity of activities) {
+      activityDataMap.set(activity.id, {
+        isCriticalPath: activity.isCriticalPath,
+        totalFloat: activity.totalFloat,
+      });
     }
 
     return activityDataMap;

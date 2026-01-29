@@ -1,4 +1,4 @@
-import { eq, and, lte, gte, or, isNull } from 'drizzle-orm';
+import { eq, and, lte, gte, or, isNull, inArray } from 'drizzle-orm';
 import type { IScheduleActivityRepository } from '../../../../domain/delay-analysis/repositories/IScheduleActivityRepository';
 import { ScheduleActivity } from '../../../../domain/delay-analysis/entities/ScheduleActivity';
 import { scheduleActivities } from '@shared/schema';
@@ -15,6 +15,20 @@ export class DrizzleScheduleActivityRepository implements IScheduleActivityRepos
     if (result.length === 0) return null;
 
     return this.mapRowToEntity(result[0]);
+  }
+
+  async findByIds(ids: string[], tenantId: string): Promise<ScheduleActivity[]> {
+    if (ids.length === 0) return [];
+
+    const result = await db
+      .select()
+      .from(scheduleActivities)
+      .where(and(
+        inArray(scheduleActivities.id, ids),
+        eq(scheduleActivities.tenantId, tenantId)
+      ));
+
+    return result.map(row => this.mapRowToEntity(row));
   }
 
   async findByProjectId(projectId: string, tenantId: string): Promise<ScheduleActivity[]> {
