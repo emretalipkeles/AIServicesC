@@ -162,6 +162,7 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
             </div>
           )}
 
+{/* AI cost display hidden for presentation
           {analysis.lastCost && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -174,6 +175,7 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
               </span>
             </motion.div>
           )}
+*/}
 
           {isLoading ? (
             <div className="flex items-center justify-center py-12">

@@ -112,7 +112,7 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
               <TableFilter
                 value={filterText}
                 onChange={setFilterText}
-                placeholder="Filter by activity, WBS, or description..."
+                placeholder="Filter by activity or description..."
                 className="max-w-md"
               />
 
@@ -120,7 +120,6 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                 <table className="w-full text-sm">
                   <thead className={tableHeaderStyles}>
                     <tr>
-                      <th className={cn(tableHeaderCellStyles, "text-xs")}>WBS</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Activity ID</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs min-w-[120px]")}>Activity Desc.</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Category</th>
@@ -159,7 +158,6 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                             transition={{ duration: 0.3 }}
                             className="border-b border-border/30 hover:bg-muted/20 transition-colors group"
                           >
-                            <td className="p-2 font-mono text-xs text-muted-foreground">{event.wbs || "-"}</td>
                             <td className="p-2 font-mono text-xs text-primary font-medium">{event.cpmActivityId}</td>
                             <td className="p-2 max-w-[120px]">
                               <TruncatedTextWithTooltip 

@@ -252,7 +252,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
               <TableFilter
                 value={filterText}
                 onChange={setFilterText}
-                placeholder="Filter by Activity ID, WBS, or Description..."
+                placeholder="Filter by Activity ID or Description..."
                 className="max-w-md"
               />
               <div className="rounded-xl border border-border/50 overflow-auto max-h-[500px]">
@@ -260,7 +260,6 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                   <thead className={tableHeaderStyles}>
                     <tr>
                       <th className={tableHeaderCellStyles}>Activity ID</th>
-                      <th className={tableHeaderCellStyles}>WBS</th>
                       <th className={cn(tableHeaderCellStyles, "min-w-[200px]")}>Description</th>
                       <th className={tableHeaderCellStyles}>Actual Start</th>
                       <th className={tableHeaderCellStyles}>Actual Finish</th>
@@ -287,7 +286,6 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                             className="border-b border-border/30 hover:bg-muted/20 transition-colors"
                           >
                             <td className="p-3 font-mono text-sm">{activity.activityId}</td>
-                            <td className="p-3 font-mono text-sm text-muted-foreground">{activity.wbs || "-"}</td>
                             <td className="p-3 max-w-[300px] truncate" title={activity.activityDescription}>
                               {activity.activityDescription}
                             </td>
@@ -354,6 +352,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
               </div>
             </div>
 
+{/* AI cost display hidden for presentation
             {lastUploadCost && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
@@ -366,6 +365,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                 </span>
               </motion.div>
             )}
+*/}
 
             <input
               type="file"
