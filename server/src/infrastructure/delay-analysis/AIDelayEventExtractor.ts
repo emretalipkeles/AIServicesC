@@ -56,7 +56,7 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
         });
       }
 
-      const events = this.parseExtractionResponse(response.content, strategyResult.baseConfidence);
+      const events = this.parseExtractionResponse(response.content, strategyResult.baseConfidence, documentType);
 
       return {
         events,
@@ -79,7 +79,7 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
     }
   }
 
-  private parseExtractionResponse(response: string, baseConfidence: number): ExtractedDelayEvent[] {
+  private parseExtractionResponse(response: string, baseConfidence: number, documentType: string): ExtractedDelayEvent[] {
     try {
       const jsonMatch = response.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
@@ -91,23 +91,38 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
         return [];
       }
 
-      return parsed.map((item: Record<string, unknown>) => ({
-        eventDescription: String(item.eventDescription || item.description || ''),
-        eventCategory: this.parseCategory(item.eventCategory || item.category),
-        eventDate: this.parseDate(item.eventDate || item.date),
-        impactDurationHours: typeof item.impactDurationHours === 'number' 
-          ? item.impactDurationHours 
-          : this.parseNumber(item.impactDurationHours),
-        sourceReference: String(item.sourceReference || item.source || ''),
-        extractedFromCode: String(item.extractedFromCode || item.code || 'GENERAL'),
-        confidenceScore: this.parseConfidenceScore(item.confidenceScore, baseConfidence),
-        responsibilityConfirmed: typeof item.responsibilityConfirmed === 'boolean' 
-          ? item.responsibilityConfirmed 
-          : undefined,
-        reworkDescription: item.reworkDescription 
-          ? String(item.reworkDescription) 
-          : undefined,
-      })).filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0);
+      return parsed.map((item: Record<string, unknown>) => {
+        let impactDurationHours: number | null = null;
+        
+        if (documentType === 'ncr') {
+          // NCR documents: Never accept AI-extracted durations
+          // The AI often estimates duration from rework scope, which is not reliable
+          // Duration for NCRs should only be captured if explicitly stated in the document
+          // Since we can't verify this at code level, we null it out completely
+          // Users can manually add duration if the NCR explicitly states one
+          impactDurationHours = null;
+        } else {
+          impactDurationHours = typeof item.impactDurationHours === 'number' 
+            ? item.impactDurationHours 
+            : this.parseNumber(item.impactDurationHours);
+        }
+
+        return {
+          eventDescription: String(item.eventDescription || item.description || ''),
+          eventCategory: this.parseCategory(item.eventCategory || item.category),
+          eventDate: this.parseDate(item.eventDate || item.date),
+          impactDurationHours,
+          sourceReference: String(item.sourceReference || item.source || ''),
+          extractedFromCode: String(item.extractedFromCode || item.code || 'GENERAL'),
+          confidenceScore: this.parseConfidenceScore(item.confidenceScore, baseConfidence),
+          responsibilityConfirmed: typeof item.responsibilityConfirmed === 'boolean' 
+            ? item.responsibilityConfirmed 
+            : undefined,
+          reworkDescription: item.reworkDescription 
+            ? String(item.reworkDescription) 
+            : undefined,
+        };
+      }).filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0);
     } catch (error) {
       console.error('Error parsing extraction response:', error);
       return [];
