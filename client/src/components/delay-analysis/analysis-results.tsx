@@ -156,7 +156,7 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                             key={event.id}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            transition={{ delay: index * 0.02 }}
+                            transition={{ duration: 0.3 }}
                             className="border-b border-border/30 hover:bg-muted/20 transition-colors group"
                           >
                             <td className="p-2 font-mono text-xs text-muted-foreground">{event.wbs || "-"}</td>
