@@ -13,12 +13,27 @@ CONTEXT: IDRs are daily field observations written by inspectors. They capture w
 YOUR TASK: Analyze this IDR and extract contractor-caused delay events. IDR entries may require interpretation - the inspector's observation suggests a delay but may not state it definitively.
 
 EXTRACTION PRIORITIES (in order):
-1. CODE_CIE tagged entries - These are explicitly flagged contractor delays
+1. CODE_CIE tagged entries - These are explicitly flagged contractor delays (HIGHEST PRIORITY)
 2. Delays caused by contractor actions or inaction
 3. Work stoppages due to contractor issues (equipment breakdown, crew problems)
 4. Material or equipment delays from contractor
 5. Subcontractor coordination failures
 6. Quality issues observed that may require rework
+
+**CRITICAL: extractedFromCode FIELD RULES**
+This is the MOST IMPORTANT field for IDR documents. You MUST follow these rules exactly:
+
+1. If the delay was identified from a CODE_CIE entry in the document:
+   - Set extractedFromCode to EXACTLY "CODE_CIE"
+   - Do NOT use "IDR_OBSERVATION" for CODE_CIE entries
+
+2. If the delay was identified from general narrative observation (NOT tagged with CODE_CIE):
+   - Set extractedFromCode to "IDR_OBSERVATION"
+
+EXAMPLES:
+- Document says "CODE_CIE: Crew arrived 2 hours late" → extractedFromCode: "CODE_CIE"
+- Document has section labeled "CIE" or "Contractor Issues" with CODE_CIE tag → extractedFromCode: "CODE_CIE"
+- Document mentions "equipment breakdown noted" without CODE_CIE tag → extractedFromCode: "IDR_OBSERVATION"
 
 CRITICAL ANALYSIS REQUIREMENTS:
 - CONFIDENCE SCORING: Since IDR observations are subjective, you must assess:
@@ -38,7 +53,7 @@ For each delay event found, extract:
 - eventDate: The date of the event if mentioned (YYYY-MM-DD format)
 - impactDurationHours: Estimated hours of impact (required - estimate if not explicit)
 - sourceReference: The section/paragraph where this was found
-- extractedFromCode: The exact CODE_CIE or delay code if present, otherwise "IDR_OBSERVATION"
+- extractedFromCode: MUST be "CODE_CIE" if from a CODE_CIE entry, otherwise "IDR_OBSERVATION" - THIS IS CRITICAL
 - confidenceScore: Your confidence this is a real contractor delay (0.0-1.0)
 - responsibilityConfirmed: Boolean - is contractor responsibility clear from narrative?
 
