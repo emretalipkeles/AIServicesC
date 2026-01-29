@@ -56,7 +56,6 @@ export async function exportDelayEventsToExcel(
   });
 
   worksheet.columns = [
-    { header: 'WBS', key: 'wbs', width: 12 },
     { header: 'Activity ID', key: 'activityId', width: 15 },
     { header: 'Activity Description', key: 'activityDesc', width: 35 },
     { header: 'Critical Path', key: 'criticalPath', width: 12 },
@@ -94,7 +93,6 @@ export async function exportDelayEventsToExcel(
 
   events.forEach((event, index) => {
     const rowData = {
-      wbs: event.wbs || '',
       activityId: event.cpmActivityId || '',
       activityDesc: event.cpmActivityDescription || '',
       criticalPath: formatCriticalPath(event.isCriticalPath),
@@ -131,11 +129,11 @@ export async function exportDelayEventsToExcel(
         right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
       };
 
-      if (colNumber === 4 || colNumber === 5 || colNumber === 9) {
+      if (colNumber === 3 || colNumber === 4 || colNumber === 8) {
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
       }
 
-      if (colNumber === 7) {
+      if (colNumber === 6) {
         const formattedCategory = formatCategory(event.eventCategory);
         const colors = categoryColors[formattedCategory];
         if (colors) {
@@ -148,7 +146,7 @@ export async function exportDelayEventsToExcel(
         }
       }
 
-      if (colNumber === 13 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
+      if (colNumber === 12 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
         const confidence = event.matchConfidence;
         let bgColor: string;
         let textColor: string;
@@ -177,7 +175,7 @@ export async function exportDelayEventsToExcel(
 
   worksheet.autoFilter = {
     from: { row: 1, column: 1 },
-    to: { row: events.length + 1, column: 15 },
+    to: { row: events.length + 1, column: 14 },
   };
 
   const today = new Date();

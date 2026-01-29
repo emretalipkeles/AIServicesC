@@ -141,12 +141,14 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
                   )}
                 </Button>
               </motion.div>
+{/* Export button hidden for presentation
               {events.length > 0 && (
                 <Button variant="outline" onClick={handleExport} disabled={analysis.isAnalyzing} className="gap-2">
                   <Download className="w-4 h-4" />
                   Export to Excel
                 </Button>
               )}
+*/}
             </div>
           }
         />

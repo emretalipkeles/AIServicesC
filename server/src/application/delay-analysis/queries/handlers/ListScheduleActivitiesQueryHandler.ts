@@ -21,6 +21,7 @@ export interface ScheduleActivityDto {
   actualFinishDate: string | null;
   scheduleUpdateMonth: string | null;
   isCriticalPath: string;
+  totalFloat: number | null;
   sourceDocumentId: string | null;
   createdAt: string;
 }
@@ -49,6 +50,7 @@ export class ListScheduleActivitiesQueryHandler {
       actualFinishDate: formatDateOnly(activity.actualFinishDate),
       scheduleUpdateMonth: activity.scheduleUpdateMonth,
       isCriticalPath: activity.isCriticalPath,
+      totalFloat: activity.totalFloat,
       sourceDocumentId: activity.sourceDocumentId,
       createdAt: activity.createdAt.toISOString(),
     };
