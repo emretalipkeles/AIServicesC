@@ -1,6 +1,7 @@
 import type { DelayEventCategory } from '../entities/ContractorDelayEvent';
 import type { ProjectDocumentType } from '../entities/ProjectDocument';
 import type { TokenUsageCallback } from './ITokenUsageRecorder';
+import type { IDRWorkActivity } from './IDocumentExtractionStrategy';
 
 export interface ExtractedDelayEvent {
   eventDescription: string;
@@ -21,6 +22,11 @@ export interface ExtractionResult {
   strategyUsed?: string;
   baseConfidence?: number;
   delayIsCertain?: boolean;
+  /**
+   * Work activities extracted from the IDR's "Contractor's Work Activity" table.
+   * These are used for fast-path activity matching.
+   */
+  workActivities?: IDRWorkActivity[];
 }
 
 export interface ExtractionOptions {

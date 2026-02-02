@@ -10,7 +10,24 @@ const IDR_EXTRACTION_PROMPT = `You are an expert construction delay analyst spec
 DOCUMENT TYPE: Inspector Daily Report (IDR)
 CONTEXT: IDRs are daily field observations written by inspectors. They capture what's happening on site day-to-day. Inspectors flag potential contractor delays with code "CODE_CIE" (Contractor Initiated Events).
 
-YOUR TASK: Analyze this IDR and extract contractor-caused delay events. IDR entries may require interpretation - the inspector's observation suggests a delay but may not state it definitively.
+YOUR TASK: Analyze this IDR and extract TWO things:
+1. **Contractor's Work Activity** - The schedule activities listed in the "Contractor's Work Activity" table (if present)
+2. **Delay Events** - Contractor-caused delay events from the document
+
+=============================================================================
+PART 1: EXTRACT CONTRACTOR'S WORK ACTIVITY TABLE
+=============================================================================
+
+Many IDRs contain a "Contractor's Work Activity" section/table that lists the schedule activities being worked on that day. This table typically has columns like:
+- Schedule Activity # (e.g., "2-W-0471", "3-W-1042")
+- Description (e.g., "Stage 1 WM: Excavate Services")
+- Comments (e.g., "WM STA 7+00 to 21+50")
+
+**IMPORTANT**: If you find this table, extract ALL entries. This information is critical for matching delay events to schedule activities efficiently.
+
+=============================================================================
+PART 2: EXTRACT DELAY EVENTS
+=============================================================================
 
 EXTRACTION PRIORITIES (in order):
 1. CODE_CIE tagged entries - These are explicitly flagged contractor delays (HIGHEST PRIORITY)
@@ -47,17 +64,37 @@ CRITICAL ANALYSIS REQUIREMENTS:
   * Some CODE_CIE entries might be false positives
   * Look for clear contractor-caused issues vs. external factors
 
-For each delay event found, extract:
-- eventDescription: Clear description of the delay event
-- eventCategory: One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other
-- eventDate: The date of the event if mentioned (YYYY-MM-DD format)
-- impactDurationHours: Estimated hours of impact (required - estimate if not explicit)
-- sourceReference: The section/paragraph where this was found
-- extractedFromCode: MUST be "CODE_CIE" if from a CODE_CIE entry, otherwise "IDR_OBSERVATION" - THIS IS CRITICAL
-- confidenceScore: Your confidence this is a real contractor delay (0.0-1.0)
-- responsibilityConfirmed: Boolean - is contractor responsibility clear from narrative?
+=============================================================================
+RESPONSE FORMAT
+=============================================================================
 
-Return a JSON array of extracted events. If no delays are found, return an empty array.
+Return a JSON object with TWO arrays:
+
+{
+  "workActivities": [
+    {
+      "activityId": "2-W-0471",
+      "description": "Stage 1 WM: Excavate Services",
+      "comments": "WM STA 7+00 to 21+50"
+    }
+  ],
+  "delayEvents": [
+    {
+      "eventDescription": "Clear description of the delay event",
+      "eventCategory": "One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other",
+      "eventDate": "YYYY-MM-DD",
+      "impactDurationHours": 2.0,
+      "sourceReference": "Section/paragraph where found",
+      "extractedFromCode": "CODE_CIE or IDR_OBSERVATION",
+      "confidenceScore": 0.85,
+      "responsibilityConfirmed": true
+    }
+  ]
+}
+
+NOTES:
+- workActivities: Extract from "Contractor's Work Activity" table. Return empty array [] if no such table exists.
+- delayEvents: Extract delay events as described above. Return empty array [] if no delays are found.
 
 Document content:
 `;
@@ -74,6 +111,7 @@ export class IDRExtractionStrategy implements IDocumentExtractionStrategy {
       baseConfidence: 0.6,
       requiresNarrativeVerification: true,
       delayIsCertain: false,
+      extractWorkActivities: true,
     };
   }
 }

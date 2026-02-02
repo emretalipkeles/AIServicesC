@@ -2,9 +2,19 @@ import type { IDelayEventExtractor, ExtractionResult, ExtractedDelayEvent, Extra
 import type { DelayEventCategory } from '../../domain/delay-analysis/entities/ContractorDelayEvent';
 import type { IAIClient } from '../../domain/interfaces/IAIClient';
 import type { IDocumentExtractionStrategyFactory } from '../../domain/delay-analysis/interfaces/IDocumentExtractionStrategyFactory';
+import type { IDRWorkActivity } from '../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 import { ModelId } from '../../domain/value-objects/ModelId';
 import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
+
+interface IDRExtractionResponse {
+  workActivities?: Array<{
+    activityId?: string;
+    description?: string;
+    comments?: string;
+  }>;
+  delayEvents?: Array<Record<string, unknown>>;
+}
 
 export class AIDelayEventExtractor implements IDelayEventExtractor {
   private readonly strategyFactory: IDocumentExtractionStrategyFactory;
@@ -56,15 +66,25 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
         });
       }
 
-      const events = this.parseExtractionResponse(response.content, strategyResult.baseConfidence, documentType);
+      const parseResult = this.parseExtractionResponse(
+        response.content, 
+        strategyResult.baseConfidence, 
+        documentType,
+        strategyResult.extractWorkActivities ?? false
+      );
+
+      if (parseResult.workActivities && parseResult.workActivities.length > 0) {
+        console.log(`[AIDelayEventExtractor] Extracted ${parseResult.workActivities.length} work activities from ${documentFilename}`);
+      }
 
       return {
-        events,
+        events: parseResult.events,
         documentId,
-        totalEventsFound: events.length,
+        totalEventsFound: parseResult.events.length,
         strategyUsed: strategy.strategyName,
         baseConfidence: strategyResult.baseConfidence,
         delayIsCertain: strategyResult.delayIsCertain,
+        workActivities: parseResult.workActivities,
       };
     } catch (error) {
       console.error('Error extracting delay events:', error);
@@ -79,27 +99,84 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
     }
   }
 
-  private parseExtractionResponse(response: string, baseConfidence: number, documentType: string): ExtractedDelayEvent[] {
+  private parseExtractionResponse(
+    response: string, 
+    baseConfidence: number, 
+    documentType: string,
+    expectWorkActivities: boolean = false
+  ): { events: ExtractedDelayEvent[]; workActivities?: IDRWorkActivity[] } {
     try {
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        return [];
+      let eventsArray: Array<Record<string, unknown>> = [];
+      let workActivities: IDRWorkActivity[] | undefined;
+
+      if (expectWorkActivities) {
+        const jsonBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
+        const cleanedResponse = jsonBlockMatch ? jsonBlockMatch[1].trim() : response;
+        
+        const objectStartIndex = cleanedResponse.indexOf('{');
+        if (objectStartIndex !== -1) {
+          let braceCount = 0;
+          let objectEndIndex = objectStartIndex;
+          
+          for (let i = objectStartIndex; i < cleanedResponse.length; i++) {
+            if (cleanedResponse[i] === '{') braceCount++;
+            if (cleanedResponse[i] === '}') braceCount--;
+            if (braceCount === 0) {
+              objectEndIndex = i + 1;
+              break;
+            }
+          }
+          
+          const objectStr = cleanedResponse.substring(objectStartIndex, objectEndIndex);
+          
+          try {
+            const parsed = JSON.parse(objectStr) as IDRExtractionResponse;
+            
+            if (parsed.workActivities && Array.isArray(parsed.workActivities)) {
+              workActivities = parsed.workActivities
+                .filter(wa => wa.activityId && wa.activityId.trim().length > 0)
+                .map(wa => ({
+                  activityId: String(wa.activityId || '').trim(),
+                  description: String(wa.description || '').trim(),
+                  comments: wa.comments ? String(wa.comments).trim() : undefined,
+                }));
+            }
+            if (parsed.delayEvents && Array.isArray(parsed.delayEvents)) {
+              eventsArray = parsed.delayEvents;
+            }
+          } catch (parseError) {
+            console.warn('[AIDelayEventExtractor] Failed to parse IDR object format, falling back to array:', parseError);
+            const arrayMatch = response.match(/\[[\s\S]*\]/);
+            if (arrayMatch) {
+              const parsed = JSON.parse(arrayMatch[0]);
+              if (Array.isArray(parsed)) {
+                eventsArray = parsed;
+              }
+            }
+          }
+        } else {
+          const arrayMatch = response.match(/\[[\s\S]*\]/);
+          if (arrayMatch) {
+            const parsed = JSON.parse(arrayMatch[0]);
+            if (Array.isArray(parsed)) {
+              eventsArray = parsed;
+            }
+          }
+        }
+      } else {
+        const jsonMatch = response.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (Array.isArray(parsed)) {
+            eventsArray = parsed;
+          }
+        }
       }
 
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-
-      return parsed.map((item: Record<string, unknown>) => {
+      const events = eventsArray.map((item: Record<string, unknown>) => {
         let impactDurationHours: number | null = null;
         
         if (documentType === 'ncr') {
-          // NCR documents: Never accept AI-extracted durations
-          // The AI often estimates duration from rework scope, which is not reliable
-          // Duration for NCRs should only be captured if explicitly stated in the document
-          // Since we can't verify this at code level, we null it out completely
-          // Users can manually add duration if the NCR explicitly states one
           impactDurationHours = null;
         } else {
           impactDurationHours = typeof item.impactDurationHours === 'number' 
@@ -123,9 +200,11 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
             : undefined,
         };
       }).filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0);
+
+      return { events, workActivities };
     } catch (error) {
       console.error('Error parsing extraction response:', error);
-      return [];
+      return { events: [] };
     }
   }
 

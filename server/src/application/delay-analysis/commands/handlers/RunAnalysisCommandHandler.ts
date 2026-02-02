@@ -8,6 +8,7 @@ import type { IDelayEventExtractor, ExtractedDelayEvent } from '../../../../doma
 import type { IActivityMatcher } from '../../../../domain/delay-analysis/interfaces/IActivityMatcher';
 import type { IProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import type { TokenUsageCallback } from '../../../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
+import type { IDRWorkActivity } from '../../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { 
   IDelayEventDeduplicationService,
   ExtractedEventWithSource 
@@ -72,6 +73,8 @@ export class RunAnalysisCommandHandler {
     const shouldExtract = command.extractFromDocuments !== false;
     const shouldMatch = command.matchToActivities !== false;
 
+    const documentWorkActivities = new Map<string, IDRWorkActivity[]>();
+
     if (shouldExtract) {
       progress.report({
         stage: 'loading_documents',
@@ -129,6 +132,16 @@ export class RunAnalysisCommandHandler {
               }
             );
 
+            if (extractionResult.workActivities && extractionResult.workActivities.length > 0) {
+              documentWorkActivities.set(doc.id, extractionResult.workActivities);
+              progress.report({
+                stage: 'extracting_events',
+                message: `Found ${extractionResult.workActivities.length} work activities in ${doc.filename} (for fast-matching)`,
+                percentage: docProgress,
+                details: { current: i + 1, total: fieldReports.length },
+              });
+            }
+
             for (const extracted of extractionResult.events) {
               allExtractedEvents.push({
                 event: extracted,
@@ -157,6 +170,12 @@ export class RunAnalysisCommandHandler {
           } catch (error) {
             result.errors.push(`Failed to extract from ${doc.filename}: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
+        }
+
+        if (documentWorkActivities.size > 0) {
+          const totalWorkActivities = Array.from(documentWorkActivities.values())
+            .reduce((sum, activities) => sum + activities.length, 0);
+          console.log(`[RunAnalysisCommandHandler] Collected ${totalWorkActivities} work activities from ${documentWorkActivities.size} documents for fast-matching`);
         }
 
         progress.report({
@@ -263,6 +282,7 @@ export class RunAnalysisCommandHandler {
             details: { total: unmatchedEvents.length },
           });
 
+          let fastMatchCount = 0;
           for (let i = 0; i < unmatchedEvents.length; i++) {
             const event = unmatchedEvents[i];
             const matchProgress = 60 + Math.floor((i / unmatchedEvents.length) * 30);
@@ -275,14 +295,25 @@ export class RunAnalysisCommandHandler {
             });
 
             try {
+              const idrWorkActivities = event.sourceDocumentId 
+                ? documentWorkActivities.get(event.sourceDocumentId)
+                : undefined;
+
               const matchResult = await this.matcher.matchEventToActivities(
                 event.eventDescription,
                 event.eventStartDate,
                 activities,
-                { runId: options?.runId, onTokenUsage: options?.onTokenUsage }
+                { 
+                  runId: options?.runId, 
+                  onTokenUsage: options?.onTokenUsage,
+                  idrWorkActivities,
+                }
               );
 
               if (matchResult) {
+                if (matchResult.matchedViaIDRActivity) {
+                  fastMatchCount++;
+                }
                 const matchedEvent = event.withActivityMatch(
                   matchResult.matchedActivityId,
                   matchResult.cpmActivityId,
@@ -298,6 +329,10 @@ export class RunAnalysisCommandHandler {
             } catch (error) {
               result.errors.push(`Failed to match event ${event.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
+          }
+
+          if (fastMatchCount > 0) {
+            console.log(`[RunAnalysisCommandHandler] ${fastMatchCount} of ${result.eventsMatched} events matched via IDR fast-match`);
           }
         }
       }

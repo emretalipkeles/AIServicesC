@@ -1,5 +1,6 @@
 import type { ScheduleActivity } from '../entities/ScheduleActivity';
 import type { TokenUsageCallback } from './ITokenUsageRecorder';
+import type { IDRWorkActivity } from './IDocumentExtractionStrategy';
 
 export interface MatchResult {
   matchedActivityId: string;
@@ -8,11 +9,18 @@ export interface MatchResult {
   wbs: string | null;
   confidence: number;
   reasoning: string;
+  matchedViaIDRActivity?: boolean;
 }
 
 export interface MatchOptions {
   runId?: string;
   onTokenUsage?: TokenUsageCallback;
+  /**
+   * IDR work activities extracted from the document.
+   * When provided, the matcher will first attempt to match against these
+   * specific activities (fast-path) before falling back to the full schedule.
+   */
+  idrWorkActivities?: IDRWorkActivity[];
 }
 
 export interface IActivityMatcher {
