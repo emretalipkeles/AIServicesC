@@ -90,8 +90,22 @@ The AI analysis uses document-type-specific extraction strategies to optimize de
 | Other | DefaultExtractionStrategy | 0.5 (low) | Uncertain | Generic extraction |
 
 **Key Differences**:
-- **IDRs**: Daily observations requiring interpretation; not all CODE_CIE entries are real delays. Duration is estimated from narrative.
+- **IDRs**: Daily observations requiring interpretation; not all CODE_CIE entries are real delays. Duration is estimated from narrative. Also extracts "Contractor's Work Activity" table for fast-path activity matching.
 - **NCRs**: Formal quality failures; NCR = rework required = definite delay. Duration is only captured if explicitly stated in the document (never estimated).
+
+### IDR Work Activity Fast-Match Optimization
+When processing IDR documents, the system extracts the "Contractor's Work Activity" table that lists the schedule activities being worked on that day (Schedule Activity #, Description, Comments). This enables a two-tier activity matching approach:
+
+1. **Fast-Path Matching** (IDR activities): When an IDR contains work activities, delay events from that document are first matched against those specific activities. Since the inspector recorded exactly which activities were being worked on, matches are high-confidence (>=85%). This is much faster than searching the full schedule.
+
+2. **Full Schedule Matching** (fallback): If fast-path matching fails or the IDR has no work activities, the system falls back to matching against the full CPM schedule (existing behavior).
+
+**Key Files**:
+- `server/src/infrastructure/delay-analysis/extraction-strategies/IDRExtractionStrategy.ts`: Prompt extracts both `workActivities` and `delayEvents`
+- `server/src/infrastructure/delay-analysis/AIActivityMatcher.ts`: `tryFastMatch()` method for IDR activity matching
+- `server/src/domain/delay-analysis/interfaces/IDocumentExtractionStrategy.ts`: `IDRWorkActivity` interface
+
+**Note**: Fast-match only works when extraction and matching run in the same analysis command. Work activities are not persisted separately.
 
 ### Feature Specifications
 - **Delay Interpretation**: AI-powered construction delay interpretation. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Uses document-type-specific extraction strategies for optimized analysis. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes.
