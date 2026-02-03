@@ -5,6 +5,7 @@ import type { IDelayAnalysisProjectRepository } from '../../../../domain/delay-a
 import type { IDocumentParserFactory } from '../../../../domain/delay-analysis/interfaces/IDocumentParserFactory';
 import type { IDocumentHashService } from '../../../../domain/delay-analysis/interfaces/IDocumentHashService';
 import { ProjectDocument } from '../../../../domain/delay-analysis/entities/ProjectDocument';
+import { extractDocumentDate } from '../../../../infrastructure/delay-analysis/DocumentDateExtractor';
 
 export interface UploadDocumentsResult {
   uploaded: Array<{
@@ -131,8 +132,19 @@ export class UploadDocumentsCommandHandler {
 
       const result = await parser.parse(buffer, document.filename);
 
+      const dateExtraction = extractDocumentDate(
+        result.rawContent,
+        document.documentType,
+        document.filename
+      );
+
+      if (dateExtraction.date) {
+        console.log(`[DocumentUpload] Extracted date from ${document.filename}: ${dateExtraction.date.toISOString().split('T')[0]} (source: ${dateExtraction.source})`);
+      }
+
       const completedDoc = processingDoc
         .withRawContent(result.rawContent)
+        .withReportDate(dateExtraction.date)
         .withProcessingStatus('completed');
       
       await this.documentRepository.update(completedDoc);

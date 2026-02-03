@@ -3,15 +3,34 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Activity, Play, Download, Loader2, DollarSign, CheckCircle, AlertCircle, Clock, Zap } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Activity, Play, Download, Loader2, DollarSign, CheckCircle, AlertCircle, Clock, Zap, Calendar } from "lucide-react";
 import { useDelayEvents, runAnalysisWithProgress, fetchRunTokenUsage } from "@/lib/analysis-api";
 import { useProjectDocuments } from "@/lib/project-documents-api";
 import { useUploadState } from "@/contexts/upload-state-context";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { GlassCard, SectionHeader, ProgressIndicator, StatCard, TableFilter } from "./ui/premium-components";
+import { GlassCard, SectionHeader, ProgressIndicator, StatCard, TableFilter, selectTriggerStyles } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 import { exportDelayEventsToExcel } from "@/lib/excel-export";
+
+const MONTHS = [
+  { value: 1, label: "January" },
+  { value: 2, label: "February" },
+  { value: 3, label: "March" },
+  { value: 4, label: "April" },
+  { value: 5, label: "May" },
+  { value: 6, label: "June" },
+  { value: 7, label: "July" },
+  { value: 8, label: "August" },
+  { value: 9, label: "September" },
+  { value: 10, label: "October" },
+  { value: 11, label: "November" },
+  { value: 12, label: "December" },
+];
+
+const currentYear = new Date().getFullYear();
+const YEARS = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
 
 interface DelayEventsProps {
   projectId: string;
@@ -23,6 +42,8 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
   const { data: events = [], isLoading } = useDelayEvents(projectId);
   const { data: documents = [] } = useProjectDocuments(projectId);
   const [filterText, setFilterText] = useState("");
+  const [filterMonth, setFilterMonth] = useState<number>(new Date().getMonth() + 1);
+  const [filterYear, setFilterYear] = useState<number>(currentYear);
 
   const documentNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -50,7 +71,12 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
     try {
       const result = await runAnalysisWithProgress(
         projectId,
-        { extractFromDocuments: true, matchToActivities: true },
+        { 
+          extractFromDocuments: true, 
+          matchToActivities: true,
+          filterMonth,
+          filterYear,
+        },
         (event) => {
           updateAnalysisProgress(event);
         }
@@ -121,7 +147,42 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
           description="CODE_CIE entries extracted from IDRs and matched to schedule activities"
           gradient="amber"
           action={
-            <div className="flex gap-2">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <Select
+                  value={filterMonth.toString()}
+                  onValueChange={(v) => setFilterMonth(parseInt(v))}
+                  disabled={analysis.isAnalyzing}
+                >
+                  <SelectTrigger className={cn(selectTriggerStyles, "w-[130px]")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((month) => (
+                      <SelectItem key={month.value} value={month.value.toString()}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filterYear.toString()}
+                  onValueChange={(v) => setFilterYear(parseInt(v))}
+                  disabled={analysis.isAnalyzing}
+                >
+                  <SelectTrigger className={cn(selectTriggerStyles, "w-[90px]")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {YEARS.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                 <Button
                   onClick={handleRunAnalysis}

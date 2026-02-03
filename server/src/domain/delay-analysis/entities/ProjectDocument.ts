@@ -90,4 +90,12 @@ export class ProjectDocument {
       updatedAt: new Date(),
     });
   }
+
+  withReportDate(reportDate: Date | null): ProjectDocument {
+    return new ProjectDocument({
+      ...this,
+      reportDate,
+      updatedAt: new Date(),
+    });
+  }
 }

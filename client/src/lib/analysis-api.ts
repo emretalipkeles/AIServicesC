@@ -266,9 +266,16 @@ export async function streamDelayEventsChat(
   return accumulatedContent;
 }
 
+export interface AnalysisOptions {
+  extractFromDocuments?: boolean;
+  matchToActivities?: boolean;
+  filterMonth?: number;
+  filterYear?: number;
+}
+
 export function runAnalysisWithProgress(
   projectId: string,
-  options: { extractFromDocuments?: boolean; matchToActivities?: boolean } = {},
+  options: AnalysisOptions = {},
   onProgress: (event: AnalysisProgressEvent) => void
 ): Promise<AnalysisResult> {
   return new Promise((resolve, reject) => {
@@ -278,6 +285,12 @@ export function runAnalysisWithProgress(
     }
     if (options.matchToActivities === false) {
       params.set('matchToActivities', 'false');
+    }
+    if (options.filterMonth !== undefined) {
+      params.set('filterMonth', options.filterMonth.toString());
+    }
+    if (options.filterYear !== undefined) {
+      params.set('filterYear', options.filterYear.toString());
     }
 
     const url = `/api/delay-analysis/projects/${projectId}/analyze/stream?${params.toString()}`;

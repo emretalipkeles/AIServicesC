@@ -3,4 +3,6 @@ export interface RunAnalysisCommand {
   tenantId: string;
   extractFromDocuments?: boolean;
   matchToActivities?: boolean;
+  filterMonth?: number;
+  filterYear?: number;
 }

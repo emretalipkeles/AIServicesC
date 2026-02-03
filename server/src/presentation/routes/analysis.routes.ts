@@ -338,8 +338,10 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
 
         const extractFromDocuments = req.query.extractFromDocuments !== 'false';
         const matchToActivities = req.query.matchToActivities !== 'false';
+        const filterMonth = req.query.filterMonth ? parseInt(req.query.filterMonth as string) : undefined;
+        const filterYear = req.query.filterYear ? parseInt(req.query.filterYear as string) : undefined;
 
-        console.log(`[Analysis] Starting streaming analysis run: ${runId} for project: ${params.projectId}`);
+        console.log(`[Analysis] Starting streaming analysis run: ${runId} for project: ${params.projectId} (filter: ${filterMonth}/${filterYear})`);
 
         await runAnalysisHandler.execute(
           {
@@ -347,6 +349,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
             tenantId: DEFAULT_TENANT_ID,
             extractFromDocuments,
             matchToActivities,
+            filterMonth,
+            filterYear,
           },
           {
             runId,

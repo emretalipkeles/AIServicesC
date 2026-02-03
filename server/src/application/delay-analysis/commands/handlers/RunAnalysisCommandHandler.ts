@@ -96,16 +96,30 @@ export class RunAnalysisCommandHandler {
         command.tenantId
       );
 
-      const fieldReports = documents.filter(doc => 
+      let fieldReports = documents.filter(doc => 
         doc.status === 'completed' && 
         (doc.documentType === 'idr' || doc.documentType === 'ncr' || doc.documentType === 'field_memo') &&
         doc.rawContent
       );
 
+      if (command.filterMonth !== undefined && command.filterYear !== undefined) {
+        const originalCount = fieldReports.length;
+        fieldReports = fieldReports.filter(doc => {
+          if (!doc.reportDate) return false;
+          const docDate = new Date(doc.reportDate);
+          return docDate.getMonth() + 1 === command.filterMonth && 
+                 docDate.getFullYear() === command.filterYear;
+        });
+        console.log(`[Analysis] Date filter applied: ${command.filterMonth}/${command.filterYear} - ${fieldReports.length} of ${originalCount} documents matched`);
+      }
+
       if (fieldReports.length === 0) {
+        const filterMessage = command.filterMonth !== undefined && command.filterYear !== undefined
+          ? `No documents found for ${command.filterMonth}/${command.filterYear}. Upload documents for this period or select a different date range.`
+          : 'No parsed documents found. Please upload and parse IDRs first.';
         progress.report({
           stage: 'loading_documents',
-          message: 'No parsed documents found. Please upload and parse IDRs first.',
+          message: filterMessage,
           percentage: 10,
         });
       } else {
