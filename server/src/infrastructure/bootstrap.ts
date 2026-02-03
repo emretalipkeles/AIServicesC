@@ -98,6 +98,7 @@ import { DocumentParserFactory } from "./document-parsing/DocumentParserFactory"
 import type { IDocumentParserFactory } from "../domain/delay-analysis/interfaces/IDocumentParserFactory";
 import { ExcelScheduleParserV2 } from "./document-parsing/ExcelScheduleParserV2";
 import { PdfScheduleParser } from "./document-parsing/PdfScheduleParser";
+import { RegexScheduleParser } from "./document-parsing/RegexScheduleParser";
 import { ScheduleParserFactory } from "./document-parsing/ScheduleParserFactory";
 import type { IScheduleParserFactory } from "../domain/delay-analysis/interfaces/IScheduleParserFactory";
 import { AIDelayEventExtractor } from "./delay-analysis/AIDelayEventExtractor";
@@ -293,19 +294,16 @@ export function createAppContainer(): AppContainer {
   
   let intentClassifier: IIntentClassifier | null = null;
   let responseNarrator: IResponseNarrator | null = null;
+  const excelParser = new ExcelScheduleParserV2();
+  const regexPdfParser = new RegexScheduleParser();
+  scheduleParserFactory = new ScheduleParserFactory([excelParser, regexPdfParser]);
+
   if (aiClient) {
     intentClassifier = new AIIntentClassifier(aiClient);
     responseNarrator = new AIPretResponseNarrator(aiClient);
     delayEventExtractor = new AIDelayEventExtractor(aiClient);
     activityMatcher = new AIActivityMatcher(aiClient);
     delayEventsChatService = new OpenAIDelayEventsChatService(aiClient);
-    
-    const excelParser = new ExcelScheduleParserV2();
-    const pdfParser = new PdfScheduleParser(aiClient);
-    scheduleParserFactory = new ScheduleParserFactory([excelParser, pdfParser]);
-  } else {
-    const excelParser = new ExcelScheduleParserV2();
-    scheduleParserFactory = new ScheduleParserFactory([excelParser]);
   }
   
   const pretCommandExecutor = intentClassifier 
