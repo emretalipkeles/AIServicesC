@@ -200,12 +200,13 @@ export class AIActivityMatcher implements IActivityMatcher {
     if (filterDate) {
       const originalCount = activities.length;
       filteredActivities = activities.filter(a => {
-        if (!a.plannedStartDate) return true;
-        return a.plannedStartDate <= filterDate;
+        const startDate = a.actualStartDate ?? a.plannedStartDate;
+        if (!startDate) return true;
+        return startDate <= filterDate;
       });
       
       if (filteredActivities.length < originalCount) {
-        console.log(`[AI] MATCHING: Filtered activities by date (${filterDate.toISOString().split('T')[0]}): ${originalCount} -> ${filteredActivities.length} activities`);
+        console.log(`[AI] MATCHING: Filtered activities by date (${filterDate.toISOString().split('T')[0]}): ${originalCount} -> ${filteredActivities.length} activities (using actual start dates when available)`);
       }
     }
     
