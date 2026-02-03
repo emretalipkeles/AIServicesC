@@ -72,7 +72,7 @@ Return a JSON object with the structure:
       "eventDescription": "Clear description of what caused the delay",
       "eventCategory": "one of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other",
       "eventDate": "YYYY-MM-DD",
-      "impactDurationHours": number or null,
+      "impactDurationHours": number (REQUIRED - always estimate hours even if not explicit),
       "sourceReference": "Include DSC/NCR/RFI number if mentioned (e.g., 'DSC 293', 'NCR-045') AND page/section reference",
       "extractedFromCode": "code tag if applicable",
       "confidenceScore": 0.0-1.0,
@@ -110,6 +110,22 @@ When diary shows work stopped and resumed, calculate duration from timestamps:
 
 **SOURCE REFERENCE FOR DIARY:**
 Include timestamp: "Diary, 1415: excavation stopped due to tree roots" or "Diary 0800-0930: crew idle"
+
+## CRITICAL - DURATION IS REQUIRED:
+You MUST provide impactDurationHours for EVERY delay event. Never leave it null or omit it.
+
+**HOW TO ESTIMATE DURATION:**
+1. If explicitly stated (e.g., "1.5 hour", "2 hours"): use that value
+2. If timestamps show start/end (e.g., "0700 stopped" ... "0830 resumed"): calculate the difference (1.5h)
+3. If waiting for direction/decision: estimate based on typical response times (often 2-4 hours or more)
+4. If rework/correction needed: estimate based on scope (typically 1-4 hours)
+5. If no clear indication: use reasonable estimate based on the nature of the delay (minimum 0.5h)
+
+Examples:
+- "CDF removal took 1.5 hours" → impactDurationHours: 1.5
+- "0800 stopped, 0930 resumed" → impactDurationHours: 1.5
+- "Waiting on SPU direction" (no resolution noted) → impactDurationHours: 2 (or more based on context)
+- "Large roots encountered, excavation stopped" → impactDurationHours: 1 (estimate)
 `;
 
 export class AIDelayEventExtractorWithTools implements IDelayEventExtractor {
@@ -415,9 +431,14 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
   ): ExtractedDelayEvent {
     let impactDurationHours: number | null = null;
     if (documentType !== 'ncr') {
-      impactDurationHours = typeof item.impactDurationHours === 'number'
-        ? item.impactDurationHours
-        : this.parseNumber(item.impactDurationHours);
+      const rawDuration = item.impactDurationHours;
+      console.log(`[AI] TOOL-EXTRACTION: Raw impactDurationHours from AI: ${JSON.stringify(rawDuration)} (type: ${typeof rawDuration})`);
+      impactDurationHours = typeof rawDuration === 'number'
+        ? rawDuration
+        : this.parseNumber(rawDuration);
+      if (impactDurationHours !== null) {
+        console.log(`[AI] TOOL-EXTRACTION: Parsed duration: ${impactDurationHours}h`);
+      }
     }
 
     return {

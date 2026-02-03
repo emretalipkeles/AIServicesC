@@ -57,9 +57,11 @@ CRITICAL ANALYSIS REQUIREMENTS:
   * Is this really a delay event or routine observation?
   * Is the contractor clearly responsible, or is it ambiguous?
   * Can delay duration be determined from the narrative?
-- DURATION ESTIMATION: IDRs often describe incidents without stating exact delay duration.
-  * Estimate hours of impact when possible (e.g., "crew arrived 2 hours late" = 2 hours)
-  * If duration is unclear, provide your best estimate based on the incident description
+- DURATION ESTIMATION (REQUIRED): You MUST provide impactDurationHours for EVERY delay event.
+  * If explicitly stated (e.g., "1.5 hour"): use that value
+  * If timestamps show start/end: calculate the difference
+  * If waiting on direction: estimate 2-4 hours minimum
+  * If unclear: provide your best estimate (minimum 0.5h) - NEVER leave duration null
 - RESPONSIBILITY VERIFICATION: Analyze the narrative to confirm contractor responsibility
   * Some CODE_CIE entries might be false positives
   * Look for clear contractor-caused issues vs. external factors
@@ -114,7 +116,7 @@ Return a JSON object with TWO arrays:
       "eventDescription": "Clear description of the delay event",
       "eventCategory": "One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other",
       "eventDate": "YYYY-MM-DD",
-      "impactDurationHours": 2.0,
+      "impactDurationHours": 2.0 (REQUIRED - always provide a number, never null),
       "sourceReference": "MUST include DSC/NCR number if mentioned (e.g., 'DSC 293: Page 2'). Format: 'DSC XXX' + location",
       "extractedFromCode": "CODE_CIE or IDR_OBSERVATION",
       "confidenceScore": 0.85,
