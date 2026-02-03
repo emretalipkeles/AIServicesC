@@ -134,4 +134,17 @@ export class ContractorDelayEvent {
       updatedAt: new Date(),
     });
   }
+
+  clearActivityMatch(): ContractorDelayEvent {
+    return new ContractorDelayEvent({
+      ...this,
+      matchedActivityId: null,
+      cpmActivityId: null,
+      cpmActivityDescription: null,
+      wbs: null,
+      matchConfidence: null,
+      matchReasoning: null,
+      updatedAt: new Date(),
+    });
+  }
 }

@@ -46,6 +46,46 @@ function normalizeImpactDuration(value: unknown): number | null {
   return Math.round(num);
 }
 
+function validateMatchAgainstReportDate(
+  activityId: string | null | undefined,
+  reportDate: Date | null | undefined,
+  activities: Array<{ id: string; actualStartDate: Date | null; actualFinishDate: Date | null; plannedStartDate: Date | null; plannedFinishDate: Date | null }>
+): { isValid: boolean; reason?: string } {
+  if (!activityId || !reportDate) {
+    return { isValid: true };
+  }
+
+  const activity = activities.find(a => a.id === activityId);
+  if (!activity) {
+    return { isValid: true };
+  }
+
+  const startDate = activity.actualStartDate ?? activity.plannedStartDate;
+  const endDate = activity.actualFinishDate ?? activity.plannedFinishDate;
+
+  if (!startDate && !endDate) {
+    return { isValid: true };
+  }
+
+  const reportTime = reportDate.getTime();
+
+  if (startDate && reportTime < startDate.getTime()) {
+    return { 
+      isValid: false, 
+      reason: `Report date (${reportDate.toISOString().split('T')[0]}) is before activity start date (${startDate.toISOString().split('T')[0]})` 
+    };
+  }
+
+  if (endDate && reportTime > endDate.getTime()) {
+    return { 
+      isValid: false, 
+      reason: `Report date (${reportDate.toISOString().split('T')[0]}) is after activity end date (${endDate.toISOString().split('T')[0]})` 
+    };
+  }
+
+  return { isValid: true };
+}
+
 export class RunAnalysisCommandHandler {
   constructor(
     private readonly projectRepository: IDelayAnalysisProjectRepository,
@@ -158,9 +198,9 @@ export class RunAnalysisCommandHandler {
               }
             );
 
-            const reportDate = doc.documentType === 'idr' 
+            const reportDate = doc.reportDate ?? (doc.documentType === 'idr' 
               ? extractReportDateFromIDR(doc.rawContent!) 
-              : null;
+              : null);
 
             if (extractionResult.workActivities && extractionResult.workActivities.length > 0) {
               documentContexts.set(doc.id, {
@@ -241,18 +281,20 @@ export class RunAnalysisCommandHandler {
         });
 
         let preMatchedCount = 0;
+        const preMatchedEvents: ContractorDelayEvent[] = [];
         for (const deduped of deduplicatedEvents) {
           const now = new Date();
           const hasPreMatch = deduped.event.matchedActivityId && 
             deduped.event.matchConfidence !== undefined &&
             deduped.event.matchConfidence >= MIN_MATCH_CONFIDENCE_FOR_SKIP / 100;
           
+          const eventId = randomUUID();
           if (hasPreMatch) {
             preMatchedCount++;
           }
 
           const event = new ContractorDelayEvent({
-            id: randomUUID(),
+            id: eventId,
             projectId: command.projectId,
             tenantId: command.tenantId,
             sourceDocumentId: deduped.primarySourceDocumentId,
@@ -283,6 +325,55 @@ export class RunAnalysisCommandHandler {
           result.eventsExtracted++;
           if (hasPreMatch) {
             result.eventsMatched++;
+            preMatchedEvents.push(event);
+          }
+        }
+        
+        if (preMatchedEvents.length > 0 && shouldMatch) {
+          const allDocuments = await this.documentRepository.findByProjectId(
+            command.projectId,
+            command.tenantId
+          );
+          const documentReportDates = new Map<string, Date>();
+          for (const doc of allDocuments) {
+            if (doc.reportDate) {
+              documentReportDates.set(doc.id, doc.reportDate);
+            }
+          }
+
+          const allActivities = await this.scheduleRepository.findByProjectId(
+            command.projectId,
+            command.tenantId
+          );
+
+          if (allActivities.length > 0) {
+            let invalidatedCount = 0;
+            for (const event of preMatchedEvents) {
+              if (!event.matchedActivityId || !event.sourceDocumentId) continue;
+
+              const storedReportDate = documentReportDates.get(event.sourceDocumentId);
+              const reportDate = storedReportDate ?? event.eventStartDate;
+              if (!storedReportDate && event.eventStartDate) {
+                console.log(`[RunAnalysisCommandHandler] Using eventStartDate as fallback for validation (no reportDate stored for doc ${event.sourceDocumentId})`);
+              }
+              const validation = validateMatchAgainstReportDate(
+                event.matchedActivityId,
+                reportDate,
+                allActivities
+              );
+
+              if (!validation.isValid) {
+                console.log(`[RunAnalysisCommandHandler] Invalidating pre-match for event ${event.id}: ${validation.reason}`);
+                const clearedEvent = event.clearActivityMatch();
+                await this.eventRepository.update(clearedEvent);
+                invalidatedCount++;
+                result.eventsMatched = Math.max(0, result.eventsMatched - 1);
+              }
+            }
+
+            if (invalidatedCount > 0) {
+              console.log(`[RunAnalysisCommandHandler] Invalidated ${invalidatedCount} pre-matched events due to date validation`);
+            }
           }
         }
 
@@ -322,6 +413,17 @@ export class RunAnalysisCommandHandler {
           message: `Loaded ${activities.length} schedule activities`,
           percentage: 55,
         });
+
+        const allDocs = await this.documentRepository.findByProjectId(
+          command.projectId,
+          command.tenantId
+        );
+        const allDocumentReportDates = new Map<string, Date>();
+        for (const doc of allDocs) {
+          if (doc.reportDate) {
+            allDocumentReportDates.set(doc.id, doc.reportDate);
+          }
+        }
 
         const unmatchedEvents = await this.eventRepository.findUnmatched(
           command.projectId,
@@ -372,6 +474,23 @@ export class RunAnalysisCommandHandler {
               );
 
               if (matchResult) {
+                const storedReportDate = docContext?.reportDate 
+                  ?? (event.sourceDocumentId ? allDocumentReportDates.get(event.sourceDocumentId) : null);
+                const reportDate = storedReportDate ?? event.eventStartDate;
+                if (!storedReportDate && event.eventStartDate) {
+                  console.log(`[RunAnalysisCommandHandler] Using eventStartDate as fallback for matching validation (no reportDate for event ${event.id})`);
+                }
+                const validation = validateMatchAgainstReportDate(
+                  matchResult.matchedActivityId,
+                  reportDate,
+                  activities
+                );
+
+                if (!validation.isValid) {
+                  console.log(`[RunAnalysisCommandHandler] Match rejected for event ${event.id}: ${validation.reason}`);
+                  continue;
+                }
+
                 if (matchResult.matchedViaIDRActivity) {
                   fastMatchCount++;
                 }
