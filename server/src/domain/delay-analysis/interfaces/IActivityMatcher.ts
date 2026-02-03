@@ -21,6 +21,11 @@ export interface MatchOptions {
    * specific activities (fast-path) before falling back to the full schedule.
    */
   idrWorkActivities?: IDRWorkActivity[];
+  /**
+   * Report date from the document (e.g., from IDR "Day/Date" header).
+   * Used to filter out activities that haven't started yet (planned_start_date > reportDate).
+   */
+  reportDate?: Date;
 }
 
 export interface IActivityMatcher {

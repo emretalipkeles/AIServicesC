@@ -15,6 +15,12 @@ import type {
 } from '../../../../domain/delay-analysis/interfaces/IDelayEventDeduplicationService';
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
+import { extractReportDateFromIDR } from '../../../../infrastructure/delay-analysis/ReportDateExtractor';
+
+interface DocumentExtractionContext {
+  workActivities: IDRWorkActivity[];
+  reportDate: Date | null;
+}
 
 const MIN_MATCH_CONFIDENCE_FOR_SKIP = 85;
 
@@ -76,7 +82,7 @@ export class RunAnalysisCommandHandler {
     const shouldExtract = command.extractFromDocuments !== false;
     const shouldMatch = command.matchToActivities !== false;
 
-    const documentWorkActivities = new Map<string, IDRWorkActivity[]>();
+    const documentContexts = new Map<string, DocumentExtractionContext>();
 
     if (shouldExtract) {
       progress.report({
@@ -138,13 +144,26 @@ export class RunAnalysisCommandHandler {
               }
             );
 
+            const reportDate = doc.documentType === 'idr' 
+              ? extractReportDateFromIDR(doc.rawContent!) 
+              : null;
+
             if (extractionResult.workActivities && extractionResult.workActivities.length > 0) {
-              documentWorkActivities.set(doc.id, extractionResult.workActivities);
+              documentContexts.set(doc.id, {
+                workActivities: extractionResult.workActivities,
+                reportDate,
+              });
+              const dateInfo = reportDate ? ` (report date: ${reportDate.toISOString().split('T')[0]})` : '';
               progress.report({
                 stage: 'extracting_events',
-                message: `Found ${extractionResult.workActivities.length} work activities in ${doc.filename} (for fast-matching)`,
+                message: `Found ${extractionResult.workActivities.length} work activities in ${doc.filename}${dateInfo}`,
                 percentage: docProgress,
                 details: { current: i + 1, total: fieldReports.length },
+              });
+            } else if (reportDate) {
+              documentContexts.set(doc.id, {
+                workActivities: [],
+                reportDate,
               });
             }
 
@@ -178,10 +197,10 @@ export class RunAnalysisCommandHandler {
           }
         }
 
-        if (documentWorkActivities.size > 0) {
-          const totalWorkActivities = Array.from(documentWorkActivities.values())
-            .reduce((sum, activities) => sum + activities.length, 0);
-          console.log(`[RunAnalysisCommandHandler] Collected ${totalWorkActivities} work activities from ${documentWorkActivities.size} documents for fast-matching`);
+        if (documentContexts.size > 0) {
+          const totalWorkActivities = Array.from(documentContexts.values())
+            .reduce((sum, ctx) => sum + ctx.workActivities.length, 0);
+          console.log(`[RunAnalysisCommandHandler] Collected ${totalWorkActivities} work activities from ${documentContexts.size} documents for force-matching`);
         }
 
         progress.report({
@@ -322,8 +341,8 @@ export class RunAnalysisCommandHandler {
             });
 
             try {
-              const idrWorkActivities = event.sourceDocumentId 
-                ? documentWorkActivities.get(event.sourceDocumentId)
+              const docContext = event.sourceDocumentId 
+                ? documentContexts.get(event.sourceDocumentId)
                 : undefined;
 
               const matchResult = await this.matcher.matchEventToActivities(
@@ -333,7 +352,8 @@ export class RunAnalysisCommandHandler {
                 { 
                   runId: options?.runId, 
                   onTokenUsage: options?.onTokenUsage,
-                  idrWorkActivities,
+                  idrWorkActivities: docContext?.workActivities,
+                  reportDate: docContext?.reportDate ?? undefined,
                 }
               );
 

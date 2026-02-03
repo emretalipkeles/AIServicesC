@@ -5,7 +5,7 @@ import type { IDRWorkActivity } from '../../domain/delay-analysis/interfaces/IDo
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 import { ModelId } from '../../domain/value-objects/ModelId';
 
-const IDR_FAST_MATCH_PROMPT = `You are an expert construction schedule analyst. Match this delay event to ONE of the activities that were being worked on that day.
+const IDR_FORCE_MATCH_PROMPT = `You are an expert construction schedule analyst. Match this delay event to the BEST activity from the ones being worked on that day.
 
 ## Delay Event:
 {eventDescription}
@@ -15,19 +15,23 @@ const IDR_FAST_MATCH_PROMPT = `You are an expert construction schedule analyst. 
 ## Activities Being Worked On (from Inspector's Report):
 {activitiesList}
 
-## Instructions:
-The inspector recorded these specific activities as being worked on the day this delay occurred. Match the delay event to the most relevant activity.
+## CRITICAL RULE: YOU MUST MATCH TO ONE OF THESE ACTIVITIES.
+The contractor was working on ONLY these activities on the day of this delay. Even if the delay description doesn't perfectly align with the activity descriptions, you MUST select the most relevant one.
 
-Since the inspector already identified these as the day's work, confidence should be HIGH (85%+) if the work types align.
+## Confidence Scoring:
+- **85-100%**: Work type in delay clearly matches the activity description (e.g., "excavation delay" matches "Excavate Services")
+- **70-84%**: Work type is related but not exact match (e.g., "equipment breakdown" during "Excavate Services" - equipment was used for that work)
+- **50-69%**: Weak match - the delay happened during this work but activity description doesn't describe the delay's work type (e.g., "signal alignment issue" during "water main excavation")
+- **40-49%**: Forced match - no logical connection but this was the contractor's work that day
 
 ## Response Format (JSON only):
 {
-  "activityId": "the exact Activity ID",
-  "confidence": <85-100>,
-  "reasoning": "Brief explanation of the match"
+  "activityId": "the exact Activity ID from the list above",
+  "confidence": <number between 40-100>,
+  "reasoning": "Brief explanation of why this activity was selected"
 }
 
-If none of the activities match the delay event at all, respond with: null
+YOU MUST RETURN A MATCH. Do not respond with null.
 `;
 
 const MATCHING_PROMPT = `You are an expert construction schedule analyst specializing in delay claims for heavy civil and transit projects. Your task is to match a contractor-caused delay event to the most relevant CPM schedule activity.
@@ -85,8 +89,8 @@ export class AIActivityMatcher implements IActivityMatcher {
     }
 
     if (options?.idrWorkActivities && options.idrWorkActivities.length > 0) {
-      console.log(`[AI] MATCHING: Trying IDR fast-match with ${options.idrWorkActivities.length} work activities...`);
-      const fastMatchResult = await this.tryFastMatch(
+      console.log(`[AI] MATCHING: Force-matching to ${options.idrWorkActivities.length} IDR work activities...`);
+      const forceMatchResult = await this.tryForceMatchToIDRActivities(
         eventDescription,
         eventDate,
         activities,
@@ -94,18 +98,17 @@ export class AIActivityMatcher implements IActivityMatcher {
         options
       );
 
-      if (fastMatchResult) {
-        console.log(`[AI] MATCHING: Fast-match succeeded -> ${fastMatchResult.cpmActivityId} (${fastMatchResult.confidence}% confidence)`);
-        return fastMatchResult;
+      if (forceMatchResult) {
+        return forceMatchResult;
       }
 
-      console.log('[AI] MATCHING: Fast-match failed, falling back to full schedule...');
+      console.log('[AI] MATCHING: No IDR activities found in schedule, falling back to date-filtered full schedule...');
     }
 
     return this.matchAgainstFullSchedule(eventDescription, eventDate, activities, options);
   }
 
-  private async tryFastMatch(
+  private async tryForceMatchToIDRActivities(
     eventDescription: string,
     eventDate: Date | null,
     allActivities: ScheduleActivity[],
@@ -116,18 +119,30 @@ export class AIActivityMatcher implements IActivityMatcher {
     const priorityActivities = allActivities.filter(a => idrActivityIds.has(a.activityId));
 
     if (priorityActivities.length === 0) {
-      console.log('[AIActivityMatcher] No matching schedule activities found for IDR work activities:', 
+      console.log('[AIActivityMatcher] IDR activities not found in schedule:', 
         idrWorkActivities.map(wa => wa.activityId));
-      return null;
+      
+      const firstIDRActivity = idrWorkActivities[0];
+      console.log(`[AI] MATCHING: Creating manual match to IDR activity ${firstIDRActivity.activityId} (not in schedule database)`);
+      
+      return {
+        matchedActivityId: firstIDRActivity.activityId,
+        cpmActivityId: firstIDRActivity.activityId,
+        cpmActivityDescription: firstIDRActivity.description,
+        wbs: null,
+        confidence: 35,
+        reasoning: `[IDR Activity - not in schedule] Activity ${firstIDRActivity.activityId} was listed in the IDR as being worked on this day, but is not found in the uploaded schedule. Manual verification recommended.`,
+        matchedViaIDRActivity: true,
+      };
     }
 
-    console.log(`[AI] MATCHING: Fast-matching against ${priorityActivities.length} IDR activities`);
+    console.log(`[AI] MATCHING: Force-matching to ${priorityActivities.length} IDR activities (description alignment will affect confidence)`);
 
     const activitiesList = idrWorkActivities
       .map(wa => `${wa.activityId} | ${wa.description} | ${wa.comments || '-'}`)
       .join('\n');
 
-    const prompt = IDR_FAST_MATCH_PROMPT
+    const prompt = IDR_FORCE_MATCH_PROMPT
       .replace('{eventDescription}', eventDescription)
       .replace('{eventDate}', eventDate?.toISOString().split('T')[0] || 'Unknown')
       .replace('{activitiesList}', activitiesList);
@@ -143,7 +158,7 @@ export class AIActivityMatcher implements IActivityMatcher {
       if (options?.onTokenUsage && options?.runId) {
         await options.onTokenUsage({
           runId: options.runId,
-          operation: 'activity_matching_fast',
+          operation: 'activity_matching_idr_force',
           model: response.model,
           inputTokens: response.inputTokens,
           outputTokens: response.outputTokens,
@@ -153,18 +168,22 @@ export class AIActivityMatcher implements IActivityMatcher {
 
       const result = this.parseMatchResponse(response.content, priorityActivities);
       
-      if (result && result.confidence >= 85) {
+      if (result) {
+        const confidenceLevel = result.confidence >= 85 ? 'high' : 
+                               result.confidence >= 70 ? 'good' :
+                               result.confidence >= 50 ? 'weak' : 'forced';
+        console.log(`[AI] MATCHING: IDR force-match succeeded -> ${result.cpmActivityId} (${result.confidence}% confidence, ${confidenceLevel} alignment)`);
         return {
           ...result,
           matchedViaIDRActivity: true,
-          reasoning: `[IDR Fast-Match] ${result.reasoning}`,
+          reasoning: `[IDR Activity Match - ${confidenceLevel} alignment] ${result.reasoning}`,
         };
       }
 
-      console.log('[AIActivityMatcher] Fast-match result below threshold:', result?.confidence);
+      console.log('[AIActivityMatcher] Force-match returned no result (unexpected)');
       return null;
     } catch (error) {
-      console.error('[AIActivityMatcher] Error in fast-match:', error);
+      console.error('[AIActivityMatcher] Error in force-match:', error);
       return null;
     }
   }
@@ -175,7 +194,27 @@ export class AIActivityMatcher implements IActivityMatcher {
     activities: ScheduleActivity[],
     options?: MatchOptions
   ): Promise<MatchResult | null> {
-    const activitiesList = activities
+    const filterDate = options?.reportDate || eventDate;
+    let filteredActivities = activities;
+    
+    if (filterDate) {
+      const originalCount = activities.length;
+      filteredActivities = activities.filter(a => {
+        if (!a.plannedStartDate) return true;
+        return a.plannedStartDate <= filterDate;
+      });
+      
+      if (filteredActivities.length < originalCount) {
+        console.log(`[AI] MATCHING: Filtered activities by date (${filterDate.toISOString().split('T')[0]}): ${originalCount} -> ${filteredActivities.length} activities`);
+      }
+    }
+    
+    if (filteredActivities.length === 0) {
+      console.log('[AI] MATCHING: No activities available after date filtering');
+      return null;
+    }
+
+    const activitiesList = filteredActivities
       .slice(0, 100)
       .map(a => `${a.activityId} | ${a.wbs || '-'} | ${a.activityDescription} | ${a.plannedStartDate?.toISOString().split('T')[0] || '-'} | ${a.plannedFinishDate?.toISOString().split('T')[0] || '-'}`)
       .join('\n');
@@ -186,7 +225,7 @@ export class AIActivityMatcher implements IActivityMatcher {
       .replace('{activitiesList}', activitiesList);
 
     try {
-      console.log(`[AI] MATCHING: Full schedule match for event: "${eventDescription.substring(0, 80)}..." (${activities.length} activities)`);
+      console.log(`[AI] MATCHING: Full schedule match for event: "${eventDescription.substring(0, 80)}..." (${filteredActivities.length} activities)`);
 
       const response = await this.aiClient.chat({
         model: ModelId.gpt52(),
@@ -204,11 +243,11 @@ export class AIActivityMatcher implements IActivityMatcher {
           model: response.model,
           inputTokens: response.inputTokens,
           outputTokens: response.outputTokens,
-          metadata: { activitiesCount: activities.length },
+          metadata: { activitiesCount: filteredActivities.length },
         });
       }
 
-      const result = this.parseMatchResponse(response.content, activities);
+      const result = this.parseMatchResponse(response.content, filteredActivities);
       
       if (result) {
         console.log(`[AI] MATCHING: Result -> ${result.cpmActivityId} (${result.confidence}% confidence)`);
