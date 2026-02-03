@@ -190,10 +190,16 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
 
-      console.log(`[AI] TOOL-EXTRACTION: Starting tool-based extraction for "${documentFilename}" (type: ${documentType})`);
+      console.log('');
+      console.log('╔══════════════════════════════════════════════════════════════════╗');
+      console.log('║  TOOL-BASED EXTRACTION ACTIVE - Real-time schedule lookup enabled ║');
+      console.log('╚══════════════════════════════════════════════════════════════════╝');
+      console.log(`[AI] TOOL-EXTRACTION: Starting for "${documentFilename}" (type: ${documentType})`);
+      console.log(`[AI] TOOL-EXTRACTION: AI can query schedule database during extraction for accurate matching`);
+      console.log('');
       
       while (continueLoop) {
-        console.log(`[AI] TOOL-EXTRACTION: Calling OpenAI API...`);
+        console.log(`[AI] TOOL-EXTRACTION: Calling OpenAI API with function calling enabled...`);
         
         const response = await this.openai.chat.completions.create({
           model: 'gpt-4.1',
@@ -228,13 +234,27 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
             }
 
             const activityIds = (args.activity_ids as string[]) || [];
-            console.log(`[AI] TOOL-EXTRACTION: Looking up ${activityIds.length} activity IDs in schedule:`, activityIds);
+            console.log('');
+            console.log(`[AI] TOOL-EXTRACTION: >>>>>> SCHEDULE DATABASE LOOKUP <<<<<<`);
+            console.log(`[AI] TOOL-EXTRACTION: AI is querying schedule for ${activityIds.length} activity IDs:`);
+            activityIds.forEach(id => console.log(`[AI] TOOL-EXTRACTION:   - ${id}`));
 
             const toolResult = await this.toolExecutor.execute({
               tenantId: options.tenantId,
               projectId: options.projectId,
               activityIds,
             });
+
+            console.log(`[AI] TOOL-EXTRACTION: Database returned: ${toolResult.found.length} found, ${toolResult.notFound.length} not found`);
+            if (toolResult.found.length > 0) {
+              console.log(`[AI] TOOL-EXTRACTION: Found activities:`);
+              toolResult.found.forEach(a => console.log(`[AI] TOOL-EXTRACTION:   ✓ ${a.activityId}: ${a.activityDescription}`));
+            }
+            if (toolResult.notFound.length > 0) {
+              console.log(`[AI] TOOL-EXTRACTION: Not found in schedule:`);
+              toolResult.notFound.forEach(id => console.log(`[AI] TOOL-EXTRACTION:   ✗ ${id}`));
+            }
+            console.log('');
 
             const toolResultContent = {
               found: toolResult.found.map(a => ({
@@ -283,10 +303,21 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
         documentType
       );
 
-      console.log(`[AI] TOOL-EXTRACTION: Completed - used ${totalInputTokens} input + ${totalOutputTokens} output tokens`);
-      console.log(`[AI] TOOL-EXTRACTION: Extracted ${parseResult.events.length} events from "${documentFilename}"`);
+      console.log('');
+      console.log('╔══════════════════════════════════════════════════════════════════╗');
+      console.log('║  TOOL-BASED EXTRACTION COMPLETED                                  ║');
+      console.log('╚══════════════════════════════════════════════════════════════════╝');
+      console.log(`[AI] TOOL-EXTRACTION: Document: "${documentFilename}"`);
+      console.log(`[AI] TOOL-EXTRACTION: Tokens used: ${totalInputTokens} input + ${totalOutputTokens} output`);
+      console.log(`[AI] TOOL-EXTRACTION: Events extracted: ${parseResult.events.length}`);
       const matchedCount = parseResult.events.filter(e => e.matchedActivityId).length;
-      console.log(`[AI] TOOL-EXTRACTION: ${matchedCount}/${parseResult.events.length} events have pre-matched activity IDs`);
+      console.log(`[AI] TOOL-EXTRACTION: Pre-matched to activities: ${matchedCount}/${parseResult.events.length}`);
+      if (matchedCount > 0) {
+        parseResult.events.filter(e => e.matchedActivityId).forEach(e => {
+          console.log(`[AI] TOOL-EXTRACTION:   ✓ "${e.eventDescription?.substring(0, 50)}..." -> ${e.matchedActivityId}`);
+        });
+      }
+      console.log('');
 
       return {
         events: parseResult.events,

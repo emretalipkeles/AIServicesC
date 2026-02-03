@@ -102,6 +102,9 @@ import { RegexScheduleParser } from "./document-parsing/RegexScheduleParser";
 import { ScheduleParserFactory } from "./document-parsing/ScheduleParserFactory";
 import type { IScheduleParserFactory } from "../domain/delay-analysis/interfaces/IScheduleParserFactory";
 import { AIDelayEventExtractor } from "./delay-analysis/AIDelayEventExtractor";
+import { AIDelayEventExtractorWithTools } from "./delay-analysis/AIDelayEventExtractorWithTools";
+import { GetScheduleActivitiesTool } from "./delay-analysis/tools/GetScheduleActivitiesTool";
+import { GetActivitiesByIdsQueryHandler } from "../application/delay-analysis/queries/handlers/GetActivitiesByIdsQueryHandler";
 import { AIActivityMatcher } from "./delay-analysis/AIActivityMatcher";
 import { OpenAIDelayEventsChatService } from "./delay-analysis/OpenAIDelayEventsChatService";
 import { StreamingOpenAIDelayEventsChatService } from "./delay-analysis/StreamingOpenAIDelayEventsChatService";
@@ -218,6 +221,10 @@ export function createAppContainer(): AppContainer {
   const aiTokenUsageRepository = new DrizzleAITokenUsageRepository();
   const documentParserFactory = new DocumentParserFactory();
 
+  const getActivitiesByIdsHandler = new GetActivitiesByIdsQueryHandler(scheduleActivityRepository);
+  const scheduleActivitiesTool = new GetScheduleActivitiesTool(getActivitiesByIdsHandler);
+  console.log('[Bootstrap] Created GetScheduleActivitiesTool for tool-based extraction');
+
   let delayEventExtractor: IDelayEventExtractor | null = null;
   let activityMatcher: IActivityMatcher | null = null;
   let delayEventsChatService: IDelayEventsChatService | null = null;
@@ -301,7 +308,8 @@ export function createAppContainer(): AppContainer {
   if (aiClient) {
     intentClassifier = new AIIntentClassifier(aiClient);
     responseNarrator = new AIPretResponseNarrator(aiClient);
-    delayEventExtractor = new AIDelayEventExtractor(aiClient);
+    delayEventExtractor = new AIDelayEventExtractorWithTools(scheduleActivitiesTool);
+    console.log('[Bootstrap] Using AIDelayEventExtractorWithTools for extraction with real-time schedule lookup');
     activityMatcher = new AIActivityMatcher(aiClient);
     delayEventsChatService = new OpenAIDelayEventsChatService(aiClient);
   }
