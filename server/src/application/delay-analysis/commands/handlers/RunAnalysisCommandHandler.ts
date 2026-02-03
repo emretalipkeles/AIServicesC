@@ -61,25 +61,15 @@ function validateMatchAgainstReportDate(
   }
 
   const startDate = activity.actualStartDate ?? activity.plannedStartDate;
-  const endDate = activity.actualFinishDate ?? activity.plannedFinishDate;
 
-  if (!startDate && !endDate) {
+  if (!startDate) {
     return { isValid: true };
   }
 
-  const reportTime = reportDate.getTime();
-
-  if (startDate && reportTime < startDate.getTime()) {
+  if (reportDate.getTime() < startDate.getTime()) {
     return { 
       isValid: false, 
       reason: `Report date (${reportDate.toISOString().split('T')[0]}) is before activity start date (${startDate.toISOString().split('T')[0]})` 
-    };
-  }
-
-  if (endDate && reportTime > endDate.getTime()) {
-    return { 
-      isValid: false, 
-      reason: `Report date (${reportDate.toISOString().split('T')[0]}) is after activity end date (${endDate.toISOString().split('T')[0]})` 
     };
   }
 
