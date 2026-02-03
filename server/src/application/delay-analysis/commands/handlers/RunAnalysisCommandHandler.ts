@@ -270,11 +270,41 @@ export class RunAnalysisCommandHandler {
           percentage: 47,
         });
 
+        const preMatchedActivityCodes = new Set<string>();
+        for (const deduped of deduplicatedEvents) {
+          if (deduped.event.matchedActivityId && 
+              deduped.event.matchConfidence !== undefined &&
+              deduped.event.matchConfidence >= MIN_MATCH_CONFIDENCE_FOR_SKIP / 100) {
+            preMatchedActivityCodes.add(deduped.event.matchedActivityId);
+          }
+        }
+
+        const activityCodeToUuidMap = new Map<string, string>();
+        if (preMatchedActivityCodes.size > 0) {
+          console.log(`[RunAnalysisCommandHandler] Looking up UUIDs for ${preMatchedActivityCodes.size} pre-matched activity codes`);
+          for (const activityCode of Array.from(preMatchedActivityCodes)) {
+            const activity = await this.scheduleRepository.findByActivityId(
+              command.projectId,
+              command.tenantId,
+              activityCode
+            );
+            if (activity) {
+              activityCodeToUuidMap.set(activityCode, activity.id);
+              console.log(`[RunAnalysisCommandHandler] Mapped activity code "${activityCode}" -> UUID "${activity.id}"`);
+            } else {
+              console.log(`[RunAnalysisCommandHandler] WARNING: Activity code "${activityCode}" not found in schedule - will skip pre-match`);
+            }
+          }
+        }
+
         let preMatchedCount = 0;
         const preMatchedEvents: ContractorDelayEvent[] = [];
         for (const deduped of deduplicatedEvents) {
           const now = new Date();
-          const hasPreMatch = deduped.event.matchedActivityId && 
+          const activityCode = deduped.event.matchedActivityId;
+          const activityUuid = activityCode ? activityCodeToUuidMap.get(activityCode) : undefined;
+          const hasPreMatch = activityCode && 
+            activityUuid &&
             deduped.event.matchConfidence !== undefined &&
             deduped.event.matchConfidence >= MIN_MATCH_CONFIDENCE_FOR_SKIP / 100;
           
@@ -288,9 +318,9 @@ export class RunAnalysisCommandHandler {
             projectId: command.projectId,
             tenantId: command.tenantId,
             sourceDocumentId: deduped.primarySourceDocumentId,
-            matchedActivityId: hasPreMatch ? deduped.event.matchedActivityId! : null,
+            matchedActivityId: hasPreMatch ? activityUuid! : null,
             wbs: hasPreMatch ? (deduped.event.matchedActivityWbs ?? null) : null,
-            cpmActivityId: hasPreMatch ? deduped.event.matchedActivityId! : null,
+            cpmActivityId: hasPreMatch ? activityCode! : null,
             cpmActivityDescription: hasPreMatch ? (deduped.event.matchedActivityDescription ?? null) : null,
             eventDescription: deduped.event.eventDescription,
             eventCategory: deduped.event.eventCategory,

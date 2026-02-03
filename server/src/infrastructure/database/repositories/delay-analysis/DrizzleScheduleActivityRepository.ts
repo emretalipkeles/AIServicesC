@@ -44,19 +44,55 @@ export class DrizzleScheduleActivityRepository implements IScheduleActivityRepos
   }
 
   async findByActivityId(projectId: string, tenantId: string, activityId: string): Promise<ScheduleActivity | null> {
-    const result = await db
-      .select()
-      .from(scheduleActivities)
-      .where(and(
-        eq(scheduleActivities.projectId, projectId),
-        eq(scheduleActivities.tenantId, tenantId),
-        eq(scheduleActivities.activityId, activityId)
-      ))
-      .limit(1);
+    const normalizedId = activityId.toUpperCase().trim();
+    const idsToTry = this.generateActivityIdVariants(normalizedId);
+    
+    for (const idVariant of idsToTry) {
+      const result = await db
+        .select()
+        .from(scheduleActivities)
+        .where(and(
+          eq(scheduleActivities.projectId, projectId),
+          eq(scheduleActivities.tenantId, tenantId),
+          eq(scheduleActivities.activityId, idVariant)
+        ))
+        .limit(1);
 
-    if (result.length === 0) return null;
+      if (result.length > 0) {
+        if (idVariant !== normalizedId) {
+          console.log(`[DrizzleScheduleActivityRepository] Matched "${normalizedId}" to "${idVariant}" (normalized)`);
+        }
+        return this.mapRowToEntity(result[0]);
+      }
+    }
 
-    return this.mapRowToEntity(result[0]);
+    return null;
+  }
+
+  private generateActivityIdVariants(activityId: string): string[] {
+    const variants = [activityId];
+    
+    const segments = activityId.split('-');
+    if (segments.length >= 2) {
+      const withoutLeadingZeros = segments.map((seg, idx) => {
+        if (idx === 0 && /^0+\d+$/.test(seg)) {
+          return seg.replace(/^0+/, '');
+        }
+        return seg;
+      }).join('-');
+      
+      if (withoutLeadingZeros !== activityId) {
+        variants.push(withoutLeadingZeros);
+      }
+      
+      const firstSeg = segments[0];
+      if (/^\d+$/.test(firstSeg) && !firstSeg.startsWith('0')) {
+        const withLeadingZero = ['0' + firstSeg, ...segments.slice(1)].join('-');
+        variants.push(withLeadingZero);
+      }
+    }
+    
+    return variants;
   }
 
   async findActiveOnDate(projectId: string, tenantId: string, date: Date): Promise<ScheduleActivity[]> {
