@@ -197,10 +197,11 @@ export class RunAnalysisCommandHandler {
                 workActivities: extractionResult.workActivities,
                 reportDate,
               });
-              const dateInfo = reportDate ? ` (report date: ${reportDate.toISOString().split('T')[0]})` : '';
+              const activityIds = extractionResult.workActivities.map(a => a.activityId).join(', ');
+              const dateInfo = reportDate ? ` (${reportDate.toISOString().split('T')[0]})` : '';
               progress.report({
                 stage: 'extracting_events',
-                message: `Found ${extractionResult.workActivities.length} work activities in ${doc.filename}${dateInfo}`,
+                message: `Found activities: ${activityIds}${dateInfo}`,
                 percentage: docProgress,
                 details: { current: i + 1, total: fieldReports.length },
               });
@@ -469,9 +470,12 @@ export class RunAnalysisCommandHandler {
             const event = unmatchedEvents[i];
             const matchProgress = 60 + Math.floor((i / unmatchedEvents.length) * 30);
 
+            const truncatedDesc = event.eventDescription.length > 50 
+              ? event.eventDescription.substring(0, 50) + '...'
+              : event.eventDescription;
             progress.report({
               stage: 'matching_events',
-              message: `Matching event ${i + 1} of ${unmatchedEvents.length}...`,
+              message: `Linking to schedule (${i + 1}/${unmatchedEvents.length}): ${truncatedDesc}`,
               percentage: matchProgress,
               details: { current: i + 1, total: unmatchedEvents.length },
             });
@@ -525,6 +529,13 @@ export class RunAnalysisCommandHandler {
 
                 await this.eventRepository.update(matchedEvent);
                 result.eventsMatched++;
+                
+                progress.report({
+                  stage: 'matching_events',
+                  message: `Matched to ${matchResult.cpmActivityId}: ${matchResult.cpmActivityDescription.substring(0, 40)}...`,
+                  percentage: matchProgress,
+                  details: { current: i + 1, total: unmatchedEvents.length },
+                });
               }
             } catch (error) {
               result.errors.push(`Failed to match event ${event.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
