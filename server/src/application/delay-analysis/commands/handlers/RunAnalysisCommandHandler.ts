@@ -134,7 +134,7 @@ export class RunAnalysisCommandHandler {
                 documentType: doc.documentType,
                 tenantId: command.tenantId,
                 projectId: command.projectId,
-                enableToolBasedMatching: options?.enableToolBasedMatching,
+                enableToolBasedMatching: options?.enableToolBasedMatching ?? true,
               }
             );
 

@@ -40,17 +40,29 @@ interface ExtractedEventRaw {
 
 const TOOL_ENABLED_SYSTEM_PROMPT = `You are a construction delay analysis expert. Your task is to extract contractor-caused delay events from construction documents and match them to schedule activities.
 
+## CRITICAL FIRST STEP - FIND ACTIVITY IDs:
+
+**BEFORE extracting any delay events, you MUST scan the document for the "Contractor's Work Activity" table or similar sections that list schedule activity IDs.**
+
+In Inspector's Daily Reports (IDRs), look for tables with columns like:
+- "Schedule Activity #" or "Activity #" (e.g., "2-W-0471", "3-W-1042", "4-PF-1526")
+- "Description" (e.g., "Stage 1 WM: Excavate Services")
+- "Comments" (e.g., "WM STA 7+00 to 21+50")
+
+These activity IDs tell you EXACTLY which CPM schedule activities the contractor was working on that day.
+
 ## EXTRACTION WORKFLOW:
 
-1. **First, scan the document for explicit activity IDs** (e.g., "Activity 1234", "Activity ID: ABC-001", "WBS 05.02.01")
-2. **If you find activity IDs, use the get_schedule_activities tool** to look them up in the project schedule
-3. **Extract all delay events** and, when possible, match them directly to the activities you looked up
-4. **Output the final JSON** with delay events, including matched activity information when available
+1. **FIRST: Find the "Contractor's Work Activity" table** - Extract ALL activity IDs listed (format: X-XX-XXXX like "2-W-0471", "3-W-1042")
+2. **IMMEDIATELY use the get_schedule_activities tool** to look up these IDs in the project schedule database
+3. **Extract delay events** from the document (diary entries, discrepancies, extra work, etc.)
+4. **Match each delay to the most relevant activity** from the tool results - the activities listed in the document are what was being worked on, so delays likely affect those specific activities
+5. **Output the final JSON** with delay events and their matched activities
 
-## ACTIVITY ID DETECTION:
-- Look for patterns like: "Activity 1234", "Activity ID: XXX", "Activity #XXX", "WBS XX.XX.XX"
-- Also check tables like "Contractor's Work Activity" that list schedule activities being worked on
-- Call the tool with all detected IDs at once for efficiency
+## ACTIVITY ID PATTERNS TO DETECT:
+- IDR format: "X-XX-XXXX" (e.g., "2-W-0471", "3-W-1042", "4-PF-1526", "1-ST-0089")
+- Also: "Activity 1234", "Activity ID: XXX", "WBS XX.XX.XX"
+- Call the tool with ALL detected IDs at once for efficiency
 
 ## OUTPUT FORMAT:
 Return a JSON object with the structure:
@@ -78,9 +90,11 @@ Return a JSON object with the structure:
 }
 
 ## MATCHING RULES:
-- Only set matchedActivityId if you are 85%+ confident the delay affects that specific activity
-- Use tool results to verify activity IDs exist and get their descriptions
-- If an activity ID was mentioned in the document but not found in the schedule, note this in matchReasoning
+- **Priority: Match to activities from the document's "Contractor's Work Activity" table** - these are the activities being worked on when the delay occurred
+- If a delay clearly relates to work described in the activity table (e.g., excavation delay matches "Excavate Services" activity), match with HIGH confidence (90%+)
+- Use tool results to get full activity descriptions and verify IDs exist in the schedule
+- Only set matchedActivityId if you are 70%+ confident the delay affects that specific activity
+- If an activity ID was mentioned in the document but not found in the schedule database, still include it with a note in matchReasoning
 `;
 
 export class AIDelayEventExtractorWithTools implements IDelayEventExtractor {
