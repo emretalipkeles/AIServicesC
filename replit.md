@@ -50,6 +50,7 @@ Preferred communication style: Simple, everyday language.
 - **Document Extraction Strategy**: Utilizes a strategy pattern (`IDocumentExtractionStrategy`) for document-type-specific processing (IDR, NCR, Field Memo, Default) to optimize delay event extraction, including IDR work activity fast-match optimization.
 - **Tool-Based Extraction**: Advanced extraction mode (enabled by default) using OpenAI function calling to query the schedule database during document processing for on-demand activity lookup, enabling single-pass extraction and matching. Prioritizes detecting "Contractor's Work Activity" tables in IDRs with activity IDs like "2-W-0471".
 - **Activity Matching Priority**: (1) Force match to IDR-listed activities first (confidence reflects description alignment: 85-100% high, 70-84% good, 50-69% weak, 40-49% forced); (2) If no IDR activities, match to date-filtered schedule (excludes activities starting after report date). Report date extracted from IDR "Day/Date" header field.
+- **Match Date Validation**: Post-match validation ensures the document's report date falls within the activity's date range (uses actual start/end dates if available, otherwise planned dates). Invalid matches are automatically cleared, keeping the delay event as unmatched.
 
 ## External Dependencies
 
