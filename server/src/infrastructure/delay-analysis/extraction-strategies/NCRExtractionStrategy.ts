@@ -39,7 +39,7 @@ For each delay event found, extract:
 - eventCategory: One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other (most NCRs should be quality_rework)
 - eventDate: The date of the NCR or incident (YYYY-MM-DD format)
 - impactDurationHours: Only include if explicitly stated in the NCR document. Leave null/empty if not mentioned. DO NOT estimate.
-- sourceReference: NCR number and section reference
+- sourceReference: MUST include NCR/DSC number (e.g., 'NCR-045', 'DSC 293') AND section reference
 - extractedFromCode: The NCR number (e.g., "NCR-045")
 - confidenceScore: Your confidence this causes delay (typically 0.85-1.0 for NCRs)
 - reworkDescription: Specific corrective action required

@@ -84,7 +84,7 @@ Return a JSON object with TWO arrays:
       "eventCategory": "One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other",
       "eventDate": "YYYY-MM-DD",
       "impactDurationHours": 2.0,
-      "sourceReference": "Section/paragraph where found",
+      "sourceReference": "MUST include DSC/NCR number if mentioned (e.g., 'DSC 293: Page 2'). Format: 'DSC XXX' + location",
       "extractedFromCode": "CODE_CIE or IDR_OBSERVATION",
       "confidenceScore": 0.85,
       "responsibilityConfirmed": true

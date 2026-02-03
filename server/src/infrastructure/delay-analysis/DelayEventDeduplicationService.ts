@@ -47,28 +47,39 @@ export class DelayEventDeduplicationService implements IDelayEventDeduplicationS
   }
 
   private generateDeduplicationKey(event: ExtractedDelayEvent): string {
-    const referenceNumber = this.extractReferenceNumber(event.sourceReference);
     const dateKey = event.eventDate ? event.eventDate.toISOString().split('T')[0] : 'no-date';
     const categoryKey = event.eventCategory || 'unknown';
     
+    const refFromSource = this.extractReferenceNumber(event.sourceReference);
+    const refFromDescription = this.extractReferenceNumber(event.eventDescription);
+    const referenceNumber = refFromSource || refFromDescription;
+    
     if (referenceNumber) {
-      return `ref:${referenceNumber.toLowerCase()}`;
+      return `ref:${dateKey}:${referenceNumber.toLowerCase()}`;
     }
 
     const descriptionKey = this.normalizeDescription(event.eventDescription);
     return `desc:${categoryKey}:${dateKey}:${descriptionKey}`;
   }
 
-  private extractReferenceNumber(sourceReference: string): string | null {
-    const ncrPattern = /NCR[-\s]?\d+/i;
-    const idrPattern = /IDR[-\s]?\d+/i;
-    const fmPattern = /FM[-\s]?\d+/i;
+  private extractReferenceNumber(text: string): string | null {
+    const patterns = [
+      /NCR[-\s]?\d+/i,
+      /IDR[-\s]?\d+/i,
+      /FM[-\s]?\d+/i,
+      /DSC[-\s]?\d+/i,
+      /RFI[-\s]?\d+/i,
+      /COR[-\s]?\d+/i,
+    ];
 
-    const match = sourceReference.match(ncrPattern) 
-      || sourceReference.match(idrPattern)
-      || sourceReference.match(fmPattern);
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        return match[0].replace(/\s/g, '-');
+      }
+    }
 
-    return match ? match[0].replace(/\s/g, '-') : null;
+    return null;
   }
 
   private normalizeDescription(description: string): string {

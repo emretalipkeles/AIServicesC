@@ -73,7 +73,7 @@ Return a JSON object with the structure:
       "eventCategory": "one of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other",
       "eventDate": "YYYY-MM-DD",
       "impactDurationHours": number or null,
-      "sourceReference": "specific location in document",
+      "sourceReference": "Include DSC/NCR/RFI number if mentioned (e.g., 'DSC 293', 'NCR-045') AND page/section reference",
       "extractedFromCode": "code tag if applicable",
       "confidenceScore": 0.0-1.0,
       "responsibilityConfirmed": true/false,

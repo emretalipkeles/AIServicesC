@@ -19,7 +19,7 @@ For each delay event found, extract:
 - eventCategory: One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other
 - eventDate: The date of the event if mentioned (YYYY-MM-DD format)
 - impactDurationHours: Estimated hours of impact if mentioned
-- sourceReference: The section/paragraph where this was found
+- sourceReference: Include DSC/NCR/RFI number if mentioned (e.g., 'DSC 293') AND page/section reference
 - extractedFromCode: Any delay code if present, otherwise "GENERAL"
 
 Return a JSON array of extracted events. If no delays are found, return an empty array.
