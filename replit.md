@@ -53,6 +53,7 @@ Preferred communication style: Simple, everyday language.
 - **Match Date Validation**: Post-match validation ensures the activity has started by the report date (uses actual start date if available, otherwise planned start date). Activities that haven't started yet are rejected. Completed activities are valid matches since delays could have occurred during that work.
 - **Activity ID Mapping**: The AI returns human-readable activity codes (e.g., "2-W-0471"), which are mapped to UUID primary keys before saving to `matchedActivityId` (FK). The activity code is preserved in `cpmActivityId` for display purposes.
 - **Activity ID Normalization**: Lookups handle leading zero variations (e.g., "02-RW-0569" matches "2-RW-0569") by generating and trying multiple variants during database queries.
+- **Diary Section Analysis**: AI extraction now explicitly analyzes IDR "Diary" sections with timestamped narratives. Recognizes multiple time formats (0700, 7am, 7:00 AM, 07:00) and calculates delay duration from timestamp gaps (e.g., "0700-crew stopped, 0830-resumed" = 1.5h delay). Source references include timestamps like "Diary, 1415: [description]".
 
 ## External Dependencies
 
