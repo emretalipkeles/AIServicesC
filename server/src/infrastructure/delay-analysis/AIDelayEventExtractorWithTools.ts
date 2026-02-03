@@ -419,7 +419,7 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
       reworkDescription: item.reworkDescription
         ? String(item.reworkDescription)
         : undefined,
-      matchedActivityId: item.matchedActivityId || undefined,
+      matchedActivityId: this.sanitizeActivityId(item.matchedActivityId),
       matchedActivityDescription: item.matchedActivityDescription || undefined,
       matchedActivityWbs: item.matchedActivityWbs || undefined,
       matchConfidence: this.normalizeMatchConfidence(item.matchConfidence),
@@ -446,6 +446,20 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
       }
     }
     return undefined;
+  }
+
+  private sanitizeActivityId(value: unknown): string | undefined {
+    if (value === null || value === undefined) return undefined;
+    
+    const strValue = String(value).trim().toUpperCase();
+    
+    const invalidValues = ['NA', 'N/A', 'NULL', 'NONE', 'UNKNOWN', '-', ''];
+    if (invalidValues.includes(strValue)) {
+      console.log(`[AI] TOOL-EXTRACTION: Sanitized invalid matchedActivityId "${value}" -> undefined`);
+      return undefined;
+    }
+    
+    return String(value).trim() || undefined;
   }
 
   private parseConfidenceScore(value: unknown, baseConfidence: number): number {
