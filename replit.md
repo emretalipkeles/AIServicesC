@@ -51,6 +51,8 @@ Preferred communication style: Simple, everyday language.
 - **Tool-Based Extraction**: Advanced extraction mode (enabled by default) using OpenAI function calling to query the schedule database during document processing for on-demand activity lookup, enabling single-pass extraction and matching. Prioritizes detecting "Contractor's Work Activity" tables in IDRs with activity IDs like "2-W-0471".
 - **Activity Matching Priority**: (1) Force match to IDR-listed activities first (confidence reflects description alignment: 85-100% high, 70-84% good, 50-69% weak, 40-49% forced); (2) If no IDR activities, match to date-filtered schedule (excludes activities starting after report date). Report date extracted from IDR "Day/Date" header field.
 - **Match Date Validation**: Post-match validation ensures the activity has started by the report date (uses actual start date if available, otherwise planned start date). Activities that haven't started yet are rejected. Completed activities are valid matches since delays could have occurred during that work.
+- **Activity ID Mapping**: The AI returns human-readable activity codes (e.g., "2-W-0471"), which are mapped to UUID primary keys before saving to `matchedActivityId` (FK). The activity code is preserved in `cpmActivityId` for display purposes.
+- **Activity ID Normalization**: Lookups handle leading zero variations (e.g., "02-RW-0569" matches "2-RW-0569") by generating and trying multiple variants during database queries.
 
 ## External Dependencies
 
