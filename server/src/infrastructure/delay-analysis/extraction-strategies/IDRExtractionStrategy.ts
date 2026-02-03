@@ -29,52 +29,13 @@ Many IDRs contain a "Contractor's Work Activity" section/table that lists the sc
 PART 2: EXTRACT DELAY EVENTS
 =============================================================================
 
-**CRITICAL: ANALYZE BOTH DSC ENTRIES AND DIARY NARRATIVE SECTIONS**
-
-IDRs contain multiple sections with delay information. You MUST analyze ALL of them:
-
-1. **DSC/Discrepancy entries** - Formal discrepancy codes (e.g., "DSC 293", "DSC 295")
-2. **Diary sections** - Daily narrative logs with timestamps (e.g., "Diary - Jansen Civil Crew #1")
-
-=============================================================================
-DIARY SECTION ANALYSIS - VERY IMPORTANT
-=============================================================================
-
-Diary sections contain timestamped narratives of daily activities. These are RICH sources of delay information.
-
-**TIME FORMAT RECOGNITION**: Inspectors use various formats. Recognize ALL of these:
-- Military time: 0700, 0830, 1415, 2100
-- AM/PM: 7am, 7:00 AM, 7:00am, 8:30 AM
-- Standard: 7:00, 8:30, 14:15
-
-**DURATION CALCULATION FROM TIMESTAMPS**:
-When the Diary shows work stopped and resumed, calculate the delay duration:
-
-Example 1:
-  "0700 - crew did not start work because machine was not working"
-  "0830 - crew started working after machine was fixed"
-  → Delay = 1.5 hours (0700 to 0830)
-
-Example 2:
-  "1415 - large roots were encountered and Jansen stopped excavation"
-  "1500 - Jansen directed to utilize Vactor Truck tomorrow"
-  → Delay = at minimum 0.75 hours, but if work didn't resume that day, note "remainder of shift"
-
-**SOURCE REFERENCE FOR DIARY ENTRIES**:
-Include the Diary section name and timestamp in sourceReference:
-- "Diary, 1415: Large roots encountered, excavation stopped (DSC 295)"
-- "Diary, 0700-0830: Equipment breakdown delayed crew start"
-
-=============================================================================
 EXTRACTION PRIORITIES (in order):
-=============================================================================
 1. CODE_CIE tagged entries - These are explicitly flagged contractor delays (HIGHEST PRIORITY)
-2. Diary narrative delays - Timestamped entries showing work stoppages, equipment issues, crew problems
-3. Delays caused by contractor actions or inaction
-4. Work stoppages due to contractor issues (equipment breakdown, crew problems)
-5. Material or equipment delays from contractor
-6. Subcontractor coordination failures
-7. Quality issues observed that may require rework
+2. Delays caused by contractor actions or inaction
+3. Work stoppages due to contractor issues (equipment breakdown, crew problems)
+4. Material or equipment delays from contractor
+5. Subcontractor coordination failures
+6. Quality issues observed that may require rework
 
 **CRITICAL: extractedFromCode FIELD RULES**
 This is the MOST IMPORTANT field for IDR documents. You MUST follow these rules exactly:

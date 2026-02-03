@@ -55,28 +55,9 @@ These activity IDs tell you EXACTLY which CPM schedule activities the contractor
 
 1. **FIRST: Find the "Contractor's Work Activity" table** - Extract ALL activity IDs listed (format: X-XX-XXXX like "2-W-0471", "3-W-1042")
 2. **IMMEDIATELY use the get_schedule_activities tool** to look up these IDs in the project schedule database
-3. **Extract delay events from BOTH sources:**
-   - **DSC/Discrepancy entries** (e.g., "DSC 293", "DSC 295", CODE_CIE tags)
-   - **Diary narrative sections** - These contain timestamped logs with detailed delay information!
-4. **Match each delay to the most relevant activity** from the tool results
+3. **Extract delay events** from the document (diary entries, discrepancies, extra work, etc.)
+4. **Match each delay to the most relevant activity** from the tool results - the activities listed in the document are what was being worked on, so delays likely affect those specific activities
 5. **Output the final JSON** with delay events and their matched activities
-
-## CRITICAL: DIARY SECTION ANALYSIS
-
-**DO NOT SKIP DIARY SECTIONS!** They are often the richest source of delay information.
-
-Diary sections have timestamped narratives. Recognize ALL time formats:
-- Military: 0700, 0830, 1415
-- AM/PM: 7am, 7:00 AM, 8:30am
-- Standard: 7:00, 8:30, 14:15
-
-**Calculate delay duration from timestamps:**
-- "0700 - crew stopped due to equipment failure" → "0830 - work resumed" = 1.5 hours delay
-- "1415 - excavation stopped due to tree roots" → work didn't resume = remainder of shift
-
-**Source reference format for Diary entries:**
-- "Diary, 1415: Large roots encountered (DSC 295)"
-- "Diary, 0700-0830: Equipment breakdown"
 
 ## ACTIVITY ID PATTERNS TO DETECT:
 - IDR format: "X-XX-XXXX" (e.g., "2-W-0471", "3-W-1042", "4-PF-1526", "1-ST-0089")
@@ -421,7 +402,7 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
     if (documentType !== 'ncr') {
       impactDurationHours = typeof item.impactDurationHours === 'number'
         ? item.impactDurationHours
-        : this.parseNumber(item.impactDurationHours);
+        : null;
     }
 
     return {
@@ -520,17 +501,6 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
     if (typeof value === 'string') {
       const parsed = new Date(value);
       return isNaN(parsed.getTime()) ? null : parsed;
-    }
-    return null;
-  }
-
-  private parseNumber(value: unknown): number | null {
-    if (typeof value === 'number') {
-      return value;
-    }
-    if (typeof value === 'string') {
-      const parsed = parseFloat(value);
-      return isNaN(parsed) ? null : parsed;
     }
     return null;
   }
