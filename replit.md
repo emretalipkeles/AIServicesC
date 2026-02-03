@@ -43,11 +43,11 @@ Preferred communication style: Simple, everyday language.
 
 ### Feature Specifications
 - **Delay Interpretation**: AI-powered interpretation of construction delays from project documents (IDRs, NCRs, Field Memos). Uses document-type-specific extraction strategies and real-time SSE progress reporting. Tracks AI token usage and displays per-run cost.
-- **Document Processing**: Upload and parse construction documents (PDF) to extract delay information. Includes SHA-256 content hash for duplicate detection and delay event deduplication based on reference numbers.
+- **Document Processing**: Upload and parse construction documents (PDF) to extract delay information. Includes SHA-256 content hash for duplicate detection and delay event deduplication based on reference numbers (NCR, IDR, FM, DSC, RFI, COR patterns with date scoping).
 - **Schedule Integration**: Upload CPM schedules (CSV/Excel/PDF) and link delay events to specific activities. Features PDF schedule parsing for all activities with 'A' (actual) markers, capturing critical path (is_critical_path) and total float (total_float).
 - **AI Chat Assistant**: Guardrailed AI assistant for construction delay inquiries. Explains delay duration methodology, accesses document content, links to source documents, and provides streaming chat with thinking steps for AI reasoning stages.
 - **Document Extraction Strategy**: Utilizes a strategy pattern (`IDocumentExtractionStrategy`) for document-type-specific processing (IDR, NCR, Field Memo, Default) to optimize delay event extraction, including IDR work activity fast-match optimization.
-- **Tool-Based Extraction**: Advanced extraction mode using OpenAI function calling to query the schedule database during document processing for on-demand activity lookup, enabling single-pass extraction and matching.
+- **Tool-Based Extraction**: Advanced extraction mode (enabled by default) using OpenAI function calling to query the schedule database during document processing for on-demand activity lookup, enabling single-pass extraction and matching. Prioritizes detecting "Contractor's Work Activity" tables in IDRs with activity IDs like "2-W-0471".
 
 ## External Dependencies
 
