@@ -180,16 +180,36 @@ export class RegexScheduleParser implements IScheduleParser {
     const lines = text.split('\n');
     const activityLines: string[] = [];
     
+    // Full date pattern to exclude (DD-Mon-YY, DD/Mon/YY, DD Mon YY)
+    const datePattern = /^\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{2,4}$/;
+    // Month abbreviations to exclude from activity ID matching
+    const monthAbbreviations = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$/i;
+    
     const activityIdPatterns = [
-      /\d+-[A-Za-z]+-\d+/,
-      /\d+-[A-Za-z]{1,4}-\d+/,
-      /[A-Za-z]+-\d+-\d+/,
-      /[A-Za-z]{1,4}\d+-\d+/,
-      /\d+[A-Za-z]{1,4}\d+/,
+      /(\d+)-([A-Za-z]+)-(\d+)/,
+      /(\d+)-([A-Za-z]{1,4})-(\d+)/,
+      /([A-Za-z]+)-(\d+)-(\d+)/,
+      /([A-Za-z]{1,4})(\d+)-(\d+)/,
+      /(\d+)([A-Za-z]{1,4})(\d+)/,
     ];
     
     const hasActivityId = (line: string): boolean => {
-      return activityIdPatterns.some(pattern => pattern.test(line));
+      for (const pattern of activityIdPatterns) {
+        const match = line.match(pattern);
+        if (match) {
+          // Check if the full match looks like a date (e.g., 11-Sep-24)
+          if (datePattern.test(match[0])) {
+            continue;
+          }
+          // Check if any captured group is a month abbreviation (date string)
+          const groups = match.slice(1);
+          const hasMonthAbbr = groups.some(g => monthAbbreviations.test(g));
+          if (!hasMonthAbbr) {
+            return true;
+          }
+        }
+      }
+      return false;
     };
     
     let currentActivityLine = '';
@@ -240,24 +260,40 @@ export class RegexScheduleParser implements IScheduleParser {
   }
 
   private parseActivityLine(line: string): ExtractedActivity | null {
+    // Full date pattern to exclude (DD-Mon-YY, DD/Mon/YY, DD Mon YY)
+    const datePattern = /^\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{2,4}$/;
+    // Month abbreviations to exclude from activity ID matching
+    const monthAbbreviations = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$/i;
+    
     const idPatterns = [
-      /(\d+-[A-Za-z]+-\d+)/,
-      /(\d+-[A-Za-z]{1,4}-\d+)/,
-      /([A-Za-z]+-\d+-\d+)/,
-      /([A-Za-z]{1,4}\d+-\d+)/,
+      /(\d+)-([A-Za-z]+)-(\d+)/,
+      /(\d+)-([A-Za-z]{1,4})-(\d+)/,
+      /([A-Za-z]+)-(\d+)-(\d+)/,
+      /([A-Za-z]{1,4})(\d+)-(\d+)/,
+      /(\d+)([A-Za-z]{1,4})(\d+)/,
     ];
     
-    let activityIdMatch: RegExpMatchArray | null = null;
+    let activityId: string | null = null;
     for (const pattern of idPatterns) {
-      activityIdMatch = line.match(pattern);
-      if (activityIdMatch) break;
+      const match = line.match(pattern);
+      if (match) {
+        // Check if the full match looks like a date (e.g., 11-Sep-24)
+        if (datePattern.test(match[0])) {
+          continue;
+        }
+        // Check if any captured group is a month abbreviation (date string)
+        const groups = match.slice(1);
+        const hasMonthAbbr = groups.some(g => monthAbbreviations.test(g));
+        if (!hasMonthAbbr) {
+          activityId = match[0];
+          break;
+        }
+      }
     }
     
-    if (!activityIdMatch) {
+    if (!activityId) {
       return null;
     }
-
-    const activityId = activityIdMatch[1];
     
     const dateWithAPattern = /(\d{1,2})[-\/\s]([A-Za-z]{3})[-\/\s](\d{2,4})\s*A\b/gi;
     const actualDates: Date[] = [];
@@ -363,25 +399,30 @@ export class RegexScheduleParser implements IScheduleParser {
     const datePattern = /\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{2,4}/;
     const dateMatch = afterId.match(datePattern);
     
+    let desc = '';
     if (dateMatch && dateMatch.index !== undefined) {
-      const desc = afterId.substring(0, dateMatch.index).trim();
-      if (desc.length > 3) {
-        return desc.replace(/^\s*[-–—]\s*/, '').trim();
-      }
+      desc = afterId.substring(0, dateMatch.index).trim();
+    } else {
+      // No date found, use the afterId cleaned up
+      desc = afterId
+        .replace(/\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{2,4}/g, '')
+        .replace(/\s+A\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    
+    // Remove trailing numeric columns (duration, float, etc.)
+    // Pattern: strip sequences of numbers at the end like "12 12 0 12 0 12" or "-3 12.5 0"
+    desc = desc.replace(/(\s+-?\d+(?:\.\d+)?)+\s*$/, '').trim();
+    
+    // Also remove leading dash/hyphen if present
+    desc = desc.replace(/^\s*[-–—]\s*/, '').trim();
+    
+    if (desc.length > 3) {
+      return desc.substring(0, 200);
     }
 
-    const cleaned = afterId
-      .replace(/\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{2,4}/g, '')
-      .replace(/\s+A\b/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const firstSentence = cleaned.split(/[.!?\n]/)[0];
-    if (firstSentence && firstSentence.length > 3) {
-      return firstSentence.substring(0, 200).trim();
-    }
-
-    return cleaned.substring(0, 200) || 'Unknown Activity';
+    return desc || 'Unknown Activity';
   }
 
   private extractWbs(line: string): string | null {
