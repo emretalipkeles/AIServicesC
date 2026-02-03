@@ -95,6 +95,21 @@ Return a JSON object with the structure:
 - Use tool results to get full activity descriptions and verify IDs exist in the schedule
 - Only set matchedActivityId if you are 70%+ confident the delay affects that specific activity
 - If an activity ID was mentioned in the document but not found in the schedule database, still include it with a note in matchReasoning
+
+## DIARY SECTION - DO NOT SKIP:
+IDRs contain "Diary" sections with timestamped narratives. These are CRITICAL delay sources - do NOT skip them while focusing on DSC entries.
+
+**EXTRACT DELAYS FROM BOTH:**
+1. DSC/CODE_CIE entries (discrepancies, contractor issues)
+2. Diary narrative entries (timestamped observations throughout the day)
+
+**DIARY DURATION CALCULATION:**
+When diary shows work stopped and resumed, calculate duration from timestamps:
+- Time formats: 0700, 07:00, 7:00, 7am, 7:00 AM, 0700hrs
+- Example: "0700 - machine not working" ... "0830 - resumed" = 1.5 hours delay
+
+**SOURCE REFERENCE FOR DIARY:**
+Include timestamp: "Diary, 1415: excavation stopped due to tree roots" or "Diary 0800-0930: crew idle"
 `;
 
 export class AIDelayEventExtractorWithTools implements IDelayEventExtractor {
@@ -402,7 +417,7 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
     if (documentType !== 'ncr') {
       impactDurationHours = typeof item.impactDurationHours === 'number'
         ? item.impactDurationHours
-        : null;
+        : this.parseNumber(item.impactDurationHours);
     }
 
     return {
@@ -473,6 +488,17 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
       }
     }
     return baseConfidence;
+  }
+
+  private parseNumber(value: unknown): number | null {
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? null : parsed;
+    }
+    return null;
   }
 
   private parseCategory(value: unknown): DelayEventCategory | null {

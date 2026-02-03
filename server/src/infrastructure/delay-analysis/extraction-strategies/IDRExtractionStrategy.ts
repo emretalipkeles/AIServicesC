@@ -65,6 +65,37 @@ CRITICAL ANALYSIS REQUIREMENTS:
   * Look for clear contractor-caused issues vs. external factors
 
 =============================================================================
+DIARY SECTION ANALYSIS (IMPORTANT)
+=============================================================================
+
+IDRs contain "Diary" sections with timestamped narrative entries. These are CRITICAL sources of delay information that you MUST analyze carefully.
+
+**DIARY FORMAT:**
+Diary entries typically look like:
+- "Diary - [Inspector Name]" or "Diary – [Crew Name]"
+- Followed by timestamped entries throughout the day
+
+**TIME FORMATS TO RECOGNIZE:**
+Inspectors use various formats: 0700, 07:00, 7:00, 7am, 7:00 AM, 7 AM, 0700hrs
+
+**DURATION CALCULATION FROM TIMESTAMPS:**
+When diary entries show work stoppage and resumption, CALCULATE the delay duration:
+- Example: "0700 - crew stopped work, machine not running" ... "0830 - crew resumed after repair"
+  → Delay duration = 1.5 hours (from 07:00 to 08:30)
+- Example: "1415 - excavation stopped due to tree roots (DSC 295)" ... "1500 - work resumed"
+  → Delay duration = 0.75 hours (45 minutes)
+
+**WHAT TO EXTRACT FROM DIARY:**
+1. Work stoppages with timestamps (calculate duration from time gaps)
+2. DSC references mentioned in diary (e.g., "DSC 293", "DSC 295")
+3. Equipment breakdowns, crew delays, material issues
+4. Coordination problems noted by inspector
+5. Quality issues that halted work
+
+**SOURCE REFERENCE FORMAT FOR DIARY ENTRIES:**
+Include the timestamp in sourceReference: "Diary, 1415: [brief description]" or "Diary 0800-0930: [description]"
+
+=============================================================================
 RESPONSE FORMAT
 =============================================================================
 
