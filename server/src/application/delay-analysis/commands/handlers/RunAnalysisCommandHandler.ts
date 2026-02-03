@@ -16,6 +16,8 @@ import type {
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 
+const MIN_MATCH_CONFIDENCE_FOR_SKIP = 85;
+
 export interface RunAnalysisResult {
   eventsExtracted: number;
   eventsMatched: number;
@@ -27,6 +29,7 @@ export interface RunAnalysisOptions {
   runId?: string;
   progressReporter?: IProgressReporter;
   onTokenUsage?: TokenUsageCallback;
+  enableToolBasedMatching?: boolean;
 }
 
 
@@ -129,6 +132,9 @@ export class RunAnalysisCommandHandler {
                 runId: options?.runId, 
                 onTokenUsage: options?.onTokenUsage,
                 documentType: doc.documentType,
+                tenantId: command.tenantId,
+                projectId: command.projectId,
+                enableToolBasedMatching: options?.enableToolBasedMatching,
               }
             );
 
@@ -201,17 +207,26 @@ export class RunAnalysisCommandHandler {
           percentage: 47,
         });
 
+        let preMatchedCount = 0;
         for (const deduped of deduplicatedEvents) {
           const now = new Date();
+          const hasPreMatch = deduped.event.matchedActivityId && 
+            deduped.event.matchConfidence !== undefined &&
+            deduped.event.matchConfidence >= MIN_MATCH_CONFIDENCE_FOR_SKIP / 100;
+          
+          if (hasPreMatch) {
+            preMatchedCount++;
+          }
+
           const event = new ContractorDelayEvent({
             id: randomUUID(),
             projectId: command.projectId,
             tenantId: command.tenantId,
             sourceDocumentId: deduped.primarySourceDocumentId,
-            matchedActivityId: null,
-            wbs: null,
-            cpmActivityId: null,
-            cpmActivityDescription: null,
+            matchedActivityId: hasPreMatch ? deduped.event.matchedActivityId! : null,
+            wbs: hasPreMatch ? (deduped.event.matchedActivityWbs ?? null) : null,
+            cpmActivityId: hasPreMatch ? deduped.event.matchedActivityId! : null,
+            cpmActivityDescription: hasPreMatch ? (deduped.event.matchedActivityDescription ?? null) : null,
             eventDescription: deduped.event.eventDescription,
             eventCategory: deduped.event.eventCategory,
             eventStartDate: deduped.event.eventDate,
@@ -219,8 +234,8 @@ export class RunAnalysisCommandHandler {
             impactDurationHours: normalizeImpactDuration(deduped.event.impactDurationHours),
             sourceReference: deduped.event.sourceReference,
             extractedFromCode: deduped.event.extractedFromCode,
-            matchConfidence: null,
-            matchReasoning: null,
+            matchConfidence: hasPreMatch ? Math.round(deduped.event.matchConfidence! * 100) : null,
+            matchReasoning: hasPreMatch ? (deduped.event.matchReasoning ?? '[Pre-matched during extraction]') : null,
             verificationStatus: 'pending',
             verifiedBy: null,
             verifiedAt: null,
@@ -233,6 +248,18 @@ export class RunAnalysisCommandHandler {
 
           await this.eventRepository.save(event);
           result.eventsExtracted++;
+          if (hasPreMatch) {
+            result.eventsMatched++;
+          }
+        }
+
+        if (preMatchedCount > 0) {
+          progress.report({
+            stage: 'saving_events',
+            message: `${preMatchedCount} events were pre-matched during extraction (activity ID detected in document)`,
+            percentage: 48,
+          });
+          console.log(`[RunAnalysisCommandHandler] ${preMatchedCount} events pre-matched during extraction`);
         }
       }
     }

@@ -107,6 +107,39 @@ When processing IDR documents, the system extracts the "Contractor's Work Activi
 
 **Note**: Fast-match only works when extraction and matching run in the same analysis command. Work activities are not persisted separately.
 
+### Tool-Based Extraction with On-Demand Activity Lookup
+An advanced extraction mode uses OpenAI function calling to enable the AI to query the schedule database during document processing:
+
+**Workflow**:
+1. AI reads document and detects explicit activity IDs (e.g., "Activity 1234", "WBS 05.02.01")
+2. AI calls `get_schedule_activities` tool to look up those activities from the database
+3. AI receives activity details (description, dates, critical path status)
+4. AI outputs delay events with matched activity information in a single pass
+
+**Enabling Tool-Based Extraction**:
+- Pass `enableToolBasedMatching: true` in `RunAnalysisOptions`
+- The handler automatically provides `tenantId` and `projectId` to the extractor
+- If `AIDelayEventExtractorWithTools` is injected, it uses tool-based extraction; otherwise falls back to standard extraction
+
+**Benefits**:
+- Single AI call per document (vs 1 extraction + N matching calls)
+- AI has full context when matching (document + activity details together)
+- Only fetches relevant activities from DB (not entire schedule)
+- Pre-matched events skip the separate matching phase (confidence >= 85%)
+- Pre-matched events include WBS code and activity description
+
+**Key Files**:
+- `server/src/domain/delay-analysis/interfaces/IExtractionToolExecutor.ts`: Domain interface for extraction tools (returns DTOs)
+- `server/src/domain/delay-analysis/interfaces/IDelayEventExtractor.ts`: Extended ExtractionOptions with tenantId/projectId/enableToolBasedMatching
+- `server/src/infrastructure/delay-analysis/tools/GetScheduleActivitiesTool.ts`: Tool implementation
+- `server/src/infrastructure/delay-analysis/AIDelayEventExtractorWithTools.ts`: Extractor with tool support
+- `server/src/application/delay-analysis/queries/GetActivitiesByIdsQuery.ts`: CQRS query for activity lookup
+- `server/src/application/delay-analysis/commands/handlers/RunAnalysisCommandHandler.ts`: Passes context to extractor
+
+**Confidence Normalization**: All confidence values are normalized to 0-1 range internally and stored as 0-100 integers in the database.
+
+**Fallback**: Events without pre-matched activities use the existing AIActivityMatcher for full schedule matching.
+
 ### Feature Specifications
 - **Delay Interpretation**: AI-powered construction delay interpretation. Processes project documents (IDRs, NCRs, Field Memos) to extract delay events and match them to CPM schedule activities. Uses document-type-specific extraction strategies for optimized analysis. Includes project management APIs, real-time SSE progress reporting, run-based AI token usage tracking, and per-run cost display in USD shown in the UI after each operation completes.
 - **Document Processing**: Upload and parse construction documents (PDF) to extract delay-related information including dates, causes, responsible parties, and impacts. Features:

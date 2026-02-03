@@ -13,6 +13,11 @@ export interface ExtractedDelayEvent {
   confidenceScore?: number;
   responsibilityConfirmed?: boolean;
   reworkDescription?: string;
+  matchedActivityId?: string;
+  matchedActivityDescription?: string;
+  matchedActivityWbs?: string;
+  matchConfidence?: number;
+  matchReasoning?: string;
 }
 
 export interface ExtractionResult {
@@ -33,6 +38,9 @@ export interface ExtractionOptions {
   runId?: string;
   onTokenUsage?: TokenUsageCallback;
   documentType?: ProjectDocumentType;
+  tenantId?: string;
+  projectId?: string;
+  enableToolBasedMatching?: boolean;
 }
 
 export interface IDelayEventExtractor {
