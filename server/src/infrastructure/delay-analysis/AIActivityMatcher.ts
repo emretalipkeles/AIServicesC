@@ -85,6 +85,7 @@ export class AIActivityMatcher implements IActivityMatcher {
     }
 
     if (options?.idrWorkActivities && options.idrWorkActivities.length > 0) {
+      console.log(`[AI] MATCHING: Trying IDR fast-match with ${options.idrWorkActivities.length} work activities...`);
       const fastMatchResult = await this.tryFastMatch(
         eventDescription,
         eventDate,
@@ -94,11 +95,11 @@ export class AIActivityMatcher implements IActivityMatcher {
       );
 
       if (fastMatchResult) {
-        console.log('[AIActivityMatcher] Fast-match succeeded via IDR activities');
+        console.log(`[AI] MATCHING: Fast-match succeeded -> ${fastMatchResult.cpmActivityId} (${fastMatchResult.confidence}% confidence)`);
         return fastMatchResult;
       }
 
-      console.log('[AIActivityMatcher] Fast-match failed, falling back to full schedule');
+      console.log('[AI] MATCHING: Fast-match failed, falling back to full schedule...');
     }
 
     return this.matchAgainstFullSchedule(eventDescription, eventDate, activities, options);
@@ -120,7 +121,7 @@ export class AIActivityMatcher implements IActivityMatcher {
       return null;
     }
 
-    console.log(`[AIActivityMatcher] Fast-matching against ${priorityActivities.length} IDR activities`);
+    console.log(`[AI] MATCHING: Fast-matching against ${priorityActivities.length} IDR activities`);
 
     const activitiesList = idrWorkActivities
       .map(wa => `${wa.activityId} | ${wa.description} | ${wa.comments || '-'}`)
@@ -185,11 +186,7 @@ export class AIActivityMatcher implements IActivityMatcher {
       .replace('{activitiesList}', activitiesList);
 
     try {
-      console.log('[AIActivityMatcher] Matching event:', {
-        eventDescription: eventDescription.substring(0, 100) + '...',
-        eventDate: eventDate?.toISOString().split('T')[0] || 'Unknown',
-        activitiesCount: activities.length,
-      });
+      console.log(`[AI] MATCHING: Full schedule match for event: "${eventDescription.substring(0, 80)}..." (${activities.length} activities)`);
 
       const response = await this.aiClient.chat({
         model: ModelId.gpt52(),
@@ -198,7 +195,7 @@ export class AIActivityMatcher implements IActivityMatcher {
         temperature: 0.1,
       });
 
-      console.log('[AIActivityMatcher] Raw AI response:', response.content);
+      console.log(`[AI] MATCHING: Completed - used ${response.inputTokens} input + ${response.outputTokens} output tokens`);
 
       if (options?.onTokenUsage && options?.runId) {
         await options.onTokenUsage({
@@ -213,11 +210,11 @@ export class AIActivityMatcher implements IActivityMatcher {
 
       const result = this.parseMatchResponse(response.content, activities);
       
-      console.log('[AIActivityMatcher] Parsed result:', result ? {
-        activityId: result.cpmActivityId,
-        confidence: result.confidence,
-        reasoning: result.reasoning?.substring(0, 100) + '...',
-      } : 'null (no match)');
+      if (result) {
+        console.log(`[AI] MATCHING: Result -> ${result.cpmActivityId} (${result.confidence}% confidence)`);
+      } else {
+        console.log('[AI] MATCHING: Result -> No match found');
+      }
 
       return result;
     } catch (error) {

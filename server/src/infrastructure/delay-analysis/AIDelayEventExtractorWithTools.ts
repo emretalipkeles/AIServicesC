@@ -176,8 +176,10 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
 
+      console.log(`[AI] TOOL-EXTRACTION: Starting tool-based extraction for "${documentFilename}" (type: ${documentType})`);
+      
       while (continueLoop) {
-        console.log(`[AIDelayEventExtractorWithTools] Calling OpenAI for ${documentFilename}...`);
+        console.log(`[AI] TOOL-EXTRACTION: Calling OpenAI API...`);
         
         const response = await this.openai.chat.completions.create({
           model: 'gpt-4.1',
@@ -201,7 +203,7 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
           for (const toolCall of choice.message.tool_calls) {
             if (toolCall.type !== 'function') continue;
             
-            console.log(`[AIDelayEventExtractorWithTools] Tool call: ${toolCall.function.name}`);
+            console.log(`[AI] TOOL-EXTRACTION: AI requested tool call: ${toolCall.function.name}`);
             
             let args: Record<string, unknown> = {};
             try {
@@ -212,7 +214,7 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
             }
 
             const activityIds = (args.activity_ids as string[]) || [];
-            console.log(`[AIDelayEventExtractorWithTools] Looking up ${activityIds.length} activity IDs:`, activityIds);
+            console.log(`[AI] TOOL-EXTRACTION: Looking up ${activityIds.length} activity IDs in schedule:`, activityIds);
 
             const toolResult = await this.toolExecutor.execute({
               tenantId: options.tenantId,
@@ -267,9 +269,10 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
         documentType
       );
 
-      console.log(`[AIDelayEventExtractorWithTools] Extracted ${parseResult.events.length} events from ${documentFilename}`);
+      console.log(`[AI] TOOL-EXTRACTION: Completed - used ${totalInputTokens} input + ${totalOutputTokens} output tokens`);
+      console.log(`[AI] TOOL-EXTRACTION: Extracted ${parseResult.events.length} events from "${documentFilename}"`);
       const matchedCount = parseResult.events.filter(e => e.matchedActivityId).length;
-      console.log(`[AIDelayEventExtractorWithTools] ${matchedCount} events have matched activity IDs`);
+      console.log(`[AI] TOOL-EXTRACTION: ${matchedCount}/${parseResult.events.length} events have pre-matched activity IDs`);
 
       return {
         events: parseResult.events,

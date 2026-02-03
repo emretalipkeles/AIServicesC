@@ -43,12 +43,16 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
     });
 
     try {
+      console.log(`[AI] EXTRACTION: Starting delay event extraction for "${documentFilename}" (type: ${documentType}, strategy: ${strategy.strategyName})`);
+      
       const response = await this.aiClient.chat({
         model: ModelId.gpt52(),
         messages: [AIMessage.user(strategyResult.prompt)],
         maxTokens: 4000,
         temperature: 0.1,
       });
+      
+      console.log(`[AI] EXTRACTION: Completed - used ${response.inputTokens} input + ${response.outputTokens} output tokens`);
 
       if (options?.onTokenUsage && options?.runId) {
         await options.onTokenUsage({
