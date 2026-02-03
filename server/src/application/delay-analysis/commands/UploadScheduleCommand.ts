@@ -6,6 +6,6 @@ export interface UploadScheduleCommand {
     contentType: string;
     buffer: Buffer;
   };
-  targetMonth: number;
-  targetYear: number;
+  targetMonth?: number;
+  targetYear?: number;
 }

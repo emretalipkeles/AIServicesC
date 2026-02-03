@@ -54,15 +54,11 @@ async function fetchScheduleActivities(projectId: string): Promise<ScheduleActiv
 export function uploadScheduleWithProgress(
   projectId: string,
   file: File,
-  targetMonth: number,
-  targetYear: number,
   onProgress: (event: ProgressEvent) => void
 ): Promise<UploadScheduleResult> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("targetMonth", targetMonth.toString());
-    formData.append("targetYear", targetYear.toString());
 
     fetch(`/api/delay-analysis/projects/${projectId}/schedule/stream`, {
       method: "POST",

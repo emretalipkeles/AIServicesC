@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, FileSpreadsheet, Trash2, FileText, Loader2, DollarSign, CheckCircle, Clock, Search } from "lucide-react";
 import { useScheduleActivities, useDeleteAllActivities, uploadScheduleWithProgress } from "@/lib/schedule-api";
@@ -10,35 +9,15 @@ import { useUploadState } from "@/contexts/upload-state-context";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { GlassCard, SectionHeader, UploadZone, ProgressIndicator, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles, selectTriggerStyles } from "./ui/premium-components";
+import { GlassCard, SectionHeader, UploadZone, ProgressIndicator, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 
 interface ScheduleUploadProps {
   projectId: string;
 }
 
-const MONTHS = [
-  { value: 1, label: "January" },
-  { value: 2, label: "February" },
-  { value: 3, label: "March" },
-  { value: 4, label: "April" },
-  { value: 5, label: "May" },
-  { value: 6, label: "June" },
-  { value: 7, label: "July" },
-  { value: 8, label: "August" },
-  { value: 9, label: "September" },
-  { value: 10, label: "October" },
-  { value: 11, label: "November" },
-  { value: 12, label: "December" },
-];
-
-const currentYear = new Date().getFullYear();
-const YEARS = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
-
 export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [targetMonth, setTargetMonth] = useState<number>(new Date().getMonth() + 1);
-  const [targetYear, setTargetYear] = useState<number>(currentYear);
   const [filterText, setFilterText] = useState("");
   const uploadSectionRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -92,7 +71,7 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
         variant: "destructive",
       });
     }
-  }, [targetMonth, targetYear]);
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -109,24 +88,19 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
       const result = await uploadScheduleWithProgress(
         projectId,
         file,
-        targetMonth,
-        targetYear,
         (event) => {
           updateScheduleProgress(event);
         }
       );
 
-      const monthName = MONTHS.find(m => m.value === targetMonth)?.label || "";
-      
-      let description = `For ${monthName} ${targetYear}: `;
       const parts = [];
       if (result.activitiesImported > 0) parts.push(`${result.activitiesImported} new`);
       if (result.activitiesUpdated > 0) parts.push(`${result.activitiesUpdated} updated`);
       if (result.activitiesSkipped > 0) parts.push(`${result.activitiesSkipped} unchanged`);
-      description += parts.join(", ") || "No activities with actual dates found";
+      const description = parts.join(", ") || "No activities with actual dates found";
 
       toast({
-        title: "Schedule processed",
+        title: "Schedule uploaded",
         description,
       });
 
@@ -315,47 +289,6 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
             gradient="purple"
           />
           <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">Target Month</label>
-                <Select
-                  value={targetMonth.toString()}
-                  onValueChange={(v) => setTargetMonth(parseInt(v))}
-                  disabled={isUploading}
-                >
-                  <SelectTrigger className={selectTriggerStyles}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MONTHS.map((month) => (
-                      <SelectItem key={month.value} value={month.value.toString()}>
-                        {month.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">Target Year</label>
-                <Select
-                  value={targetYear.toString()}
-                  onValueChange={(v) => setTargetYear(parseInt(v))}
-                  disabled={isUploading}
-                >
-                  <SelectTrigger className={selectTriggerStyles}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {YEARS.map((year) => (
-                      <SelectItem key={year} value={year.toString()}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
 {/* AI cost display hidden for presentation
             {lastUploadCost && (
               <motion.div

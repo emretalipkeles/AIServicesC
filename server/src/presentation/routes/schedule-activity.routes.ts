@@ -87,14 +87,8 @@ export function registerScheduleActivityRoutes(app: Express, container: AppConta
           return;
         }
 
-        const bodyResult = uploadScheduleBodySchema.safeParse({
-          targetMonth: Number(req.body.targetMonth),
-          targetYear: Number(req.body.targetYear),
-        });
-        if (!bodyResult.success) {
-          res.status(400).json({ error: bodyResult.error.message });
-          return;
-        }
+        const targetMonth = req.body.targetMonth ? Number(req.body.targetMonth) : undefined;
+        const targetYear = req.body.targetYear ? Number(req.body.targetYear) : undefined;
 
         const file = req.file;
         if (!file) {
@@ -127,8 +121,8 @@ export function registerScheduleActivityRoutes(app: Express, container: AppConta
             filename: file.originalname,
             contentType: file.mimetype,
           },
-          targetMonth: bodyResult.data.targetMonth,
-          targetYear: bodyResult.data.targetYear,
+          targetMonth,
+          targetYear,
         };
 
         try {
