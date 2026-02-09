@@ -196,6 +196,7 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
           sourceReference: String(item.sourceReference || item.source || ''),
           extractedFromCode: String(item.extractedFromCode || item.code || 'GENERAL'),
           confidenceScore: this.parseConfidenceScore(item.confidenceScore, baseConfidence),
+          delayEventConfidence: this.parseConfidenceScore(item.delayEventConfidence, baseConfidence),
           responsibilityConfirmed: typeof item.responsibilityConfirmed === 'boolean' 
             ? item.responsibilityConfirmed 
             : undefined,

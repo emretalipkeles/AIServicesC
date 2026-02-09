@@ -18,6 +18,7 @@ export interface ExtractedDelayEvent {
   matchedActivityWbs?: string;
   matchConfidence?: number;
   matchReasoning?: string;
+  delayEventConfidence?: number;
 }
 
 export interface ExtractionResult {

@@ -36,6 +36,7 @@ interface ExtractedEventRaw {
   matchedActivityWbs?: string;
   matchConfidence?: number;
   matchReasoning?: string;
+  delayEventConfidence?: number;
 }
 
 const TOOL_ENABLED_SYSTEM_PROMPT = `You are a construction delay analysis expert. Your task is to extract contractor-caused delay events from construction documents and match them to schedule activities.
@@ -76,6 +77,7 @@ Return a JSON object with the structure:
       "sourceReference": "Include DSC/NCR/RFI number if mentioned (e.g., 'DSC 293', 'NCR-045') AND page/section reference",
       "extractedFromCode": "code tag if applicable",
       "confidenceScore": 0.0-1.0,
+      "delayEventConfidence": 0.0-1.0,
       "responsibilityConfirmed": true/false,
       "matchedActivityId": "activity ID if matched" or null,
       "matchedActivityDescription": "description of matched activity from tool results" or null,
@@ -449,6 +451,7 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
       sourceReference: String(item.sourceReference || item.source || ''),
       extractedFromCode: String(item.extractedFromCode || item.code || 'GENERAL'),
       confidenceScore: this.parseConfidenceScore(item.confidenceScore, baseConfidence),
+      delayEventConfidence: this.parseConfidenceScore(item.delayEventConfidence, baseConfidence),
       responsibilityConfirmed: typeof item.responsibilityConfirmed === 'boolean'
         ? item.responsibilityConfirmed
         : undefined,

@@ -4,6 +4,7 @@ import type {
   ExtractionStrategyResult 
 } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
+import { DEFAULT_DELAY_DEFINITION } from '../../../domain/delay-analysis/config/DelayDefinitionConfig';
 
 const FIELD_MEMO_EXTRACTION_PROMPT = `You are an expert construction delay analyst specializing in Field Memos and general project correspondence.
 
@@ -33,6 +34,16 @@ For each delay event found, extract:
 - sourceReference: The section/paragraph where this was found
 - extractedFromCode: "FIELD_MEMO" or any specific reference code found
 - confidenceScore: Your confidence this is a real contractor delay (0.0-1.0)
+- delayEventConfidence: Your confidence that this is truly a delay event (0.0-1.0). Assess using the following definition and indicators:
+
+DELAY DEFINITION:
+${DEFAULT_DELAY_DEFINITION.definition}
+
+HIGH CONFIDENCE INDICATORS (score 0.7-1.0):
+${DEFAULT_DELAY_DEFINITION.highConfidenceIndicators.map(i => `- ${i}`).join('\n')}
+
+LOW CONFIDENCE INDICATORS (score 0.0-0.5):
+${DEFAULT_DELAY_DEFINITION.lowConfidenceIndicators.map(i => `- ${i}`).join('\n')}
 
 Return a JSON array of extracted events. If no delays are found, return an empty array.
 

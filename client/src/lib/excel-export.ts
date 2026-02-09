@@ -13,6 +13,7 @@ interface DelayEventData {
   sourceReference?: string | null;
   sourceDocumentId?: string | null;
   extractedFromCode?: string | null;
+  delayEventConfidence?: number | null;
   matchConfidence?: number | null;
   matchReasoning?: string | null;
   verificationStatus: string;
@@ -61,13 +62,14 @@ export async function exportDelayEventsToExcel(
     { header: 'Critical Path', key: 'criticalPath', width: 12 },
     { header: 'Total Float', key: 'totalFloat', width: 12 },
     { header: 'Delay Event', key: 'eventDesc', width: 40 },
+    { header: 'Delay Event Confidence', key: 'delayEventConfidence', width: 22 },
     { header: 'Category', key: 'category', width: 22 },
     { header: 'Date', key: 'date', width: 12 },
     { header: 'Delay Duration estimate (hrs)', key: 'duration', width: 22 },
     { header: 'Source Document', key: 'sourceDoc', width: 30 },
     { header: 'Extracted From Code', key: 'extractedCode', width: 18 },
     { header: 'Source Reference', key: 'sourceRef', width: 25 },
-    { header: 'Confidence', key: 'confidence', width: 12 },
+    { header: 'Match Reasoning Confidence', key: 'confidence', width: 22 },
     { header: 'Match Reasoning', key: 'reasoning', width: 45 },
     { header: 'Reviewer Approval', key: 'status', width: 18 },
   ];
@@ -98,6 +100,7 @@ export async function exportDelayEventsToExcel(
       criticalPath: formatCriticalPath(event.isCriticalPath),
       totalFloat: event.totalFloat ?? null,
       eventDesc: event.eventDescription,
+      delayEventConfidence: event.delayEventConfidence ? `${event.delayEventConfidence}%` : '',
       category: formatCategory(event.eventCategory),
       date: event.eventStartDate ? new Date(event.eventStartDate) : null,
       duration: event.impactDurationHours || null,
@@ -129,11 +132,36 @@ export async function exportDelayEventsToExcel(
         right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
       };
 
-      if (colNumber === 3 || colNumber === 4 || colNumber === 8) {
+      if (colNumber === 3 || colNumber === 4 || colNumber === 9) {
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
       }
 
-      if (colNumber === 6) {
+      if (colNumber === 6 && event.delayEventConfidence !== null && event.delayEventConfidence !== undefined) {
+        const confidence = event.delayEventConfidence;
+        let bgColor: string;
+        let textColor: string;
+        
+        if (confidence < 50) {
+          bgColor = 'FFFEE2E2';
+          textColor = 'FFDC2626';
+        } else if (confidence < 80) {
+          bgColor = 'FFFEF3C7';
+          textColor = 'FFB45309';
+        } else {
+          bgColor = 'FFD1FAE5';
+          textColor = 'FF059669';
+        }
+        
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: bgColor },
+        };
+        cell.font = { color: { argb: textColor }, size: 10, bold: true };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      }
+
+      if (colNumber === 7) {
         const formattedCategory = formatCategory(event.eventCategory);
         const colors = categoryColors[formattedCategory];
         if (colors) {
@@ -146,7 +174,7 @@ export async function exportDelayEventsToExcel(
         }
       }
 
-      if (colNumber === 12 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
+      if (colNumber === 13 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
         const confidence = event.matchConfidence;
         let bgColor: string;
         let textColor: string;
@@ -175,7 +203,7 @@ export async function exportDelayEventsToExcel(
 
   worksheet.autoFilter = {
     from: { row: 1, column: 1 },
-    to: { row: events.length + 1, column: 14 },
+    to: { row: events.length + 1, column: 15 },
   };
 
   const today = new Date();

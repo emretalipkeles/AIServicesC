@@ -332,6 +332,9 @@ export class RunAnalysisCommandHandler {
             extractedFromCode: deduped.event.extractedFromCode,
             matchConfidence: hasPreMatch ? Math.round(deduped.event.matchConfidence! * 100) : null,
             matchReasoning: hasPreMatch ? (deduped.event.matchReasoning ?? '[Pre-matched during extraction]') : null,
+            delayEventConfidence: deduped.event.delayEventConfidence 
+              ? Math.round(deduped.event.delayEventConfidence * 100) 
+              : null,
             verificationStatus: 'pending',
             verifiedBy: null,
             verifiedAt: null,

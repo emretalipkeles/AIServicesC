@@ -28,6 +28,7 @@ export interface ContractorDelayEventProps {
   extractedFromCode?: string | null;
   matchConfidence?: number | null;
   matchReasoning?: string | null;
+  delayEventConfidence?: number | null;
   verificationStatus: VerificationStatus;
   verifiedBy?: string | null;
   verifiedAt?: Date | null;
@@ -54,6 +55,7 @@ export class ContractorDelayEvent {
   readonly extractedFromCode: string | null;
   readonly matchConfidence: number | null;
   readonly matchReasoning: string | null;
+  readonly delayEventConfidence: number | null;
   readonly verificationStatus: VerificationStatus;
   readonly verifiedBy: string | null;
   readonly verifiedAt: Date | null;
@@ -79,6 +81,7 @@ export class ContractorDelayEvent {
     this.extractedFromCode = props.extractedFromCode ?? null;
     this.matchConfidence = props.matchConfidence ?? null;
     this.matchReasoning = props.matchReasoning ?? null;
+    this.delayEventConfidence = props.delayEventConfidence ?? null;
     this.verificationStatus = props.verificationStatus;
     this.verifiedBy = props.verifiedBy ?? null;
     this.verifiedAt = props.verifiedAt ?? null;

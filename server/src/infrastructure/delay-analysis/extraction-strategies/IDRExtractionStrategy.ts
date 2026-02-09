@@ -4,6 +4,7 @@ import type {
   ExtractionStrategyResult 
 } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
+import { DEFAULT_DELAY_DEFINITION } from '../../../domain/delay-analysis/config/DelayDefinitionConfig';
 
 const IDR_EXTRACTION_PROMPT = `You are an expert construction delay analyst specializing in Inspector Daily Reports (IDRs).
 
@@ -98,6 +99,23 @@ When diary entries show work stoppage and resumption, CALCULATE the delay durati
 Include the timestamp in sourceReference: "Diary, 1415: [brief description]" or "Diary 0800-0930: [description]"
 
 =============================================================================
+DELAY EVENT CONFIDENCE ASSESSMENT
+=============================================================================
+
+For each delay event you extract, assess your confidence that this is truly a delay event (not a routine observation or normal progress note). Use the following definition and indicators:
+
+DELAY DEFINITION:
+${DEFAULT_DELAY_DEFINITION.definition}
+
+HIGH CONFIDENCE INDICATORS (score 0.7-1.0):
+${DEFAULT_DELAY_DEFINITION.highConfidenceIndicators.map(i => `- ${i}`).join('\n')}
+
+LOW CONFIDENCE INDICATORS (score 0.0-0.5):
+${DEFAULT_DELAY_DEFINITION.lowConfidenceIndicators.map(i => `- ${i}`).join('\n')}
+
+Set "delayEventConfidence" as a number between 0.0 and 1.0 for each event.
+
+=============================================================================
 RESPONSE FORMAT
 =============================================================================
 
@@ -120,6 +138,7 @@ Return a JSON object with TWO arrays:
       "sourceReference": "MUST include DSC/NCR number if mentioned (e.g., 'DSC 293: Page 2'). Format: 'DSC XXX' + location",
       "extractedFromCode": "CODE_CIE or IDR_OBSERVATION",
       "confidenceScore": 0.85,
+      "delayEventConfidence": 0.85,
       "responsibilityConfirmed": true
     }
   ]

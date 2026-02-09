@@ -21,6 +21,7 @@ export interface DelayEventDto {
   extractedFromCode: string | null;
   matchConfidence: number | null;
   matchReasoning: string | null;
+  delayEventConfidence: number | null;
   verificationStatus: VerificationStatus;
   createdAt: string;
 }
@@ -100,6 +101,7 @@ export class ListDelayEventsQueryHandler {
       extractedFromCode: event.extractedFromCode,
       matchConfidence: event.matchConfidence,
       matchReasoning: event.matchReasoning,
+      delayEventConfidence: event.delayEventConfidence,
       verificationStatus: event.verificationStatus,
       createdAt: event.createdAt.toISOString(),
     };

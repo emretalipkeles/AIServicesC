@@ -103,6 +103,7 @@ export class DelayEventDeduplicationService implements IDelayEventDeduplicationS
       impactDurationHours: existing.impactDurationHours ?? incoming.impactDurationHours,
       sourceReference: this.mergeSourceReferences(existing.sourceReference, incoming.sourceReference),
       confidenceScore: Math.max(existing.confidenceScore || 0, incoming.confidenceScore || 0),
+      delayEventConfidence: Math.max(existing.delayEventConfidence || 0, incoming.delayEventConfidence || 0),
     };
   }
 

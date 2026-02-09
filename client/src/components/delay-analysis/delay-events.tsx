@@ -308,6 +308,7 @@ interface EventCardProps {
     cpmActivityDescription: string | null;
     matchConfidence: number | null;
     matchReasoning: string | null;
+    delayEventConfidence: number | null;
     impactDurationHours: number | null;
     verificationStatus: string;
   };
@@ -315,14 +316,16 @@ interface EventCardProps {
 }
 
 function EventCard({ event, index }: EventCardProps) {
-  const getConfidenceStyle = (confidence: number | null) => {
-    if (confidence === null) return { bg: "bg-zinc-500/10", text: "text-zinc-600 dark:text-zinc-400", label: "Unmatched" };
-    if (confidence >= 80) return { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", label: `High (${confidence}%)` };
-    if (confidence >= 50) return { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", label: `Medium (${confidence}%)` };
-    return { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", label: `Low (${confidence}%)` };
+  const getConfidenceStyle = (confidence: number | null, prefix?: string) => {
+    const p = prefix ? `${prefix}: ` : '';
+    if (confidence === null) return { bg: "bg-zinc-500/10", text: "text-zinc-600 dark:text-zinc-400", label: `${p}N/A` };
+    if (confidence >= 80) return { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", label: `${p}High (${confidence}%)` };
+    if (confidence >= 50) return { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", label: `${p}Medium (${confidence}%)` };
+    return { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", label: `${p}Low (${confidence}%)` };
   };
 
-  const confidenceStyle = getConfidenceStyle(event.matchConfidence);
+  const matchConfidenceStyle = getConfidenceStyle(event.matchConfidence, "Match");
+  const delayConfidenceStyle = getConfidenceStyle(event.delayEventConfidence, "Event");
 
   return (
     <motion.div
@@ -376,9 +379,15 @@ function EventCard({ event, index }: EventCardProps) {
         <div className="flex flex-col items-end gap-2 flex-shrink-0">
           <span className={cn(
             "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium",
-            confidenceStyle.bg, confidenceStyle.text
+            delayConfidenceStyle.bg, delayConfidenceStyle.text
           )}>
-            {confidenceStyle.label}
+            {delayConfidenceStyle.label}
+          </span>
+          <span className={cn(
+            "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium",
+            matchConfidenceStyle.bg, matchConfidenceStyle.text
+          )}>
+            {matchConfidenceStyle.label}
           </span>
           <span className={cn(
             "inline-flex items-center px-2 py-0.5 rounded-full text-xs",

@@ -129,7 +129,8 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                       <th className={cn(tableHeaderCellStyles, "text-xs min-w-[120px]")}>Match Reason</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Date</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Dur.</th>
-                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Conf.</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Event Conf.</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Match Conf.</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -211,6 +212,9 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                               {event.impactDurationHours ? (
                                 <span className="font-medium">{event.impactDurationHours}h</span>
                               ) : "-"}
+                            </td>
+                            <td className="p-2">
+                              <ConfidenceBadge confidence={event.delayEventConfidence} />
                             </td>
                             <td className="p-2">
                               <ConfidenceBadge confidence={event.matchConfidence} />

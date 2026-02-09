@@ -4,6 +4,7 @@ import type {
   ExtractionStrategyResult 
 } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
+import { DEFAULT_DELAY_DEFINITION } from '../../../domain/delay-analysis/config/DelayDefinitionConfig';
 
 const NCR_EXTRACTION_PROMPT = `You are an expert construction delay analyst specializing in Non-Conformance Reports (NCRs).
 
@@ -42,7 +43,13 @@ For each delay event found, extract:
 - sourceReference: MUST include NCR/DSC number (e.g., 'NCR-045', 'DSC 293') AND section reference
 - extractedFromCode: The NCR number (e.g., "NCR-045")
 - confidenceScore: Your confidence this causes delay (typically 0.85-1.0 for NCRs)
+- delayEventConfidence: Your confidence that this is truly a delay event (0.0-1.0). For NCRs, this should typically be 0.85-1.0 since NCRs document definite quality failures requiring corrective action.
 - reworkDescription: Specific corrective action required
+
+DELAY EVENT CONFIDENCE ASSESSMENT:
+${DEFAULT_DELAY_DEFINITION.definition}
+
+For NCRs, confidence should typically be 0.85-1.0 since they document definite quality failures.
 
 Return a JSON array of extracted events. If no delays are found (rare for NCRs), return an empty array.
 

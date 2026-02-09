@@ -328,6 +328,7 @@ export const contractorDelayEvents = pgTable("contractor_delay_events", {
   sourceReference: text("source_reference"),
   extractedFromCode: text("extracted_from_code"),
   matchConfidence: integer("match_confidence"),
+  delayEventConfidence: integer("delay_event_confidence"),
   matchReasoning: text("match_reasoning"),
   verificationStatus: text("verification_status").notNull().default("pending"),
   verifiedBy: text("verified_by"),
