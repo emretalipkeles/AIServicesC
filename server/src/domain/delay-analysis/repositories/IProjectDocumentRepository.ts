@@ -12,4 +12,5 @@ export interface IProjectDocumentRepository {
   delete(id: string, tenantId: string): Promise<void>;
   deleteByProjectId(projectId: string, tenantId: string): Promise<number>;
   countByProjectId(projectId: string, tenantId: string): Promise<number>;
+  findByFilenamePattern(projectId: string, tenantId: string, filenamePattern: string): Promise<ProjectDocument[]>;
 }

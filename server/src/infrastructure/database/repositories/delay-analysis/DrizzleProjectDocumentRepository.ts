@@ -1,4 +1,4 @@
-import { eq, and, count } from 'drizzle-orm';
+import { eq, and, count, ilike } from 'drizzle-orm';
 import type { IProjectDocumentRepository } from '../../../../domain/delay-analysis/repositories/IProjectDocumentRepository';
 import { ProjectDocument, type ProjectDocumentType, type DocumentProcessingStatus } from '../../../../domain/delay-analysis/entities/ProjectDocument';
 import { projectDocuments } from '@shared/schema';
@@ -176,6 +176,23 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
       ));
 
     return result[0]?.count ?? 0;
+  }
+
+  async findByFilenamePattern(
+    projectId: string,
+    tenantId: string,
+    filenamePattern: string
+  ): Promise<ProjectDocument[]> {
+    const result = await db
+      .select()
+      .from(projectDocuments)
+      .where(and(
+        eq(projectDocuments.projectId, projectId),
+        eq(projectDocuments.tenantId, tenantId),
+        ilike(projectDocuments.filename, '%' + filenamePattern + '%')
+      ));
+
+    return result.map(row => this.mapRowToEntity(row));
   }
 
   private mapRowToEntity(row: typeof projectDocuments.$inferSelect): ProjectDocument {

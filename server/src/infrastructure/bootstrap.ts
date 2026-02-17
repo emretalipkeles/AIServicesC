@@ -138,6 +138,8 @@ import type { IContractorDelayEventRepository } from "../domain/delay-analysis/r
 import type { IAITokenUsageRepository } from "../domain/delay-analysis/repositories/IAITokenUsageRepository";
 import { DrizzleAITokenUsageRepository } from "./database/repositories/delay-analysis/DrizzleAITokenUsageRepository";
 import { RecordTokenUsageCommandHandler } from "../application/delay-analysis/commands/handlers/RecordTokenUsageCommandHandler";
+import { SearchDocumentsByFilenameQueryHandler } from "../application/delay-analysis/queries/handlers/SearchDocumentsByFilenameQueryHandler";
+import { GetDelayEventsByDocumentQueryHandler } from "../application/delay-analysis/queries/handlers/GetDelayEventsByDocumentQueryHandler";
 
 export interface AppContainer {
   commandBus: ICommandBus;
@@ -194,6 +196,9 @@ export interface AppContainer {
     documentHashService: IDocumentHashService;
     delayEventDeduplicationService: IDelayEventDeduplicationService;
     getDocumentContentQueryHandler: GetDocumentContentQueryHandler | null;
+    searchDocumentsByFilenameQueryHandler: SearchDocumentsByFilenameQueryHandler | null;
+    getDelayEventsByDocumentQueryHandler: GetDelayEventsByDocumentQueryHandler | null;
+    getActivitiesByIdsQueryHandler: GetActivitiesByIdsQueryHandler | null;
   };
 }
 
@@ -518,6 +523,13 @@ export function createAppContainer(): AppContainer {
         new DocumentContentProvider(),
         projectDocumentRepository
       ),
+      searchDocumentsByFilenameQueryHandler: new SearchDocumentsByFilenameQueryHandler(
+        projectDocumentRepository
+      ),
+      getDelayEventsByDocumentQueryHandler: new GetDelayEventsByDocumentQueryHandler(
+        contractorDelayEventRepository
+      ),
+      getActivitiesByIdsQueryHandler: getActivitiesByIdsHandler,
     },
   };
 }

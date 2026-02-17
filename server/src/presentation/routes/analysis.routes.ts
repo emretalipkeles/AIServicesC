@@ -12,6 +12,10 @@ import { SendDelayEventsChatQuery } from '../../application/delay-analysis/queri
 import { SendDelayEventsChatQueryHandler } from '../../application/delay-analysis/queries/handlers/SendDelayEventsChatQueryHandler';
 import type { StreamingChatEvent } from '../../domain/delay-analysis/interfaces/IStreamingDelayEventsChatService';
 import { GetDocumentContentTool } from '../../infrastructure/delay-analysis/tools/GetDocumentContentTool';
+import { SearchDocumentsByFilenameTool } from '../../infrastructure/delay-analysis/tools/SearchDocumentsByFilenameTool';
+import { GetDelayEventsByDocumentTool } from '../../infrastructure/delay-analysis/tools/GetDelayEventsByDocumentTool';
+import { GetScheduleActivityDetailsTool } from '../../infrastructure/delay-analysis/tools/GetScheduleActivityDetailsTool';
+import { CompositeChatToolExecutor } from '../../infrastructure/delay-analysis/tools/CompositeChatToolExecutor';
 import ExcelJS from 'exceljs';
 
 const DEFAULT_TENANT_ID = 'default';
@@ -465,7 +469,10 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
         const params = listDelayEventsParamsSchema.parse(req.params);
         const body = delayEventsChatBodySchema.parse(req.body);
 
-        if (!container.services.getDocumentContentQueryHandler) {
+        if (!container.services.getDocumentContentQueryHandler || 
+            !container.services.searchDocumentsByFilenameQueryHandler ||
+            !container.services.getDelayEventsByDocumentQueryHandler ||
+            !container.services.getActivitiesByIdsQueryHandler) {
           res.status(503).json({ 
             success: false, 
             error: 'Streaming chat service not available' 
@@ -495,11 +502,36 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
           );
         }
 
-        const toolExecutor = new GetDocumentContentTool(
+        const documentContentTool = new GetDocumentContentTool(
           container.services.getDocumentContentQueryHandler,
           params.projectId,
           DEFAULT_TENANT_ID
         );
+
+        const searchDocumentsTool = new SearchDocumentsByFilenameTool(
+          container.services.searchDocumentsByFilenameQueryHandler,
+          params.projectId,
+          DEFAULT_TENANT_ID
+        );
+
+        const delayEventsTool = new GetDelayEventsByDocumentTool(
+          container.services.getDelayEventsByDocumentQueryHandler,
+          params.projectId,
+          DEFAULT_TENANT_ID
+        );
+
+        const activityDetailsTool = new GetScheduleActivityDetailsTool(
+          container.services.getActivitiesByIdsQueryHandler,
+          params.projectId,
+          DEFAULT_TENANT_ID
+        );
+
+        const toolExecutor = new CompositeChatToolExecutor([
+          documentContentTool,
+          searchDocumentsTool,
+          delayEventsTool,
+          activityDetailsTool,
+        ]);
 
         const sendEvent = (event: StreamingChatEvent) => {
           res.write(`data: ${JSON.stringify(event)}\n\n`);
