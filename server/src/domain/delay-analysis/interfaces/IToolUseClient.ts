@@ -23,10 +23,17 @@ export interface ToolCallBlock {
   arguments: Record<string, unknown>;
 }
 
+export interface TokenUsageInfo {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
 export interface ToolUseResponse {
   textContent: string;
   toolCalls: ToolCallBlock[];
   stopReason: 'end_turn' | 'tool_use';
+  tokenUsage?: TokenUsageInfo;
 }
 
 export interface IToolUseClient {

@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { IToolUseClient, ToolUseRequest, ToolUseResponse, ToolCallBlock } from '../../../domain/delay-analysis/interfaces/IToolUseClient';
+import type { IToolUseClient, ToolUseRequest, ToolUseResponse, ToolCallBlock, TokenUsageInfo } from '../../../domain/delay-analysis/interfaces/IToolUseClient';
 
 export class OpenAIToolUseClient implements IToolUseClient {
   private readonly openai: OpenAI;
@@ -46,6 +46,7 @@ export class OpenAIToolUseClient implements IToolUseClient {
       messages: openaiMessages,
       tools: openaiTools.length > 0 ? openaiTools : undefined,
       stream: true,
+      stream_options: { include_usage: true },
       max_completion_tokens: 4000,
       temperature: 0.3,
     });
@@ -53,6 +54,7 @@ export class OpenAIToolUseClient implements IToolUseClient {
     let accumulatedText = '';
     const toolCalls: Array<{ id: string; function: { name: string; arguments: string } }> = [];
     let currentToolCall: { id: string; function: { name: string; arguments: string } } | null = null;
+    let tokenUsage: TokenUsageInfo | undefined;
 
     for await (const chunk of response) {
       const delta = chunk.choices[0]?.delta;
@@ -79,6 +81,14 @@ export class OpenAIToolUseClient implements IToolUseClient {
             currentToolCall.function.arguments += tc.function.arguments;
           }
         }
+      }
+
+      if (chunk.usage) {
+        tokenUsage = {
+          inputTokens: chunk.usage.prompt_tokens ?? 0,
+          outputTokens: chunk.usage.completion_tokens ?? 0,
+          totalTokens: chunk.usage.total_tokens ?? 0,
+        };
       }
     }
 
@@ -107,6 +117,7 @@ export class OpenAIToolUseClient implements IToolUseClient {
       textContent: accumulatedText,
       toolCalls: parsedToolCalls,
       stopReason: hasToolCalls ? 'tool_use' : 'end_turn',
+      tokenUsage,
     };
   }
 }

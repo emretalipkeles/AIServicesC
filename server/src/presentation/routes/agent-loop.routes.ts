@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from 'express';
 import type { AppContainer } from '../../infrastructure/bootstrap';
-import type { AgentLoopEvent } from '../../domain/delay-analysis/interfaces/IAgentLoop';
+import type { AgentLoopEvent, AgentLoopResult } from '../../domain/delay-analysis/interfaces/IAgentLoop';
+import { AITokenUsage } from '../../domain/delay-analysis/entities/AITokenUsage';
 import { z } from 'zod';
 
 const agentLoopBodySchema = z.object({
@@ -67,10 +68,11 @@ export function registerAgentLoopRoutes(app: Express, container: AppContainer): 
         };
 
         const systemPrompt = container.agentLoop.systemPrompt || '';
+        const projectId = body.projectId || '';
 
-        await container.agentLoop.loop.run(
+        const result: AgentLoopResult = await container.agentLoop.loop.run(
           {
-            projectId: body.projectId || '',
+            projectId,
             tenantId: DEFAULT_TENANT_ID,
             userMessage: body.message,
             conversationHistory: body.conversationHistory,
@@ -78,6 +80,39 @@ export function registerAgentLoopRoutes(app: Express, container: AppContainer): 
           },
           onEvent
         );
+
+        if (result.tokenUsage && result.tokenUsage.totalTokens > 0 && projectId) {
+          try {
+            const model = result.model || 'gpt-4.1';
+            const cost = AITokenUsage.calculateCost(
+              model,
+              result.tokenUsage.inputTokens,
+              result.tokenUsage.outputTokens
+            );
+
+            const chatRunId = `agent-chat-${Date.now()}`;
+            const usage = AITokenUsage.create({
+              projectId,
+              runId: chatRunId,
+              operation: 'agent_chat',
+              model,
+              inputTokens: result.tokenUsage.inputTokens,
+              outputTokens: result.tokenUsage.outputTokens,
+              totalTokens: result.tokenUsage.totalTokens,
+              estimatedCostUsd: cost,
+              metadata: {
+                iterationCount: result.iterationCount,
+                apiCalls: result.tokenUsage.apiCalls,
+                toolsUsed: result.toolsUsed,
+              },
+            });
+
+            await container.repositories.aiTokenUsage.save(usage);
+            console.log(`[AgentLoopStream] Saved token usage: ${result.tokenUsage.totalTokens} tokens, $${cost.toFixed(6)} (${result.tokenUsage.apiCalls} API calls)`);
+          } catch (usageError) {
+            console.error('[AgentLoopStream] Failed to save token usage:', usageError);
+          }
+        }
 
         res.write('data: [DONE]\n\n');
         res.end();

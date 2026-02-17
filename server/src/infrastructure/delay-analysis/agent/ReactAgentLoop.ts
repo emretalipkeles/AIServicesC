@@ -1,4 +1,4 @@
-import type { IAgentLoop, AgentLoopInput, AgentLoopResult, AgentLoopEvent } from '../../../domain/delay-analysis/interfaces/IAgentLoop';
+import type { IAgentLoop, AgentLoopInput, AgentLoopResult, AgentLoopEvent, AgentLoopTokenUsage } from '../../../domain/delay-analysis/interfaces/IAgentLoop';
 import type { IToolRegistry } from '../../../domain/delay-analysis/interfaces/IToolRegistry';
 import type { IToolUseClient, ToolUseMessage } from '../../../domain/delay-analysis/interfaces/IToolUseClient';
 import type { ToolExecutionContext } from '../../../domain/delay-analysis/interfaces/ITool';
@@ -8,7 +8,8 @@ const MAX_ITERATIONS = 15;
 export class ReactAgentLoop implements IAgentLoop {
   constructor(
     private readonly toolRegistry: IToolRegistry,
-    private readonly toolUseClient: IToolUseClient
+    private readonly toolUseClient: IToolUseClient,
+    private readonly modelName: string = 'gpt-4.1'
   ) {}
 
   async run(
@@ -17,6 +18,12 @@ export class ReactAgentLoop implements IAgentLoop {
   ): Promise<AgentLoopResult> {
     const toolsUsed: string[] = [];
     let iterations = 0;
+    const cumulativeTokens: AgentLoopTokenUsage = {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      apiCalls: 0,
+    };
 
     onEvent({ type: 'loop_started', message: 'Starting analysis...' });
 
@@ -58,6 +65,13 @@ export class ReactAgentLoop implements IAgentLoop {
           },
         });
 
+        if (response.tokenUsage) {
+          cumulativeTokens.inputTokens += response.tokenUsage.inputTokens;
+          cumulativeTokens.outputTokens += response.tokenUsage.outputTokens;
+          cumulativeTokens.totalTokens += response.tokenUsage.totalTokens;
+          cumulativeTokens.apiCalls++;
+        }
+
         if (response.stopReason === 'end_turn' || response.toolCalls.length === 0) {
           const finalResponse = response.textContent;
 
@@ -75,13 +89,15 @@ export class ReactAgentLoop implements IAgentLoop {
             iterationCount: iterations,
           });
 
-          console.log(`[ReactAgentLoop] Completed in ${iterations} iterations, tools used: ${toolsUsed.join(', ') || 'none'}`);
+          console.log(`[ReactAgentLoop] Completed in ${iterations} iterations, tools used: ${toolsUsed.join(', ') || 'none'}, tokens: ${cumulativeTokens.totalTokens} (${cumulativeTokens.apiCalls} API calls)`);
 
           return {
             success: true,
             response: finalResponse,
             toolsUsed,
             iterationCount: iterations,
+            tokenUsage: cumulativeTokens,
+            model: this.modelName,
           };
         }
 
@@ -181,6 +197,8 @@ export class ReactAgentLoop implements IAgentLoop {
         response: 'I reached my analysis limit. Please try a more specific question.',
         toolsUsed,
         iterationCount: iterations,
+        tokenUsage: cumulativeTokens,
+        model: this.modelName,
         error: `Max iterations reached (${MAX_ITERATIONS})`,
       };
 
@@ -199,6 +217,8 @@ export class ReactAgentLoop implements IAgentLoop {
         response: 'I encountered an error while analyzing. Please try again.',
         toolsUsed,
         iterationCount: iterations,
+        tokenUsage: cumulativeTokens,
+        model: this.modelName,
         error: errorMsg,
       };
     }

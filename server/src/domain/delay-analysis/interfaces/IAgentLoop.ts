@@ -6,11 +6,20 @@ export interface AgentLoopInput {
   systemPrompt: string;
 }
 
+export interface AgentLoopTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  apiCalls: number;
+}
+
 export interface AgentLoopResult {
   success: boolean;
   response: string;
   toolsUsed: string[];
   iterationCount: number;
+  tokenUsage?: AgentLoopTokenUsage;
+  model?: string;
   error?: string;
 }
 
