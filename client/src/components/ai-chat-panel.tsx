@@ -173,19 +173,29 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
         content: m.content,
       }));
 
-      const isOrchestrated = !selectedAgent;
+      const isDelayAnalyst = selectedAgent?.name?.toLowerCase().includes('delay') && tabContext?.activeDelayAnalysisProjectId;
+      const isOrchestrated = !selectedAgent && !isDelayAnalyst;
       
-      const streamEndpoint = selectedAgent 
-        ? `/api/agents/${selectedAgent.id}/chat/stream`
-        : '/api/ai/orchestrate/stream';
-      
-      const orchestrationContext = tabContext?.activeDelayAnalysisProjectId 
-        ? { activeDelayAnalysisProjectId: tabContext.activeDelayAnalysisProjectId }
-        : undefined;
+      let streamEndpoint: string;
+      let streamBody: Record<string, unknown>;
 
-      const streamBody = selectedAgent
-        ? { messages: [...conversationHistory, { role: 'user', content: inputValue }] }
-        : { message: inputValue, conversationId, context: orchestrationContext };
+      if (isDelayAnalyst) {
+        streamEndpoint = '/api/ai/agent-loop/stream';
+        streamBody = {
+          projectId: tabContext.activeDelayAnalysisProjectId,
+          message: inputValue,
+          conversationHistory,
+        };
+      } else if (selectedAgent) {
+        streamEndpoint = `/api/agents/${selectedAgent.id}/chat/stream`;
+        streamBody = { messages: [...conversationHistory, { role: 'user', content: inputValue }] };
+      } else {
+        streamEndpoint = '/api/ai/orchestrate/stream';
+        const orchestrationContext = tabContext?.activeDelayAnalysisProjectId 
+          ? { activeDelayAnalysisProjectId: tabContext.activeDelayAnalysisProjectId }
+          : undefined;
+        streamBody = { message: inputValue, conversationId, context: orchestrationContext };
+      }
 
       console.log('[AIChatPanel] Sending message with conversationId:', conversationId);
 
@@ -210,7 +220,8 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
         timestamp: new Date(),
         agentName: selectedAgent?.name || "AI Assistant",
         isStreaming: true,
-        statusMessage: isOrchestrated ? "Discovering agents..." : undefined,
+        statusMessage: isOrchestrated ? "Discovering agents..." : (isDelayAnalyst ? "Starting analysis..." : undefined),
+        thinkingSteps: isDelayAnalyst ? [] : undefined,
       };
       setMessages((prev) => [...prev, streamingMessage]);
 
@@ -241,9 +252,103 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                 const jsonStr = line.slice(5).trim();
                 if (!jsonStr || jsonStr === '[DONE]') continue;
                 
-                const data = JSON.parse(jsonStr) as OrchestrationProgress | { type: string; content?: string; error?: string };
+                const data = JSON.parse(jsonStr) as OrchestrationProgress | { type: string; content?: string; error?: string; message?: string; toolName?: string; toolArgs?: Record<string, unknown>; toolsUsed?: string[]; iterationCount?: number; iteration?: number; success?: boolean };
                 
-                if (isOrchestrated) {
+                if (isDelayAnalyst) {
+                  switch (data.type) {
+                    case 'thinking': {
+                      const thinkingMsg = (data as { message?: string; iteration?: number }).message || 'Analyzing...';
+                      const iteration = (data as { iteration?: number }).iteration;
+                      setMessages((prev) =>
+                        prev.map((msg) =>
+                          msg.id === assistantMessageId
+                            ? {
+                                ...msg,
+                                statusMessage: thinkingMsg,
+                                thinkingSteps: [
+                                  ...(msg.thinkingSteps || []).map(s => ({ ...s, completed: true })),
+                                  { stage: 'thinking', message: thinkingMsg + (iteration && iteration > 1 ? ` (step ${iteration})` : '') },
+                                ],
+                              }
+                            : msg
+                        )
+                      );
+                      break;
+                    }
+                    case 'tool_invocation': {
+                      const toolName = (data as { toolName?: string }).toolName || 'unknown';
+                      const toolDisplayNames: Record<string, string> = {
+                        'search_documents_by_filename': 'Searching documents',
+                        'get_document_content': 'Reading document',
+                        'get_delay_events_by_document': 'Checking delay events',
+                        'get_schedule_activity_details': 'Looking up schedule activities',
+                      };
+                      const displayName = toolDisplayNames[toolName] || `Using ${toolName}`;
+                      setMessages((prev) =>
+                        prev.map((msg) =>
+                          msg.id === assistantMessageId
+                            ? {
+                                ...msg,
+                                statusMessage: displayName + '...',
+                                thinkingSteps: [
+                                  ...(msg.thinkingSteps || []).map(s => ({ ...s, completed: true })),
+                                  { stage: 'tool', message: displayName },
+                                ],
+                              }
+                            : msg
+                        )
+                      );
+                      break;
+                    }
+                    case 'tool_result': {
+                      setMessages((prev) =>
+                        prev.map((msg) =>
+                          msg.id === assistantMessageId
+                            ? {
+                                ...msg,
+                                thinkingSteps: (msg.thinkingSteps || []).map((s, i, arr) =>
+                                  i === arr.length - 1 ? { ...s, completed: true } : s
+                                ),
+                              }
+                            : msg
+                        )
+                      );
+                      break;
+                    }
+                    case 'content': {
+                      if (data.content) {
+                        accumulatedContent += data.content;
+                        setMessages((prev) =>
+                          prev.map((msg) =>
+                            msg.id === assistantMessageId
+                              ? { ...msg, content: accumulatedContent, statusMessage: undefined }
+                              : msg
+                          )
+                        );
+                      }
+                      break;
+                    }
+                    case 'done':
+                    case 'loop_completed': {
+                      setMessages((prev) =>
+                        prev.map((msg) =>
+                          msg.id === assistantMessageId
+                            ? {
+                                ...msg,
+                                isStreaming: false,
+                                statusMessage: undefined,
+                                thinkingSteps: (msg.thinkingSteps || []).map(s => ({ ...s, completed: true })),
+                              }
+                            : msg
+                        )
+                      );
+                      break;
+                    }
+                    case 'error': {
+                      throw new Error((data as { message?: string }).message || 'Agent error');
+                    }
+                  }
+                } else if (isOrchestrated) {
                   switch (data.type) {
                     case 'discovery':
                       if ((data as OrchestrationProgress).conversationId) {
@@ -867,8 +972,10 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                         const isLastStep = stepIndex === message.thinkingSteps!.length - 1;
                         const isActive = isLastStep && message.isStreaming && !message.content;
                         const StepIcon = step.stage === 'analyzing' ? Brain
+                          : step.stage === 'thinking' ? Brain
                           : step.stage === 'searching_events' ? Search
                           : step.stage === 'fetching_document' ? FileText
+                          : step.stage === 'tool' ? Search
                           : step.completed ? CheckCircle
                           : Sparkles;
                         

@@ -112,6 +112,16 @@ import { DocumentContentProvider } from "./delay-analysis/DocumentContentProvide
 import { SHA256DocumentHashService } from "./delay-analysis/SHA256DocumentHashService";
 import { DelayEventDeduplicationService } from "./delay-analysis/DelayEventDeduplicationService";
 import { GetDocumentContentTool } from "./delay-analysis/tools/GetDocumentContentTool";
+import type { IAgentLoop } from "../domain/delay-analysis/interfaces/IAgentLoop";
+import { ReactAgentLoop } from "./delay-analysis/agent/ReactAgentLoop";
+import { OpenAIToolUseClient } from "./delay-analysis/agent/OpenAIToolUseClient";
+import { ToolRegistryImpl } from "./delay-analysis/agent/ToolRegistryImpl";
+import { SearchDocumentsByFilenameTool as AgentSearchDocsTool } from "./delay-analysis/agent/tools/SearchDocumentsByFilenameTool";
+import { GetDocumentContentTool as AgentGetDocContentTool } from "./delay-analysis/agent/tools/GetDocumentContentTool";
+import { GetDelayEventsByDocumentTool as AgentGetDelayEventsTool } from "./delay-analysis/agent/tools/GetDelayEventsByDocumentTool";
+import { GetScheduleActivityDetailsTool as AgentGetActivityDetailsTool } from "./delay-analysis/agent/tools/GetScheduleActivityDetailsTool";
+import { ContractorDelayTrainingGuide } from "../domain/delay-analysis/config/ContractorDelayTrainingGuide";
+import { DelayKnowledgePromptBuilder } from "./delay-analysis/DelayKnowledgePromptBuilder";
 import type { IDelayEventExtractor } from "../domain/delay-analysis/interfaces/IDelayEventExtractor";
 import type { IActivityMatcher } from "../domain/delay-analysis/interfaces/IActivityMatcher";
 import type { IDelayEventsChatService } from "../domain/delay-analysis/interfaces/IDelayEventsChatService";
@@ -199,6 +209,8 @@ export interface AppContainer {
     searchDocumentsByFilenameQueryHandler: SearchDocumentsByFilenameQueryHandler | null;
     getDelayEventsByDocumentQueryHandler: GetDelayEventsByDocumentQueryHandler | null;
     getActivitiesByIdsQueryHandler: GetActivitiesByIdsQueryHandler | null;
+    agentLoop: IAgentLoop | null;
+    agentLoopSystemPrompt: string;
   };
 }
 
@@ -530,6 +542,102 @@ export function createAppContainer(): AppContainer {
         contractorDelayEventRepository
       ),
       getActivitiesByIdsQueryHandler: getActivitiesByIdsHandler,
+      agentLoop: (() => {
+        const openAiKey = process.env.OPEN_AI_KEY;
+        if (!openAiKey) {
+          console.warn('[Bootstrap] OPEN_AI_KEY not set - agent loop disabled');
+          return null;
+        }
+
+        const toolRegistry = new ToolRegistryImpl();
+
+        const searchDocsQH = new SearchDocumentsByFilenameQueryHandler(projectDocumentRepository);
+        const getDocContentQH = new GetDocumentContentQueryHandler(
+          new DocumentContentProvider(),
+          projectDocumentRepository
+        );
+        const getDelayEventsQH = new GetDelayEventsByDocumentQueryHandler(contractorDelayEventRepository);
+
+        toolRegistry.register(new AgentSearchDocsTool(searchDocsQH));
+        toolRegistry.register(new AgentGetDocContentTool(getDocContentQH));
+        toolRegistry.register(new AgentGetDelayEventsTool(getDelayEventsQH));
+        toolRegistry.register(new AgentGetActivityDetailsTool(getActivitiesByIdsHandler));
+
+        const toolUseClient = new OpenAIToolUseClient(openAiKey, 'gpt-4.1');
+        const agentLoop = new ReactAgentLoop(toolRegistry, toolUseClient);
+
+        console.log('[Bootstrap] ReactAgentLoop initialized with 4 tools');
+        return agentLoop;
+      })(),
+      agentLoopSystemPrompt: (() => {
+        const knowledgeBase = new ContractorDelayTrainingGuide();
+        const promptBuilder = new DelayKnowledgePromptBuilder(knowledgeBase);
+        const knowledgePrompt = promptBuilder.buildPromptForDocumentType('idr');
+
+        return `You are a specialized construction delay analysis expert and verification assistant. Your purpose is to help users verify whether delay events were correctly identified, analyze their classifications, and provide detailed reasoning based on the Contractor Delay Training Guide.
+
+## YOUR CAPABILITIES:
+
+You have access to the following tools to investigate delay events:
+
+1. **search_documents_by_filename** - Find documents by filename, date code, or inspector initials
+2. **get_document_content** - Retrieve the full text of a source document
+3. **get_delay_events_by_document** - Find all delay events extracted from a specific document
+4. **get_schedule_activity_details** - Look up CPM schedule activity details by activity ID
+
+## ANALYTICAL METHODOLOGY:
+
+When a user asks you to verify or analyze a delay event, follow this exact workflow:
+
+### Step 1: LOCATE THE SOURCE
+- If the user mentions a document filename, use search_documents_by_filename to find it
+- If they mention a delay event, use get_delay_events_by_document to find events from that document
+
+### Step 2: READ THE EVIDENCE
+- Use get_document_content to retrieve the full document text
+- Focus on diary entries, timestamps, and narrative descriptions
+- Note exact timestamps and durations mentioned
+
+### Step 3: CROSS-REFERENCE THE TRAINING GUIDE
+Using the Contractor Delay Training Guide knowledge base below, evaluate:
+- Which delay CATEGORY does this event fall under? (Resource & Staffing, Subcontractor & Supplier, Quality Deficiencies, Planning & Coordination, Equipment Failures)
+- Does it match any specific INDICATOR in that category?
+- Does it pass the CORE TEST: "Was the Contractor doing everything within its power to diligently prosecute the Work?"
+- Does any EXCLUSION apply? (DSCs, owner-directed suspensions, unforeseen conditions, etc.)
+- Walk through the DECISION FRAMEWORK questions
+- Compare to relevant WORKED EXAMPLES
+
+### Step 4: PROVIDE YOUR VERDICT
+- State whether the classification is correct, with your reasoning
+- Assess the confidence level and whether it's appropriate
+- Note if the duration estimate is supported by the evidence
+- Flag any gray areas or aspects that need human judgment
+- Reference specific sections of the Training Guide in your analysis
+
+## CRITICAL RULES:
+
+1. **ALWAYS use your tools to investigate** - Never answer from memory alone. Search for and read the actual documents.
+2. **ONLY answer questions about the delay events data and documents in this project.**
+3. **REFUSE questions not directly about delay analysis.** Say: "I can only answer questions about the delay events in this project."
+4. **Base ALL answers strictly on the data, documents, and Training Guide.** Never make up information.
+5. **Always show your reasoning** - walk through the Training Guide criteria step by step.
+6. **Be honest about gray areas** - if a classification is borderline, say so and explain why.
+7. **Reference timestamps and diary entries** when discussing evidence from documents.
+
+## DURATION ESTIMATION METHODOLOGY:
+
+### For Inspector Daily Reports (IDRs):
+- Durations are estimated by interpreting the narrative and timestamps
+- **Explicit timestamp gaps**: "0930-crew stopped, 1100-resumed" = 1.5 hours
+- **Explicit mentions**: "crew arrived 2 hours late" → 2 hours
+- **Estimated from context**: Equipment breakdowns, crew shortages → estimated based on typical resolution times
+
+### For Non-Conformance Reports (NCRs):
+- NCR = rework required = definite delay
+- Duration = removal time + redo time + re-inspection time
+
+${knowledgePrompt}`;
+      })(),
     },
   };
 }
