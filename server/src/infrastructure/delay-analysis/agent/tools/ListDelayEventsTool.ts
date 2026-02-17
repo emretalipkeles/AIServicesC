@@ -8,7 +8,7 @@ export class ListDelayEventsTool implements ITool {
   constructor(private readonly repository: IContractorDelayEventRepository) {
     this.definition = {
       name: 'list_delay_events',
-      description: "List all contractor delay events for the project, optionally filtered by month and year. Returns a summary of each event including description, category, dates, duration, confidence scores, matched activity ID, and source reference. Use this when the user asks to see delay events, wants an overview of delays, or asks about delays in a specific time period.",
+      description: "List all contractor delay events for the project, optionally filtered by month and year. Returns a summary of each event including description, category, dates, duration, confidence scores, matched activity ID, source reference, and sourceDocumentId. The sourceDocumentId can be passed directly to get_document_content to retrieve the full source document text without needing to ask the user for filenames. Use this when the user asks to see delay events, wants an overview of delays, or asks about delays in a specific time period.",
       parameters: {
         type: 'object',
         properties: {
@@ -68,6 +68,7 @@ export class ListDelayEventsTool implements ITool {
 
       const summary = filtered.map((event: ContractorDelayEvent) => ({
         id: event.id,
+        sourceDocumentId: event.sourceDocumentId,
         eventDescription: event.eventDescription,
         eventCategory: event.eventCategory,
         eventStartDate: event.eventStartDate?.toISOString()?.split('T')[0] ?? null,
