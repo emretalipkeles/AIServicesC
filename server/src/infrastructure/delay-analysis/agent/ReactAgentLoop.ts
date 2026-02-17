@@ -51,8 +51,9 @@ export class ReactAgentLoop implements IAgentLoop {
 
         onEvent({
           type: 'thinking',
-          message: iterations === 1 ? 'Analyzing your question...' : `Continuing analysis (step ${iterations})...`,
+          message: iterations === 1 ? 'Analyzing your question...' : `Continuing analysis...`,
           iterationCount: iterations,
+          iteration: iterations,
         });
 
         console.log(`[ReactAgentLoop] Iteration ${iterations}/${MAX_ITERATIONS}`);
@@ -122,6 +123,7 @@ export class ReactAgentLoop implements IAgentLoop {
             toolName: toolCall.name,
             toolArgs: toolCall.arguments,
             message: `Using tool: ${toolCall.name}`,
+            iteration: iterations,
           });
 
           if (!tool) {

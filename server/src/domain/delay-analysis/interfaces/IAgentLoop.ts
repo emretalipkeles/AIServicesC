@@ -42,6 +42,7 @@ export interface AgentLoopEvent {
   toolResult?: unknown;
   toolError?: string;
   iterationCount?: number;
+  iteration?: number;
   toolsUsed?: string[];
   response?: string;
   error?: string;

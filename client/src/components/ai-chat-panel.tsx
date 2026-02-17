@@ -81,6 +81,7 @@ interface ThinkingStep {
   stage: string;
   message: string;
   completed?: boolean;
+  iteration?: number;
 }
 
 interface CostInfo {
@@ -247,7 +248,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                               statusMessage: thinkingMsg,
                               thinkingSteps: [
                                 ...(msg.thinkingSteps || []).map(s => ({ ...s, completed: true })),
-                                { stage: 'thinking', message: thinkingMsg + (iteration && iteration > 1 ? ` (step ${iteration})` : '') },
+                                { stage: 'thinking', message: thinkingMsg, iteration },
                               ],
                             }
                           : msg
@@ -265,19 +266,23 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                       'list_delay_events': 'Listing delay events',
                     };
                     const displayName = toolDisplayNames[toolName] || `Using ${toolName}`;
+                    const iteration = data.iteration;
+                    const stepLabel = iteration && iteration > 1 ? ` (step ${iteration})` : '';
                     setMessages((prev) =>
-                      prev.map((msg) =>
-                        msg.id === assistantMessageId
-                          ? {
-                              ...msg,
-                              statusMessage: displayName + '...',
-                              thinkingSteps: [
-                                ...(msg.thinkingSteps || []).map(s => ({ ...s, completed: true })),
-                                { stage: 'tool', message: displayName },
-                              ],
-                            }
-                          : msg
-                      )
+                      prev.map((msg) => {
+                        if (msg.id !== assistantMessageId) return msg;
+                        const steps = (msg.thinkingSteps || []);
+                        const lastStep = steps[steps.length - 1];
+                        const lastIsThinking = lastStep && lastStep.stage === 'thinking' && !lastStep.completed;
+                        const updatedSteps = lastIsThinking
+                          ? [...steps.slice(0, -1).map(s => ({ ...s, completed: true })), { stage: 'tool' as const, message: displayName + stepLabel }]
+                          : [...steps.map(s => ({ ...s, completed: true })), { stage: 'tool' as const, message: displayName + stepLabel }];
+                        return {
+                          ...msg,
+                          statusMessage: displayName + '...',
+                          thinkingSteps: updatedSteps,
+                        };
+                      })
                     );
                     break;
                   }

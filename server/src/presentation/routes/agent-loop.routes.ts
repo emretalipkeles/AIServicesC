@@ -20,9 +20,9 @@ function mapAgentLoopEventToSSE(event: AgentLoopEvent): object {
     case 'loop_started':
       return { type: 'thinking', message: event.message };
     case 'thinking':
-      return { type: 'thinking', message: event.message, iteration: event.iterationCount };
+      return { type: 'thinking', message: event.message, iteration: event.iteration || event.iterationCount };
     case 'tool_invocation':
-      return { type: 'tool_invocation', toolName: event.toolName, toolArgs: event.toolArgs, message: event.message };
+      return { type: 'tool_invocation', toolName: event.toolName, toolArgs: event.toolArgs, message: event.message, iteration: event.iteration };
     case 'tool_result':
       return { type: 'tool_result', toolName: event.toolName, success: !event.toolError, error: event.toolError };
     case 'response_chunk':
