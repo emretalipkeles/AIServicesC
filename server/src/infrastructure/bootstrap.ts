@@ -210,7 +210,7 @@ function createAgentLoop(
   toolRegistry.register(new AgentGetActivityDetailsTool(getActivitiesByIdsHandler));
   toolRegistry.register(new AgentListDelayEventsTool(contractorDelayEventRepository));
 
-  const agentModel = 'gpt-4.1';
+  const agentModel = 'gpt-5.2';
   const toolUseClient = new OpenAIToolUseClient(openAiKey, agentModel);
   const loop = new ReactAgentLoop(toolRegistry, toolUseClient, agentModel);
 

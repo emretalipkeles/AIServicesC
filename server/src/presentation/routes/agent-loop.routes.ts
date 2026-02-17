@@ -83,7 +83,7 @@ export function registerAgentLoopRoutes(app: Express, container: AppContainer): 
 
         if (result.tokenUsage && result.tokenUsage.totalTokens > 0 && projectId) {
           try {
-            const model = result.model || 'gpt-4.1';
+            const model = result.model || 'gpt-5.2';
             const cost = AITokenUsage.calculateCost(
               model,
               result.tokenUsage.inputTokens,

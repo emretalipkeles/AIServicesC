@@ -7,6 +7,7 @@ Construction Delay Interpreter is an AI-powered platform designed to analyze and
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+**CRITICAL: Always use GPT-5.2 as the AI model everywhere. Never use GPT-4.1 or any older model. This applies to all AI features: agent loop, extraction, chat, and any new AI functionality.**
 
 ## System Architecture
 
