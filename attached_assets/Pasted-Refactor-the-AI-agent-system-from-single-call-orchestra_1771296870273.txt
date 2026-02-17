@@ -1,0 +1,55 @@
+Refactor the AI agent system from single-call orchestration to the ReAct Agent Loop pattern.
+
+The current AI wiring uses a single-call approach where the frontend sends a message, the backend calls the LLM once, and returns a response. This needs to be replaced with an autonomous agent loop where the AI can call tools iteratively, observe results, and decide next steps on its own — looping until it either produces a final response or reaches a max iteration limit.
+
+Discard the old approach entirely. Remove any code that does a single LLM call and directly returns the result. The new architecture has these core parts:
+
+1. Domain Layer — Interfaces only, no external dependencies:
+
+IAgentLoop — the core interface with two methods: run(input, onEvent) and resume(sessionId, userInput, onEvent). The run method takes a message + conversation history + system context and returns an AgentLoopResult (which includes success, response, toolsUsed, artifacts, awaitingInput, iterationCount). The resume method lets the loop continue after it paused waiting for user input.
+ITool — defines ToolDefinition (name, description, parameters) and ToolExecutionResult (success, output, needsInput, inputPrompt). Each tool is a spoke; the agent is the hub.
+IToolRegistry — register(tool), getAll(), getByName(name), getDefinitions(). The registry holds all tools and provides their definitions to the LLM.
+IToolExecutor — execute(tool, args, context) with a ToolExecutionContext that carries tenantId, userId, sessionId, and an onProgress callback for real-time progress events.
+IToolUseClient — chatWithTools(request) that wraps the LLM API call. It takes a system prompt, messages array (user/assistant with text/tool_use/tool_result blocks), tool definitions, and an onTextChunk callback for streaming. Returns ToolUseResponse with content blocks and stopReason (end_turn or tool_use).
+AgentLoopEvents — typed events: loop_started, thinking, tool_invocation, tool_progress, tool_result, response_chunk, response_complete, awaiting_input, loop_completed, loop_failed, loop_resumed. These are emitted via the onEvent callback and translated to SSE.
+2. Infrastructure Layer — Implementations:
+
+ReactAgentLoop — the core loop implementation. It:
+Creates an AgentSession entity to track state (running/awaiting_input/completed/failed)
+Builds initial messages from conversation history + current user message
+Enters a while (iterations < MAX_ITERATIONS) loop (use 15 as the max)
+Each iteration: calls toolUseClient.chatWithTools() → if stopReason === 'end_turn' or no tool_use blocks, extract final text response and break → if tool_use blocks exist, iterate through them, look up each tool from the registry, execute via the tool executor, collect tool_result content blocks, push assistant message + tool results back onto the messages array, and loop again
+If a tool returns needsInput: true, the loop pauses, saves session state, and returns with awaitingInput: true
+Emits typed events at every stage (thinking, tool_invocation, tool_result, response_chunk, etc.)
+ToolRegistryImpl — simple Map-based registry
+ToolExecutorImpl — routes execution to either direct IExecutableTool implementations or adapts from existing capabilities
+BedrockToolUseClient (or whatever LLM client you use) — implements IToolUseClient, handles both streaming and non-streaming calls, converts tool definitions to the LLM's expected format
+3. Application Layer — CQRS handlers:
+
+RunAgentLoopCommandHandler — builds the system prompt via AgentContextBuilder, then calls agentLoop.run()
+ResumeAgentLoopCommandHandler — calls agentLoop.resume()
+AgentLoopEventToSSEAdapter — translates domain events into SSE-friendly progress objects (discovery, planning, agent-start, agent-chunk, agent-done, synthesis-chunk, synthesis-done, awaiting-input, error)
+4. Presentation Layer — SSE streaming endpoint:
+
+POST /api/ai/agent-loop/stream — validates input, sets up SSE headers (Content-Type: text/event-stream, Cache-Control: no-cache, Connection: keep-alive), creates an SSE writer function that does res.write('data: ${JSON.stringify(event)}\n\n'), passes it as the onEvent callback, ends with data: [DONE]
+POST /api/ai/agent-loop/resume — same SSE pattern for resuming paused sessions
+GET /api/ai/agent-loop/pending-session — checks if there's a session awaiting user input
+5. Frontend — consume SSE stream:
+
+Replace any fetch().then(json) pattern with fetch() + reading response.body as a stream
+Parse each data: {...} line as an OrchestrationProgress event
+Handle event types: discovery (show thinking indicator), planning (show status), agent-start/agent-done (show tool execution status), synthesis-chunk (append to streaming response), synthesis-done (finalize message), awaiting-input (show input prompt), error (show error)
+On [DONE] signal, mark the response as complete
+Key principles:
+
+The agent autonomously decides what tools to call and how many iterations to run — the frontend just sends a message and renders the stream
+Tool definitions are sent to the LLM so it can choose which to call. Tool results are fed back as tool_result message blocks
+The onEvent callback decouples the domain from transport (SSE). The domain emits events; the presentation translates them
+Session state (tool invocations, artifacts, conversation) is tracked in an AgentSession entity so the loop can pause/resume
+All existing "capabilities" or "agents" become tools registered in the ToolRegistry — they don't call the LLM themselves; they just execute business logic and return structured results
+What to delete:
+
+Any single-call AI endpoint that calls the LLM once and returns
+Any "orchestrator" or "router" that picks one agent/capability and runs it in isolation
+Any frontend code that expects a simple JSON response from the AI endpoint
+Adapt the domain-specific details (tool names, capabilities, entity names) to match this app's domain, but follow the structural pattern exactly.
