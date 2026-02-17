@@ -14,7 +14,42 @@ export class DelayKnowledgePromptBuilder {
 
   buildPromptForDocumentType(documentType: ProjectDocumentType): string {
     const sections = this.knowledgeBase.getSectionsForDocumentType(documentType);
-    return this.buildPromptFromSections(sections);
+
+    console.log('');
+    console.log('╔══════════════════════════════════════════════════════════════════╗');
+    console.log('║  CONTRACTOR DELAY TRAINING GUIDE - KNOWLEDGE BASE INJECTION     ║');
+    console.log('╚══════════════════════════════════════════════════════════════════╝');
+    console.log(`[Knowledge Base] Document type: ${documentType}`);
+    console.log(`[Knowledge Base] Sections selected (${sections.length}): ${sections.join(', ')}`);
+
+    const prompt = this.buildPromptFromSections(sections);
+
+    const approxTokens = Math.round(prompt.length / 4);
+    console.log(`[Knowledge Base] Prompt size: ~${approxTokens.toLocaleString()} tokens (${prompt.length.toLocaleString()} chars)`);
+
+    const allSections: KnowledgeSection[] = [
+      'delay_definition', 'contract_basis', 'categories', 'exclusions',
+      'decision_framework', 'worked_examples_delays', 'worked_examples_not_delays',
+      'worked_examples_gray', 'gray_areas', 'common_pitfalls', 'guiding_principle', 'cheat_sheet',
+    ];
+    const included = allSections.filter(s => sections.includes(s));
+    const excluded = allSections.filter(s => !sections.includes(s));
+
+    if (included.length > 0) {
+      console.log(`[Knowledge Base] ✓ INCLUDED sections:`);
+      for (const s of included) {
+        console.log(`[Knowledge Base]   ✓ ${s}`);
+      }
+    }
+    if (excluded.length > 0) {
+      console.log(`[Knowledge Base] ✗ EXCLUDED sections (not needed for ${documentType}):`);
+      for (const s of excluded) {
+        console.log(`[Knowledge Base]   ✗ ${s}`);
+      }
+    }
+    console.log('');
+
+    return prompt;
   }
 
   buildPromptFromSections(sections: ReadonlyArray<KnowledgeSection>): string {

@@ -49,6 +49,7 @@ const knowledgeBaseInstance = new ContractorDelayTrainingGuide();
 const knowledgePromptBuilder = new DelayKnowledgePromptBuilder(knowledgeBaseInstance);
 
 function buildToolEnabledSystemPrompt(documentType: ProjectDocumentType): string {
+  console.log(`[Knowledge Base] Building SYSTEM PROMPT knowledge base for tool-based extractor (document type: ${documentType})`);
   const knowledgeBaseContent = knowledgePromptBuilder.buildPromptForDocumentType(documentType);
 
   return `You are a construction delay analysis expert. Your task is to extract contractor-caused delay events from construction documents and match them to schedule activities.
