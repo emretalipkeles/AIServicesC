@@ -13,6 +13,7 @@ export class GetScheduleActivityDetailsTool implements ITool {
         properties: {
           activity_ids: {
             type: 'array',
+            items: { type: 'string' },
             description: 'Array of activity ID codes to look up.'
           }
         },
