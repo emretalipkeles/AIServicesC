@@ -1,0 +1,47 @@
+[AI] TOOL-EXTRACTION: Calling OpenAI API with function calling enabled...
+[AIDelayEventExtractorWithTools] Error extracting delay events: BadRequestError: 400 Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.
+    at Function.generate (/home/runner/workspace/node_modules/openai/src/core/error.ts:72:14)
+    at OpenAI.makeStatusError (/home/runner/workspace/node_modules/openai/src/client.ts:478:28)
+    at OpenAI.makeRequest (/home/runner/workspace/node_modules/openai/src/client.ts:728:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async AIDelayEventExtractorWithTools.extractDelayEventsWithTools (/home/runner/workspace/server/src/infrastructure/delay-analysis/AIDelayEventExtractorWithTools.ts:254:26)
+    at async RunAnalysisCommandHandler.execute (/home/runner/workspace/server/src/application/delay-analysis/commands/handlers/RunAnalysisCommandHandler.ts:177:38)
+    at async <anonymous> (/home/runner/workspace/server/src/presentation/routes/analysis.routes.ts:346:9) {
+  status: 400,
+  headers: Headers {
+    date: 'Tue, 17 Feb 2026 01:39:10 GMT',
+    'content-type': 'application/json',
+    'content-length': '245',
+    connection: 'keep-alive',
+    'access-control-expose-headers': 'X-Request-ID',
+    'openai-organization': 'team-16af1bf0-1dac-4806-81f6-9c6d2909516b',
+    'openai-processing-ms': '13',
+    'openai-project': 'proj_4OXXx5vPffYdaHP5c4J8qMTk',
+    'openai-version': '2020-10-01',
+    server: 'cloudflare',
+    'x-ratelimit-limit-requests': '15000',
+    'x-ratelimit-limit-tokens': '40000000',
+    'x-ratelimit-remaining-requests': '14999',
+    'x-ratelimit-remaining-tokens': '39977986',
+    'x-ratelimit-reset-requests': '4ms',
+    'x-ratelimit-reset-tokens': '33ms',
+    'x-request-id': 'req_76b90bc52c1e4fffa7d7634cdba9ea16',
+    'x-openai-proxy-wasm': 'v0.1',
+    'cf-cache-status': 'DYNAMIC',
+    'set-cookie': '__cf_bm=lKhfNm5Zu84AIe5w5LO_fz9THciWLO9PWlR8DDTNkMI-1771292350.1543026-1.0.1.1-976fhGtG_xbtYhlYGOdVWqn_GH1SpwdG4WOtYQqh6Oir9BEP45ygvxFTjJVssVggiT46_7SslJgD0M1i4U0MvvbAY3I56FY6IEyV3XIyzV4ZAvdibhPaoNt2K3XXNshI; HttpOnly; Secure; Path=/; Domain=api.openai.com; Expires=Tue, 17 Feb 2026 02:09:10 GMT',
+    'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
+    'x-content-type-options': 'nosniff',
+    'cf-ray': '9cf191c47de93295-SEA',
+    'alt-svc': 'h3=":443"; ma=86400'
+  },
+  requestID: 'req_76b90bc52c1e4fffa7d7634cdba9ea16',
+  error: {
+    message: "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.",
+    type: 'invalid_request_error',
+    param: 'max_tokens',
+    code: 'unsupported_parameter'
+  },
+  code: 'unsupported_parameter',
+  param: 'max_tokens',
+  type: 'invalid_request_error'
+}
