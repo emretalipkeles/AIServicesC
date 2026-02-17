@@ -1,0 +1,64 @@
+The agent loop code is in place, but the routing and bootstrap wiring still follows the old pattern. This needs to be fixed — the old routes should be pointing to the agent loop, and the bootstrap must properly wire all the dependencies. Here's exactly what needs to change:
+
+1. Bootstrap / Dependency Injection — Create an agent-loop-setup function
+
+You need a dedicated bootstrap function (e.g., createAgentLoop()) that wires everything together and returns the handlers the routes will use. This function should:
+
+Accept dependencies it needs from the rest of your app (repositories, capability registry, capability executor, etc.)
+Return an object with: runHandler, resumeHandler, pendingSessionHandler, conversationPersistence (all nullable, so the system degrades gracefully if AI isn't configured)
+Inside, it should:
+Instantiate the ToolUseClient (your LLM client) with API keys from environment variables
+Instantiate the ToolRegistryImpl
+Create a CapabilityToolAdapter that takes your existing capability registry and calls adaptAll() to convert every registered capability into an ITool — then register each adapted tool in the tool registry
+Create any standalone executable tools (like custom tools that don't come from capabilities) and register them in both the tool registry AND the tool executor
+Instantiate ToolExecutorImpl with the capability executor, capability registry, and tool adapter
+Instantiate InMemoryAgentSessionRepository (or a persistent one if you prefer)
+Instantiate AgentContextBuilder (builds the system prompt dynamically)
+Instantiate adapters for conversation persistence, outcome recording, and memory optimization
+Instantiate ReactAgentLoop with all the above as dependencies
+Instantiate RunAgentLoopCommandHandler and ResumeAgentLoopCommandHandler (CQRS command handlers that wrap the agent loop)
+Instantiate GetPendingSessionQueryHandler for checking paused sessions
+Return { runHandler, resumeHandler, pendingSessionHandler, conversationPersistence }
+If AI is not configured (no API key), return all handlers as null and log a warning
+2. AppContainer — Add the agent loop section
+
+Your AppContainer type (or whatever your DI container type is) needs a new agentLoop section:
+
+agentLoop: {
+  runHandler: RunAgentLoopCommandHandler | null;
+  resumeHandler: ResumeAgentLoopCommandHandler | null;
+  pendingSessionHandler: GetPendingSessionQueryHandler | null;
+  conversationPersistence: IConversationPersistence | null;
+};
+In the main bootstrap file where you build the container, call createAgentLoop(deps, isAIConfigured) and assign the result to container.agentLoop.
+
+3. Route Registration — Replace old AI chat routes with agent loop routes
+
+Create a new agent-loop.routes.ts that:
+
+Receives the AppContainer (or just the agentLoop section)
+Extracts runHandler, resumeHandler, pendingSessionHandler from container.agentLoop
+If any are null, log a warning and return without registering routes
+Instantiates AgentLoopController with these handlers
+Registers these routes:
+POST /api/ai/agent-loop/stream → controller.streamAgentLoop (the main SSE endpoint)
+POST /api/ai/agent-loop/resume → controller.resumeSession
+GET /api/ai/agent-loop/pending-session → controller.getPendingSession
+4. Update the route index file
+
+In your central routes/index.ts (or wherever you register all routes):
+
+Import and call registerAgentLoopRoutes(app, container)
+The old AI chat routes (like POST /api/ai/chat, POST /api/ai/chat/stream, POST /api/agents/:id/chat/stream) can stay if you still need them for backward compatibility, but the frontend should now call /api/ai/agent-loop/stream instead
+5. Update the frontend to use the new endpoint
+
+The frontend chat component should now:
+
+POST to /api/ai/agent-loop/stream instead of the old chat endpoint
+Send { message, conversationId, packageId } as the body (not the old format)
+Read the response as an SSE stream (not as a JSON response)
+For resuming paused sessions, POST to /api/ai/agent-loop/resume with { sessionId, userInput }
+On page load, check GET /api/ai/agent-loop/pending-session to see if there's a paused session that needs user input
+The key insight: The old routing had the controller calling a command handler that did a single LLM call. The new routing has the controller calling a command handler that calls agentLoop.run(), which internally loops. The controller doesn't know about the loop — it just sets up SSE headers, passes an event callback, and the loop emits events that get written to the SSE stream. The bootstrap is what wires the loop to its tools, LLM client, and session storage.
+
+Look at all existing AI/chat route files and the bootstrap code. Replace the old wiring with the agent loop pattern. The old streamChatHandler, streamChatWithAgentHandler, and similar single-call handlers are no longer the primary AI path — the agent loop is.

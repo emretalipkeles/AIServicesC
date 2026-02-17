@@ -1,0 +1,200 @@
+  /* Enhanced animated thinking indicator */
+  .animate-thinking-logo {
+    animation: thinkingLogo 2s ease-in-out infinite;
+  }
+
+  @keyframes thinkingLogo {
+    0%, 100% {
+      transform: scale(1) rotate(0deg);
+    }
+    25% {
+      transform: scale(1.05) rotate(3deg);
+    }
+    50% {
+      transform: scale(0.98) rotate(-2deg);
+    }
+    75% {
+      transform: scale(1.02) rotate(1deg);
+    }
+  }
+
+  .animate-thinking-glow {
+    animation: thinkingGlow 2s ease-in-out infinite;
+    background: radial-gradient(circle, hsl(var(--primary) / 0.4) 0%, transparent 70%);
+  }
+
+  @keyframes thinkingGlow {
+    0%, 100% {
+      opacity: 0.4;
+      transform: scale(1.2);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.6);
+    }
+  }
+
+  .animate-thinking-ring {
+    animation: thinkingRing 2s linear infinite;
+    border: 1px solid hsl(var(--primary) / 0.3);
+  }
+
+  @keyframes thinkingRing {
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+
+  .animate-thinking-sparkle-1 {
+    animation: thinkingSparkle1 1.5s ease-in-out infinite;
+    top: -4px;
+    right: -4px;
+  }
+
+  @keyframes thinkingSparkle1 {
+    0%, 100% {
+      opacity: 0;
+      transform: scale(0) rotate(0deg);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1) rotate(180deg);
+    }
+  }
+
+  .animate-thinking-sparkle-2 {
+    animation: thinkingSparkle2 1.5s ease-in-out infinite 0.3s;
+    bottom: -3px;
+    left: -3px;
+  }
+
+  @keyframes thinkingSparkle2 {
+    0%, 100% {
+      opacity: 0;
+      transform: scale(0) rotate(0deg);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1) rotate(-180deg);
+    }
+  }
+
+  .animate-thinking-sparkle-3 {
+    animation: thinkingSparkle3 1.5s ease-in-out infinite 0.6s;
+    top: -2px;
+    left: -4px;
+  }
+
+  @keyframes thinkingSparkle3 {
+    0%, 100% {
+      opacity: 0;
+      transform: scale(0) rotate(0deg);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1) rotate(90deg);
+    }
+  }
+
+  .animate-thinking-dot-1 {
+    animation: thinkingDots 1.2s ease-in-out infinite;
+  }
+
+  .animate-thinking-dot-2 {
+    animation: thinkingDots 1.2s ease-in-out infinite 0.2s;
+  }
+
+  .animate-thinking-dot-3 {
+    animation: thinkingDots 1.2s ease-in-out infinite 0.4s;
+  }
+
+  @keyframes thinkingDots {
+    0%, 60%, 100% {
+      opacity: 0.3;
+      transform: translateY(0);
+    }
+    30% {
+      opacity: 1;
+      transform: translateY(-2px);
+    }
+  }
+
+  .animate-thinking-status {
+    animation: thinkingStatus 3s ease-in-out infinite;
+  }
+
+  @keyframes thinkingStatus {
+    0%, 100% {
+      opacity: 0.9;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  .animate-thinking-bar-1 {
+    animation: thinkingBar 0.8s ease-in-out infinite;
+  }
+
+  .animate-thinking-bar-2 {
+    animation: thinkingBar 0.8s ease-in-out infinite 0.1s;
+  }
+
+  .animate-thinking-bar-3 {
+    animation: thinkingBar 0.8s ease-in-out infinite 0.2s;
+  }
+
+  .animate-thinking-bar-4 {
+    animation: thinkingBar 0.8s ease-in-out infinite 0.3s;
+  }
+
+  .animate-thinking-bar-5 {
+    animation: thinkingBar 0.8s ease-in-out infinite 0.4s;
+  }
+
+  @keyframes thinkingBar {
+    0%, 100% {
+      transform: scaleY(0.33);
+      opacity: 0.4;
+    }
+    50% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+  /* Step fade-in animation for autonomous progress */
+  .animate-step-fade-in {
+    animation: stepFadeIn 0.4s ease-out both;
+  }
+
+  @keyframes stepFadeIn {
+    0% {
+      opacity: 0;
+      transform: translateX(-8px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Scale-in animation for checkmarks */
+  .animate-scale-in {
+    animation: scaleIn 0.25s ease-out both;
+  }
+
+  @keyframes scaleIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.5);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
