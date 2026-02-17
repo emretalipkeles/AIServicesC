@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { ICommandBus } from '../../application/interfaces/ICommandBus';
 import type { IQueryBus } from '../../application/interfaces/IQueryBus';
-import type { AgentDto, AgentDocumentDto, ChatWithAgentResponseDto } from '../../application/dto/AgentDto';
+import type { AgentDto, AgentDocumentDto } from '../../application/dto/AgentDto';
 import type { ReindexResult } from '../../application/commands/handlers/ReindexAgentCommandHandler';
 import type { UploadDocumentFileResult } from '../../application/commands/handlers/UploadDocumentFileCommandHandler';
 import { CreateAgentCommand } from '../../application/commands/CreateAgentCommand';
@@ -11,7 +11,6 @@ import { UploadDocumentCommand } from '../../application/commands/UploadDocument
 import { UploadDocumentFileCommand } from '../../application/commands/UploadDocumentFileCommand';
 import { DeleteDocumentCommand } from '../../application/commands/DeleteDocumentCommand';
 import { ReindexAgentCommand } from '../../application/commands/ReindexAgentCommand';
-import { ChatWithAgentCommand } from '../../application/commands/ChatWithAgentCommand';
 import { GetAgentQuery } from '../../application/queries/GetAgentQuery';
 import { ListAgentsQuery } from '../../application/queries/ListAgentsQuery';
 import { ListAgentDocumentsQuery } from '../../application/queries/ListAgentDocumentsQuery';
@@ -19,16 +18,11 @@ import {
   createAgentSchema,
   updateAgentSchema,
   uploadDocumentSchema,
-  chatWithAgentSchema,
 } from '../validators/agentValidators';
-import type { StreamChatWithAgentCommandHandler } from '../../application/commands/handlers/StreamChatWithAgentCommandHandler';
-import { StreamChatWithAgentCommand } from '../../application/commands/StreamChatWithAgentCommand';
-
 export class AgentController {
   constructor(
     private readonly commandBus: ICommandBus,
     private readonly queryBus: IQueryBus,
-    private readonly streamHandler?: StreamChatWithAgentCommandHandler
   ) {}
 
   async listAgents(req: Request, res: Response): Promise<void> {
@@ -221,116 +215,6 @@ export class AgentController {
       res.json(result);
     } catch (error) {
       this.handleError(res, error);
-    }
-  }
-
-  async chatWithAgent(req: Request, res: Response): Promise<void> {
-    try {
-      const parseResult = chatWithAgentSchema.safeParse(req.body);
-      if (!parseResult.success) {
-        res.status(400).json({ error: 'Validation failed', details: parseResult.error.errors });
-        return;
-      }
-
-      const tenantId = (req as any).tenantId ?? 'default';
-      const { messages, maxTokens, temperature } = parseResult.data;
-      
-      const command = new ChatWithAgentCommand(req.params.id, tenantId, messages, maxTokens, temperature);
-      const response = await this.commandBus.execute<typeof command, ChatWithAgentResponseDto>(command);
-      
-      res.json(response);
-    } catch (error) {
-      this.handleError(res, error);
-    }
-  }
-
-  async streamChatWithAgent(req: Request, res: Response): Promise<void> {
-    let isClientConnected = true;
-    let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
-    let abortController: AbortController | null = null;
-    let streamStarted = false;
-
-    res.on('close', () => {
-      isClientConnected = false;
-      if (streamStarted && abortController) {
-        abortController.abort();
-      }
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-      }
-    });
-
-    try {
-      if (!this.streamHandler) {
-        res.status(503).json({ error: 'Streaming not configured' });
-        return;
-      }
-
-      const parseResult = chatWithAgentSchema.safeParse(req.body);
-      if (!parseResult.success) {
-        res.status(400).json({ error: 'Validation failed', details: parseResult.error.errors });
-        return;
-      }
-
-      const tenantId = (req as any).tenantId ?? 'default';
-      const { messages, maxTokens, temperature } = parseResult.data;
-
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no');
-      res.flushHeaders();
-
-      res.write(':connected\n\n');
-
-      heartbeatInterval = setInterval(() => {
-        if (isClientConnected) {
-          res.write(':ping\n\n');
-        }
-      }, 15000);
-
-      const command = new StreamChatWithAgentCommand(
-        req.params.id,
-        tenantId,
-        messages,
-        maxTokens,
-        temperature
-      );
-
-      abortController = new AbortController();
-      streamStarted = true;
-
-      await this.streamHandler.handleStream(
-        command,
-        (chunk) => {
-          if (!isClientConnected) return;
-          
-          if (chunk.type === 'content' && chunk.content) {
-            res.write(`data: ${JSON.stringify({ type: 'content', content: chunk.content })}\n\n`);
-          } else if (chunk.type === 'done') {
-            res.write(`data: ${JSON.stringify({ type: 'done', inputTokens: chunk.inputTokens, outputTokens: chunk.outputTokens })}\n\n`);
-          } else if (chunk.type === 'error') {
-            res.write(`data: ${JSON.stringify({ type: 'error', error: chunk.error })}\n\n`);
-          }
-        },
-        { abortSignal: abortController.signal }
-      );
-
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-      }
-      res.end();
-    } catch (error) {
-      console.error('Stream chat with agent error:', error);
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-      }
-      if (!res.headersSent) {
-        this.handleError(res, error);
-      } else if (isClientConnected) {
-        res.write(`data: ${JSON.stringify({ type: 'error', error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`);
-        res.end();
-      }
     }
   }
 

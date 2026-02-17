@@ -38,7 +38,6 @@ export function registerAgentRoutes(app: Express, container: AppContainer): void
   const agentController = new AgentController(
     container.commandBus,
     container.queryBus,
-    container.handlers.streamChatWithAgentHandler
   );
 
   app.get("/api/agents", (req, res) => agentController.listAgents(req, res));
@@ -62,6 +61,4 @@ export function registerAgentRoutes(app: Express, container: AppContainer): void
   });
   app.delete("/api/agents/:id/documents/:docId", (req, res) => agentController.deleteDocument(req, res));
   app.post("/api/agents/:id/reindex", (req, res) => agentController.reindexAgent(req, res));
-  app.post("/api/agents/:id/chat", (req, res) => agentController.chatWithAgent(req, res));
-  app.post("/api/agents/:id/chat/stream", (req, res) => agentController.streamChatWithAgent(req, res));
 }

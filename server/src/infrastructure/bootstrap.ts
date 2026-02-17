@@ -13,12 +13,6 @@ import { DrizzleConversationRepository } from "./database/repositories/DrizzleCo
 import { DocumentProcessor } from "./documents/DocumentProcessor";
 import { AIDocumentExtractionService } from "./documents/AIDocumentExtractionService";
 import { DocumentUnderstandingService } from "./documents/DocumentUnderstandingService";
-import { AgentDiscoveryService } from "./orchestration/AgentDiscoveryService";
-import { OrchestrationPlanner } from "./orchestration/OrchestrationPlanner";
-import { AgentExecutor } from "./orchestration/AgentExecutor";
-import { ResponseSynthesizer } from "./orchestration/ResponseSynthesizer";
-import { FallbackResponseGenerator } from "./orchestration/FallbackResponseGenerator";
-import { AIConversationSummarizer } from "./orchestration/AIConversationSummarizer";
 import { DelayEventsAgentContextProvider } from "./delay-analysis/DelayEventsAgentContextProvider";
 import { PretToolRegistry } from "./pret/PretToolRegistry";
 import { PretOrchestrator } from "../application/pret/services/PretOrchestrator";
@@ -38,11 +32,6 @@ import { YauzlPackageAnalyzer } from "./pret/analyzers/YauzlPackageAnalyzer";
 import { YamlDimensionMemberReader } from "./pret/readers/YamlDimensionMemberReader";
 import type { IPackageAnalyzer } from "../domain/pret/interfaces/IPackageAnalyzer";
 import type { IDimensionMemberReader } from "../domain/pret/interfaces/IDimensionMemberReader";
-import { UpdateConversationContextHandler } from "../application/orchestration/handlers/UpdateConversationContextHandler";
-import { NarrateUploadResultHandler } from "../application/orchestration/handlers/NarrateUploadResultHandler";
-import { StreamNarrateUploadResultHandler } from "../application/orchestration/handlers/StreamNarrateUploadResultHandler";
-import { AIUploadNarrator } from "./orchestration/narrators/AIUploadNarrator";
-import type { IUploadNarrator } from "../domain/orchestration/interfaces/IUploadNarrator";
 import type { IPretToolRegistry } from "../domain/pret/interfaces/IPretToolRegistry";
 import type { IBuildContextRepository } from "../domain/pret/interfaces/IBuildContextRepository";
 import type { IFileContextRepository } from "../domain/pret/interfaces/IFileContextRepository";
@@ -53,8 +42,6 @@ import type { IPretFileReader } from "../domain/pret/interfaces/IPretFileReader"
 import type { IPretPackageStorage } from "../domain/pret/interfaces/IPretPackageStorage";
 import type { IPretPackageSessionRepository } from "../domain/pret/interfaces/IPretPackageSessionRepository";
 import type { IConversationContextRepository } from "../domain/orchestration/interfaces/IConversationContextRepository";
-import { SendChatCommandHandler } from "../application/commands/handlers/SendChatCommandHandler";
-import { StreamChatCommandHandler } from "../application/commands/handlers/StreamChatCommandHandler";
 import { CreateAgentCommandHandler } from "../application/commands/handlers/CreateAgentCommandHandler";
 import { UpdateAgentCommandHandler } from "../application/commands/handlers/UpdateAgentCommandHandler";
 import { DeleteAgentCommandHandler } from "../application/commands/handlers/DeleteAgentCommandHandler";
@@ -63,9 +50,7 @@ import { UploadDocumentFileCommandHandler } from "../application/commands/handle
 import { DeleteDocumentCommandHandler } from "../application/commands/handlers/DeleteDocumentCommandHandler";
 import { ReindexAgentCommandHandler } from "../application/commands/handlers/ReindexAgentCommandHandler";
 import { ChatWithAgentCommandHandler } from "../application/commands/handlers/ChatWithAgentCommandHandler";
-import { StreamChatWithAgentCommandHandler } from "../application/commands/handlers/StreamChatWithAgentCommandHandler";
 import { SaveStructuredOutputCommandHandler } from "../application/commands/handlers/SaveStructuredOutputCommandHandler";
-import { OrchestrateCommandHandler } from "../application/commands/handlers/OrchestrateCommandHandler";
 import { TestConnectionQueryHandler } from "../application/queries/handlers/TestConnectionQueryHandler";
 import { GetAgentQueryHandler } from "../application/queries/handlers/GetAgentQueryHandler";
 import { ListAgentsQueryHandler } from "../application/queries/handlers/ListAgentsQueryHandler";
@@ -76,7 +61,6 @@ import type { IChunkRepository } from "../domain/repositories/IChunkRepository";
 import type { IStructuredOutputRepository } from "../domain/repositories/IStructuredOutputRepository";
 import type { IProcessingSessionRepository } from "../domain/repositories/IProcessingSessionRepository";
 import type { IConversationRepository } from "../domain/interfaces/IConversationRepository";
-import type { IConversationSummarizer } from "../domain/interfaces/IConversationSummarizer";
 import type { ISessionMemoryRepository } from "../domain/interfaces/ISessionMemoryRepository";
 import type { ICommandBus } from "../application/interfaces/ICommandBus";
 import type { IQueryBus } from "../application/interfaces/IQueryBus";
@@ -106,12 +90,9 @@ import { AIDelayEventExtractorWithTools } from "./delay-analysis/AIDelayEventExt
 import { GetScheduleActivitiesTool } from "./delay-analysis/tools/GetScheduleActivitiesTool";
 import { GetActivitiesByIdsQueryHandler } from "../application/delay-analysis/queries/handlers/GetActivitiesByIdsQueryHandler";
 import { AIActivityMatcher } from "./delay-analysis/AIActivityMatcher";
-import { OpenAIDelayEventsChatService } from "./delay-analysis/OpenAIDelayEventsChatService";
-import { StreamingOpenAIDelayEventsChatService } from "./delay-analysis/StreamingOpenAIDelayEventsChatService";
 import { DocumentContentProvider } from "./delay-analysis/DocumentContentProvider";
 import { SHA256DocumentHashService } from "./delay-analysis/SHA256DocumentHashService";
 import { DelayEventDeduplicationService } from "./delay-analysis/DelayEventDeduplicationService";
-import { GetDocumentContentTool } from "./delay-analysis/tools/GetDocumentContentTool";
 import type { IAgentLoop } from "../domain/delay-analysis/interfaces/IAgentLoop";
 import { ReactAgentLoop } from "./delay-analysis/agent/ReactAgentLoop";
 import { OpenAIToolUseClient } from "./delay-analysis/agent/OpenAIToolUseClient";
@@ -124,8 +105,6 @@ import { ContractorDelayTrainingGuide } from "../domain/delay-analysis/config/Co
 import { DelayKnowledgePromptBuilder } from "./delay-analysis/DelayKnowledgePromptBuilder";
 import type { IDelayEventExtractor } from "../domain/delay-analysis/interfaces/IDelayEventExtractor";
 import type { IActivityMatcher } from "../domain/delay-analysis/interfaces/IActivityMatcher";
-import type { IDelayEventsChatService } from "../domain/delay-analysis/interfaces/IDelayEventsChatService";
-import type { IStreamingDelayEventsChatService } from "../domain/delay-analysis/interfaces/IStreamingDelayEventsChatService";
 import type { IDocumentContentProvider } from "../domain/delay-analysis/interfaces/IDocumentContentProvider";
 import type { IDocumentHashService } from "../domain/delay-analysis/interfaces/IDocumentHashService";
 import type { IDelayEventDeduplicationService } from "../domain/delay-analysis/interfaces/IDelayEventDeduplicationService";
@@ -175,21 +154,14 @@ export interface AppContainer {
   };
   
   handlers: {
-    streamChatHandler: StreamChatCommandHandler;
-    streamChatWithAgentHandler: StreamChatWithAgentCommandHandler;
-    orchestrateHandler: OrchestrateCommandHandler | null;
     importPretPackageHandler: ImportPretPackageHandler | null;
     getPretPackageHandler: GetPretPackageHandler | null;
     analyzePackageHandler: AnalyzePackageHandler | null;
     getDimensionMembersHandler: GetDimensionMembersHandler | null;
-    updateConversationContextHandler: UpdateConversationContextHandler;
-    narrateUploadResultHandler: NarrateUploadResultHandler | null;
-    streamNarratorHandler: StreamNarrateUploadResultHandler | null;
   };
   
   services: {
     isAIConfigured: boolean;
-    conversationSummarizer: IConversationSummarizer | null;
     pretToolRegistry: IPretToolRegistry | null;
     pretOrchestrator: PretOrchestrator | null;
     pretContextService: PretContextService | null;
@@ -200,18 +172,116 @@ export interface AppContainer {
     scheduleParserFactory: IScheduleParserFactory;
     delayEventExtractor: IDelayEventExtractor | null;
     activityMatcher: IActivityMatcher | null;
-    delayEventsChatService: IDelayEventsChatService | null;
-    streamingDelayEventsChatService: IStreamingDelayEventsChatService | null;
     documentContentProvider: IDocumentContentProvider;
     documentHashService: IDocumentHashService;
     delayEventDeduplicationService: IDelayEventDeduplicationService;
-    getDocumentContentQueryHandler: GetDocumentContentQueryHandler | null;
-    searchDocumentsByFilenameQueryHandler: SearchDocumentsByFilenameQueryHandler | null;
-    getDelayEventsByDocumentQueryHandler: GetDelayEventsByDocumentQueryHandler | null;
-    getActivitiesByIdsQueryHandler: GetActivitiesByIdsQueryHandler | null;
-    agentLoop: IAgentLoop | null;
-    agentLoopSystemPrompt: string;
   };
+
+  agentLoop: {
+    loop: IAgentLoop | null;
+    systemPrompt: string;
+  };
+}
+
+function createAgentLoop(
+  projectDocumentRepository: IProjectDocumentRepository,
+  contractorDelayEventRepository: IContractorDelayEventRepository,
+  getActivitiesByIdsHandler: GetActivitiesByIdsQueryHandler,
+): AppContainer['agentLoop'] {
+  const openAiKey = process.env.OPEN_AI_KEY;
+  if (!openAiKey) {
+    console.warn('[Bootstrap] OPEN_AI_KEY not set - agent loop disabled');
+    return { loop: null, systemPrompt: '' };
+  }
+
+  const toolRegistry = new ToolRegistryImpl();
+
+  const searchDocsQH = new SearchDocumentsByFilenameQueryHandler(projectDocumentRepository);
+  const getDocContentQH = new GetDocumentContentQueryHandler(
+    new DocumentContentProvider(),
+    projectDocumentRepository
+  );
+  const getDelayEventsQH = new GetDelayEventsByDocumentQueryHandler(contractorDelayEventRepository);
+
+  toolRegistry.register(new AgentSearchDocsTool(searchDocsQH));
+  toolRegistry.register(new AgentGetDocContentTool(getDocContentQH));
+  toolRegistry.register(new AgentGetDelayEventsTool(getDelayEventsQH));
+  toolRegistry.register(new AgentGetActivityDetailsTool(getActivitiesByIdsHandler));
+
+  const toolUseClient = new OpenAIToolUseClient(openAiKey, 'gpt-4.1');
+  const loop = new ReactAgentLoop(toolRegistry, toolUseClient);
+
+  console.log('[Bootstrap] ReactAgentLoop initialized with 4 tools');
+
+  const knowledgeBase = new ContractorDelayTrainingGuide();
+  const promptBuilder = new DelayKnowledgePromptBuilder(knowledgeBase);
+  const knowledgePrompt = promptBuilder.buildPromptForDocumentType('idr');
+
+  const systemPrompt = `You are a specialized construction delay analysis expert and verification assistant. Your purpose is to help users verify whether delay events were correctly identified, analyze their classifications, and provide detailed reasoning based on the Contractor Delay Training Guide.
+
+## YOUR CAPABILITIES:
+
+You have access to the following tools to investigate delay events:
+
+1. **search_documents_by_filename** - Find documents by filename, date code, or inspector initials
+2. **get_document_content** - Retrieve the full text of a source document
+3. **get_delay_events_by_document** - Find all delay events extracted from a specific document
+4. **get_schedule_activity_details** - Look up CPM schedule activity details by activity ID
+
+## ANALYTICAL METHODOLOGY:
+
+When a user asks you to verify or analyze a delay event, follow this exact workflow:
+
+### Step 1: LOCATE THE SOURCE
+- If the user mentions a document filename, use search_documents_by_filename to find it
+- If they mention a delay event, use get_delay_events_by_document to find events from that document
+
+### Step 2: READ THE EVIDENCE
+- Use get_document_content to retrieve the full document text
+- Focus on diary entries, timestamps, and narrative descriptions
+- Note exact timestamps and durations mentioned
+
+### Step 3: CROSS-REFERENCE THE TRAINING GUIDE
+Using the Contractor Delay Training Guide knowledge base below, evaluate:
+- Which delay CATEGORY does this event fall under? (Resource & Staffing, Subcontractor & Supplier, Quality Deficiencies, Planning & Coordination, Equipment Failures)
+- Does it match any specific INDICATOR in that category?
+- Does it pass the CORE TEST: "Was the Contractor doing everything within its power to diligently prosecute the Work?"
+- Does any EXCLUSION apply? (DSCs, owner-directed suspensions, unforeseen conditions, etc.)
+- Walk through the DECISION FRAMEWORK questions
+- Compare to relevant WORKED EXAMPLES
+
+### Step 4: PROVIDE YOUR VERDICT
+- State whether the classification is correct, with your reasoning
+- Assess the confidence level and whether it's appropriate
+- Note if the duration estimate is supported by the evidence
+- Flag any gray areas or aspects that need human judgment
+- Reference specific sections of the Training Guide in your analysis
+
+## CRITICAL RULES:
+
+1. **ALWAYS use your tools to investigate** - Never answer from memory alone. Search for and read the actual documents.
+2. **ONLY answer questions about the delay events data and documents in this project.**
+3. **REFUSE questions not directly about delay analysis.** Say: "I can only answer questions about the delay events in this project."
+4. **Base ALL answers strictly on the data, documents, and Training Guide.** Never make up information.
+5. **Always show your reasoning** - walk through the Training Guide criteria step by step.
+6. **Be honest about gray areas** - if a classification is borderline, say so and explain why.
+7. **Reference timestamps and diary entries** when discussing evidence from documents.
+
+## DURATION ESTIMATION METHODOLOGY:
+
+### For Inspector Daily Reports (IDRs):
+- Durations are estimated by interpreting the narrative and timestamps
+- **Explicit timestamp gaps**: "0930-crew stopped, 1100-resumed" = 1.5 hours
+- **Explicit mentions**: "crew arrived 2 hours late" → 2 hours
+- **Estimated from context**: Equipment breakdowns, crew shortages → estimated based on typical resolution times
+
+### For Non-Conformance Reports (NCRs):
+- NCR = rework required = definite delay
+- Duration = removal time + redo time + re-inspection time
+
+${knowledgePrompt}`;
+
+  return { loop, systemPrompt };
 }
 
 export function createAppContainer(): AppContainer {
@@ -244,7 +314,6 @@ export function createAppContainer(): AppContainer {
 
   let delayEventExtractor: IDelayEventExtractor | null = null;
   let activityMatcher: IActivityMatcher | null = null;
-  let delayEventsChatService: IDelayEventsChatService | null = null;
   let scheduleParserFactory: IScheduleParserFactory;
 
   let pretPackageStorage: IPretPackageStorage | null = null;
@@ -328,7 +397,6 @@ export function createAppContainer(): AppContainer {
     delayEventExtractor = new AIDelayEventExtractorWithTools(scheduleActivitiesTool);
     console.log('[Bootstrap] Using AIDelayEventExtractorWithTools for extraction with real-time schedule lookup');
     activityMatcher = new AIActivityMatcher(aiClient);
-    delayEventsChatService = new OpenAIDelayEventsChatService(aiClient);
   }
   
   const pretCommandExecutor = intentClassifier 
@@ -340,26 +408,6 @@ export function createAppContainer(): AppContainer {
       )
     : null;
 
-  const discoveryService = new AgentDiscoveryService();
-  const planner = aiClient ? new OrchestrationPlanner(aiClient) : null;
-  const executor = new AgentExecutor(agentRepository, chunkRepository, aiClientFactory);
-  
-  if (pretOrchestrator) {
-    executor.setPretOrchestrator(pretOrchestrator);
-  }
-  
-  executor.setConversationContextRepository(conversationContextRepository);
-  executor.setPackageAnalysisCache(packageAnalysisCache);
-  executor.setSessionMemoryRepository(sessionMemoryRepository);
-  executor.setPretCommandExecutor(pretCommandExecutor);
-  executor.setDelayEventsContextProvider(new DelayEventsAgentContextProvider(contractorDelayEventRepository));
-  
-  const synthesizer = aiClient ? new ResponseSynthesizer(aiClient) : null;
-  const fallbackGenerator = aiClient ? new FallbackResponseGenerator(aiClient) : null;
-  const conversationSummarizer = aiClient ? new AIConversationSummarizer(aiClient) : null;
-
-  const sendChatHandler = new SendChatCommandHandler(bedrockClientProvider);
-  const streamChatHandler = new StreamChatCommandHandler(bedrockClientProvider);
   const testConnectionHandler = new TestConnectionQueryHandler(bedrockClientProvider);
 
   const createAgentHandler = new CreateAgentCommandHandler(agentRepository);
@@ -379,24 +427,10 @@ export function createAppContainer(): AppContainer {
   const chatWithAgentHandler = new ChatWithAgentCommandHandler(
     agentRepository, chunkRepository, bedrockClientProvider
   );
-  const streamChatWithAgentHandler = new StreamChatWithAgentCommandHandler(
-    agentRepository, chunkRepository, bedrockClientProvider
-  );
 
   const saveStructuredOutputHandler = new SaveStructuredOutputCommandHandler(
     agentRepository, structuredOutputRepository
   );
-
-  let orchestrateHandler: OrchestrateCommandHandler | null = null;
-  if (planner && synthesizer && fallbackGenerator) {
-    orchestrateHandler = new OrchestrateCommandHandler(
-      discoveryService,
-      planner,
-      executor,
-      synthesizer,
-      fallbackGenerator
-    );
-  }
 
   const getAgentHandler = new GetAgentQueryHandler(agentRepository);
   const listAgentsHandler = new ListAgentsQueryHandler(agentRepository);
@@ -441,23 +475,6 @@ export function createAppContainer(): AppContainer {
     }
   }
 
-  const updateConversationContextHandler = new UpdateConversationContextHandler(
-    conversationContextRepository
-  );
-
-  let narrateUploadResultHandler: NarrateUploadResultHandler | null = null;
-  let streamNarratorHandler: StreamNarrateUploadResultHandler | null = null;
-  if (aiClient) {
-    const uploadNarrator = new AIUploadNarrator(aiClient);
-    narrateUploadResultHandler = new NarrateUploadResultHandler(uploadNarrator);
-    streamNarratorHandler = new StreamNarrateUploadResultHandler(
-      uploadNarrator, 
-      conversationRepository,
-      conversationContextRepository
-    );
-  }
-
-  commandBus.register('SendChatCommand', sendChatHandler);
   commandBus.register('CreateAgentCommand', createAgentHandler);
   commandBus.register('UpdateAgentCommand', updateAgentHandler);
   commandBus.register('DeleteAgentCommand', deleteAgentHandler);
@@ -502,20 +519,13 @@ export function createAppContainer(): AppContainer {
       aiTokenUsage: aiTokenUsageRepository,
     },
     handlers: {
-      streamChatHandler,
-      streamChatWithAgentHandler,
-      orchestrateHandler,
       importPretPackageHandler,
       getPretPackageHandler,
       analyzePackageHandler,
       getDimensionMembersHandler,
-      updateConversationContextHandler,
-      narrateUploadResultHandler,
-      streamNarratorHandler,
     },
     services: {
       isAIConfigured: bedrockClientProvider.isConfigured(),
-      conversationSummarizer,
       pretToolRegistry,
       pretOrchestrator,
       pretContextService,
@@ -526,119 +536,11 @@ export function createAppContainer(): AppContainer {
       scheduleParserFactory,
       delayEventExtractor,
       activityMatcher,
-      delayEventsChatService,
-      streamingDelayEventsChatService: new StreamingOpenAIDelayEventsChatService(),
       documentContentProvider: new DocumentContentProvider(),
       documentHashService: new SHA256DocumentHashService(),
       delayEventDeduplicationService: new DelayEventDeduplicationService(),
-      getDocumentContentQueryHandler: new GetDocumentContentQueryHandler(
-        new DocumentContentProvider(),
-        projectDocumentRepository
-      ),
-      searchDocumentsByFilenameQueryHandler: new SearchDocumentsByFilenameQueryHandler(
-        projectDocumentRepository
-      ),
-      getDelayEventsByDocumentQueryHandler: new GetDelayEventsByDocumentQueryHandler(
-        contractorDelayEventRepository
-      ),
-      getActivitiesByIdsQueryHandler: getActivitiesByIdsHandler,
-      agentLoop: (() => {
-        const openAiKey = process.env.OPEN_AI_KEY;
-        if (!openAiKey) {
-          console.warn('[Bootstrap] OPEN_AI_KEY not set - agent loop disabled');
-          return null;
-        }
-
-        const toolRegistry = new ToolRegistryImpl();
-
-        const searchDocsQH = new SearchDocumentsByFilenameQueryHandler(projectDocumentRepository);
-        const getDocContentQH = new GetDocumentContentQueryHandler(
-          new DocumentContentProvider(),
-          projectDocumentRepository
-        );
-        const getDelayEventsQH = new GetDelayEventsByDocumentQueryHandler(contractorDelayEventRepository);
-
-        toolRegistry.register(new AgentSearchDocsTool(searchDocsQH));
-        toolRegistry.register(new AgentGetDocContentTool(getDocContentQH));
-        toolRegistry.register(new AgentGetDelayEventsTool(getDelayEventsQH));
-        toolRegistry.register(new AgentGetActivityDetailsTool(getActivitiesByIdsHandler));
-
-        const toolUseClient = new OpenAIToolUseClient(openAiKey, 'gpt-4.1');
-        const agentLoop = new ReactAgentLoop(toolRegistry, toolUseClient);
-
-        console.log('[Bootstrap] ReactAgentLoop initialized with 4 tools');
-        return agentLoop;
-      })(),
-      agentLoopSystemPrompt: (() => {
-        const knowledgeBase = new ContractorDelayTrainingGuide();
-        const promptBuilder = new DelayKnowledgePromptBuilder(knowledgeBase);
-        const knowledgePrompt = promptBuilder.buildPromptForDocumentType('idr');
-
-        return `You are a specialized construction delay analysis expert and verification assistant. Your purpose is to help users verify whether delay events were correctly identified, analyze their classifications, and provide detailed reasoning based on the Contractor Delay Training Guide.
-
-## YOUR CAPABILITIES:
-
-You have access to the following tools to investigate delay events:
-
-1. **search_documents_by_filename** - Find documents by filename, date code, or inspector initials
-2. **get_document_content** - Retrieve the full text of a source document
-3. **get_delay_events_by_document** - Find all delay events extracted from a specific document
-4. **get_schedule_activity_details** - Look up CPM schedule activity details by activity ID
-
-## ANALYTICAL METHODOLOGY:
-
-When a user asks you to verify or analyze a delay event, follow this exact workflow:
-
-### Step 1: LOCATE THE SOURCE
-- If the user mentions a document filename, use search_documents_by_filename to find it
-- If they mention a delay event, use get_delay_events_by_document to find events from that document
-
-### Step 2: READ THE EVIDENCE
-- Use get_document_content to retrieve the full document text
-- Focus on diary entries, timestamps, and narrative descriptions
-- Note exact timestamps and durations mentioned
-
-### Step 3: CROSS-REFERENCE THE TRAINING GUIDE
-Using the Contractor Delay Training Guide knowledge base below, evaluate:
-- Which delay CATEGORY does this event fall under? (Resource & Staffing, Subcontractor & Supplier, Quality Deficiencies, Planning & Coordination, Equipment Failures)
-- Does it match any specific INDICATOR in that category?
-- Does it pass the CORE TEST: "Was the Contractor doing everything within its power to diligently prosecute the Work?"
-- Does any EXCLUSION apply? (DSCs, owner-directed suspensions, unforeseen conditions, etc.)
-- Walk through the DECISION FRAMEWORK questions
-- Compare to relevant WORKED EXAMPLES
-
-### Step 4: PROVIDE YOUR VERDICT
-- State whether the classification is correct, with your reasoning
-- Assess the confidence level and whether it's appropriate
-- Note if the duration estimate is supported by the evidence
-- Flag any gray areas or aspects that need human judgment
-- Reference specific sections of the Training Guide in your analysis
-
-## CRITICAL RULES:
-
-1. **ALWAYS use your tools to investigate** - Never answer from memory alone. Search for and read the actual documents.
-2. **ONLY answer questions about the delay events data and documents in this project.**
-3. **REFUSE questions not directly about delay analysis.** Say: "I can only answer questions about the delay events in this project."
-4. **Base ALL answers strictly on the data, documents, and Training Guide.** Never make up information.
-5. **Always show your reasoning** - walk through the Training Guide criteria step by step.
-6. **Be honest about gray areas** - if a classification is borderline, say so and explain why.
-7. **Reference timestamps and diary entries** when discussing evidence from documents.
-
-## DURATION ESTIMATION METHODOLOGY:
-
-### For Inspector Daily Reports (IDRs):
-- Durations are estimated by interpreting the narrative and timestamps
-- **Explicit timestamp gaps**: "0930-crew stopped, 1100-resumed" = 1.5 hours
-- **Explicit mentions**: "crew arrived 2 hours late" → 2 hours
-- **Estimated from context**: Equipment breakdowns, crew shortages → estimated based on typical resolution times
-
-### For Non-Conformance Reports (NCRs):
-- NCR = rework required = definite delay
-- Duration = removal time + redo time + re-inspection time
-
-${knowledgePrompt}`;
-      })(),
     },
+    agentLoop: createAgentLoop(projectDocumentRepository, contractorDelayEventRepository, getActivitiesByIdsHandler),
   };
 }
 

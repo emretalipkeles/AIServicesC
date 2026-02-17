@@ -96,15 +96,6 @@ interface Message {
   thinkingSteps?: ThinkingStep[];
 }
 
-interface OrchestrationProgress {
-  type: 'discovery' | 'planning' | 'agent-start' | 'agent-chunk' | 'agent-done' | 'synthesis-start' | 'synthesis-chunk' | 'synthesis-done' | 'fallback' | 'error' | 'memory-optimizing' | 'memory-optimized' | 'package-updated';
-  agentId?: string;
-  agentName?: string;
-  content?: string;
-  conversationId?: string;
-  packageId?: string;
-}
-
 interface AIChatPanelProps {
   onCollapse?: () => void;
 }
@@ -173,29 +164,14 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
         content: m.content,
       }));
 
-      const isDelayAnalyst = selectedAgent?.name?.toLowerCase().includes('delay') && tabContext?.activeDelayAnalysisProjectId;
-      const isOrchestrated = !selectedAgent && !isDelayAnalyst;
+      const hasActiveProject = !!tabContext?.activeDelayAnalysisProjectId;
       
-      let streamEndpoint: string;
-      let streamBody: Record<string, unknown>;
-
-      if (isDelayAnalyst) {
-        streamEndpoint = '/api/ai/agent-loop/stream';
-        streamBody = {
-          projectId: tabContext.activeDelayAnalysisProjectId,
-          message: inputValue,
-          conversationHistory,
-        };
-      } else if (selectedAgent) {
-        streamEndpoint = `/api/agents/${selectedAgent.id}/chat/stream`;
-        streamBody = { messages: [...conversationHistory, { role: 'user', content: inputValue }] };
-      } else {
-        streamEndpoint = '/api/ai/orchestrate/stream';
-        const orchestrationContext = tabContext?.activeDelayAnalysisProjectId 
-          ? { activeDelayAnalysisProjectId: tabContext.activeDelayAnalysisProjectId }
-          : undefined;
-        streamBody = { message: inputValue, conversationId, context: orchestrationContext };
-      }
+      const streamEndpoint = '/api/ai/agent-loop/stream';
+      const streamBody: Record<string, unknown> = {
+        projectId: tabContext?.activeDelayAnalysisProjectId || '',
+        message: inputValue,
+        conversationHistory,
+      };
 
       console.log('[AIChatPanel] Sending message with conversationId:', conversationId);
 
@@ -220,8 +196,8 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
         timestamp: new Date(),
         agentName: selectedAgent?.name || "AI Assistant",
         isStreaming: true,
-        statusMessage: isOrchestrated ? "Discovering agents..." : (isDelayAnalyst ? "Starting analysis..." : undefined),
-        thinkingSteps: isDelayAnalyst ? [] : undefined,
+        statusMessage: hasActiveProject ? "Starting analysis..." : undefined,
+        thinkingSteps: hasActiveProject ? [] : undefined,
       };
       setMessages((prev) => [...prev, streamingMessage]);
 
@@ -229,8 +205,6 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
       const decoder = new TextDecoder();
       let accumulatedContent = "";
       let buffer = "";
-      let currentAgentName = "";
-      let currentAgentId = "";
       
       while (true) {
         const { done, value } = await reader.read();
@@ -252,239 +226,99 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                 const jsonStr = line.slice(5).trim();
                 if (!jsonStr || jsonStr === '[DONE]') continue;
                 
-                const data = JSON.parse(jsonStr) as OrchestrationProgress | { type: string; content?: string; error?: string; message?: string; toolName?: string; toolArgs?: Record<string, unknown>; toolsUsed?: string[]; iterationCount?: number; iteration?: number; success?: boolean };
+                const data = JSON.parse(jsonStr) as { type: string; content?: string; error?: string; message?: string; toolName?: string; toolArgs?: Record<string, unknown>; toolsUsed?: string[]; iterationCount?: number; iteration?: number; success?: boolean };
                 
-                if (isDelayAnalyst) {
-                  switch (data.type) {
-                    case 'thinking': {
-                      const thinkingMsg = (data as { message?: string; iteration?: number }).message || 'Analyzing...';
-                      const iteration = (data as { iteration?: number }).iteration;
-                      setMessages((prev) =>
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? {
-                                ...msg,
-                                statusMessage: thinkingMsg,
-                                thinkingSteps: [
-                                  ...(msg.thinkingSteps || []).map(s => ({ ...s, completed: true })),
-                                  { stage: 'thinking', message: thinkingMsg + (iteration && iteration > 1 ? ` (step ${iteration})` : '') },
-                                ],
-                              }
-                            : msg
-                        )
-                      );
-                      break;
-                    }
-                    case 'tool_invocation': {
-                      const toolName = (data as { toolName?: string }).toolName || 'unknown';
-                      const toolDisplayNames: Record<string, string> = {
-                        'search_documents_by_filename': 'Searching documents',
-                        'get_document_content': 'Reading document',
-                        'get_delay_events_by_document': 'Checking delay events',
-                        'get_schedule_activity_details': 'Looking up schedule activities',
-                      };
-                      const displayName = toolDisplayNames[toolName] || `Using ${toolName}`;
-                      setMessages((prev) =>
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? {
-                                ...msg,
-                                statusMessage: displayName + '...',
-                                thinkingSteps: [
-                                  ...(msg.thinkingSteps || []).map(s => ({ ...s, completed: true })),
-                                  { stage: 'tool', message: displayName },
-                                ],
-                              }
-                            : msg
-                        )
-                      );
-                      break;
-                    }
-                    case 'tool_result': {
-                      setMessages((prev) =>
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? {
-                                ...msg,
-                                thinkingSteps: (msg.thinkingSteps || []).map((s, i, arr) =>
-                                  i === arr.length - 1 ? { ...s, completed: true } : s
-                                ),
-                              }
-                            : msg
-                        )
-                      );
-                      break;
-                    }
-                    case 'content': {
-                      if (data.content) {
-                        accumulatedContent += data.content;
-                        setMessages((prev) =>
-                          prev.map((msg) =>
-                            msg.id === assistantMessageId
-                              ? { ...msg, content: accumulatedContent, statusMessage: undefined }
-                              : msg
-                          )
-                        );
-                      }
-                      break;
-                    }
-                    case 'done':
-                    case 'loop_completed': {
-                      setMessages((prev) =>
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? {
-                                ...msg,
-                                isStreaming: false,
-                                statusMessage: undefined,
-                                thinkingSteps: (msg.thinkingSteps || []).map(s => ({ ...s, completed: true })),
-                              }
-                            : msg
-                        )
-                      );
-                      break;
-                    }
-                    case 'error': {
-                      throw new Error((data as { message?: string }).message || 'Agent error');
-                    }
-                  }
-                } else if (isOrchestrated) {
-                  switch (data.type) {
-                    case 'discovery':
-                      if ((data as OrchestrationProgress).conversationId) {
-                        setConversationId((data as OrchestrationProgress).conversationId!);
-                      }
-                      setMessages((prev) => 
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? { ...msg, statusMessage: "Discovering agents..." }
-                            : msg
-                        )
-                      );
-                      break;
-                    case 'planning':
-                      setMessages((prev) => 
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? { ...msg, statusMessage: "Planning response..." }
-                            : msg
-                        )
-                      );
-                      break;
-                    case 'agent-start':
-                      currentAgentName = (data as OrchestrationProgress).agentName || '';
-                      currentAgentId = (data as OrchestrationProgress).agentId || '';
-                      setMessages((prev) => 
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? { ...msg, statusMessage: `Consulting ${currentAgentName}...`, agentName: currentAgentName, agentId: currentAgentId }
-                            : msg
-                        )
-                      );
-                      break;
-                    case 'agent-chunk':
-                      if ((data as OrchestrationProgress).content) {
-                        accumulatedContent += (data as OrchestrationProgress).content;
-                        setMessages((prev) => 
-                          prev.map((msg) =>
-                            msg.id === assistantMessageId
-                              ? { ...msg, content: accumulatedContent, statusMessage: undefined }
-                              : msg
-                          )
-                        );
-                      }
-                      break;
-                    case 'agent-done':
-                      break;
-                    case 'synthesis-start':
-                      setMessages((prev) => 
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? { ...msg, statusMessage: "Synthesizing response...", agentName: "AI Assistant" }
-                            : msg
-                        )
-                      );
-                      accumulatedContent = "";
-                      break;
-                    case 'synthesis-chunk':
-                      if ((data as OrchestrationProgress).content) {
-                        accumulatedContent += (data as OrchestrationProgress).content;
-                        setMessages((prev) => 
-                          prev.map((msg) =>
-                            msg.id === assistantMessageId
-                              ? { ...msg, content: accumulatedContent, statusMessage: undefined }
-                              : msg
-                          )
-                        );
-                      }
-                      break;
-                    case 'synthesis-done':
-                      setMessages((prev) => 
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? { ...msg, isStreaming: false, statusMessage: undefined }
-                            : msg
-                        )
-                      );
-                      break;
-                    case 'fallback':
-                      accumulatedContent = (data as OrchestrationProgress).content || '';
-                      setMessages((prev) => 
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? { ...msg, content: accumulatedContent, isStreaming: false, statusMessage: undefined }
-                            : msg
-                        )
-                      );
-                      break;
-                    case 'error':
-                      throw new Error((data as OrchestrationProgress).content || 'Orchestration error');
-                    case 'memory-optimizing':
-                      setMessages((prev) => 
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? { ...msg, statusMessage: "Memory optimizing...", isStreaming: true }
-                            : msg
-                        )
-                      );
-                      break;
-                    case 'memory-optimized':
-                      setMessages((prev) => 
-                        prev.map((msg) =>
-                          msg.id === assistantMessageId
-                            ? { ...msg, statusMessage: undefined, isStreaming: false }
-                            : msg
-                        )
-                      );
-                      break;
-                    case 'package-updated':
-                      if ((data as OrchestrationProgress).packageId) {
-                        const pkgId = (data as OrchestrationProgress).packageId;
-                        console.log('[AIChatPanel] Package updated, invalidating queries for:', pkgId);
-                        queryClient.invalidateQueries({ queryKey: ['/api/pret/packages', pkgId, 'analyze'] });
-                      }
-                      break;
-                  }
-                } else {
-                  if (data.type === 'content' && data.content) {
-                    accumulatedContent += data.content;
-                    setMessages((prev) => 
+                switch (data.type) {
+                  case 'thinking': {
+                    const thinkingMsg = data.message || 'Analyzing...';
+                    const iteration = data.iteration;
+                    setMessages((prev) =>
                       prev.map((msg) =>
                         msg.id === assistantMessageId
-                          ? { ...msg, content: accumulatedContent }
+                          ? {
+                              ...msg,
+                              statusMessage: thinkingMsg,
+                              thinkingSteps: [
+                                ...(msg.thinkingSteps || []).map(s => ({ ...s, completed: true })),
+                                { stage: 'thinking', message: thinkingMsg + (iteration && iteration > 1 ? ` (step ${iteration})` : '') },
+                              ],
+                            }
                           : msg
                       )
                     );
-                  } else if (data.type === 'done') {
-                    setMessages((prev) => 
+                    break;
+                  }
+                  case 'tool_invocation': {
+                    const toolName = data.toolName || 'unknown';
+                    const toolDisplayNames: Record<string, string> = {
+                      'search_documents_by_filename': 'Searching documents',
+                      'get_document_content': 'Reading document',
+                      'get_delay_events_by_document': 'Checking delay events',
+                      'get_schedule_activity_details': 'Looking up schedule activities',
+                    };
+                    const displayName = toolDisplayNames[toolName] || `Using ${toolName}`;
+                    setMessages((prev) =>
                       prev.map((msg) =>
                         msg.id === assistantMessageId
-                          ? { ...msg, isStreaming: false }
+                          ? {
+                              ...msg,
+                              statusMessage: displayName + '...',
+                              thinkingSteps: [
+                                ...(msg.thinkingSteps || []).map(s => ({ ...s, completed: true })),
+                                { stage: 'tool', message: displayName },
+                              ],
+                            }
                           : msg
                       )
                     );
-                  } else if (data.type === 'error') {
-                    throw new Error((data as { error?: string }).error || 'Stream error');
+                    break;
+                  }
+                  case 'tool_result': {
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === assistantMessageId
+                          ? {
+                              ...msg,
+                              thinkingSteps: (msg.thinkingSteps || []).map((s, i, arr) =>
+                                i === arr.length - 1 ? { ...s, completed: true } : s
+                              ),
+                            }
+                          : msg
+                      )
+                    );
+                    break;
+                  }
+                  case 'content': {
+                    if (data.content) {
+                      accumulatedContent += data.content;
+                      setMessages((prev) =>
+                        prev.map((msg) =>
+                          msg.id === assistantMessageId
+                            ? { ...msg, content: accumulatedContent, statusMessage: undefined }
+                            : msg
+                        )
+                      );
+                    }
+                    break;
+                  }
+                  case 'done':
+                  case 'loop_completed': {
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === assistantMessageId
+                          ? {
+                              ...msg,
+                              isStreaming: false,
+                              statusMessage: undefined,
+                              thinkingSteps: (msg.thinkingSteps || []).map(s => ({ ...s, completed: true })),
+                            }
+                          : msg
+                      )
+                    );
+                    break;
+                  }
+                  case 'error': {
+                    throw new Error(data.message || 'Agent error');
                   }
                 }
               } catch (parseError) {

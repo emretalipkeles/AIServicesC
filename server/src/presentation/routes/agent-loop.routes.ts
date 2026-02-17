@@ -4,7 +4,7 @@ import type { AgentLoopEvent } from '../../domain/delay-analysis/interfaces/IAge
 import { z } from 'zod';
 
 const agentLoopBodySchema = z.object({
-  projectId: z.string().uuid('Invalid project ID'),
+  projectId: z.string().uuid('Invalid project ID').optional().or(z.literal('')),
   message: z.string().min(1, 'Message is required').max(4000, 'Message too long'),
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
@@ -44,7 +44,7 @@ export function registerAgentLoopRoutes(app: Express, container: AppContainer): 
       try {
         const body = agentLoopBodySchema.parse(req.body);
 
-        if (!container.services.agentLoop) {
+        if (!container.agentLoop.loop) {
           res.status(503).json({
             success: false,
             error: 'Agent loop not available - set OPEN_AI_KEY to enable AI features',
@@ -66,11 +66,11 @@ export function registerAgentLoopRoutes(app: Express, container: AppContainer): 
           sendEvent(sseEvent);
         };
 
-        const systemPrompt = container.services.agentLoopSystemPrompt || '';
+        const systemPrompt = container.agentLoop.systemPrompt || '';
 
-        await container.services.agentLoop.run(
+        await container.agentLoop.loop.run(
           {
-            projectId: body.projectId,
+            projectId: body.projectId || '',
             tenantId: DEFAULT_TENANT_ID,
             userMessage: body.message,
             conversationHistory: body.conversationHistory,
