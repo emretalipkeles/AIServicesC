@@ -217,7 +217,7 @@ export class StreamingOpenAIDelayEventsChatService implements IStreamingDelayEve
           ],
           tools,
           stream: true,
-          max_tokens: 2000,
+          max_completion_tokens: 2000,
           temperature: 0.3
         });
 

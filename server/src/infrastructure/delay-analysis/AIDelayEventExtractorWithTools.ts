@@ -255,7 +255,7 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
           model: TOOL_EXTRACTION_MODEL,
           messages,
           tools,
-          max_tokens: 4000,
+          max_completion_tokens: 4000,
           temperature: 0.1,
         });
 
