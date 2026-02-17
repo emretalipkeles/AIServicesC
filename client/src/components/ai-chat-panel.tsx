@@ -83,6 +83,12 @@ interface ThinkingStep {
   completed?: boolean;
 }
 
+interface CostInfo {
+  totalTokens: number;
+  estimatedCostUsd: number;
+  iterationCount: number;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -94,6 +100,7 @@ interface Message {
   statusMessage?: string;
   packageInfo?: PackageInfo;
   thinkingSteps?: ThinkingStep[];
+  costInfo?: CostInfo;
 }
 
 interface AIChatPanelProps {
@@ -226,7 +233,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                 const jsonStr = line.slice(5).trim();
                 if (!jsonStr || jsonStr === '[DONE]') continue;
                 
-                const data = JSON.parse(jsonStr) as { type: string; content?: string; error?: string; message?: string; toolName?: string; toolArgs?: Record<string, unknown>; toolsUsed?: string[]; iterationCount?: number; iteration?: number; success?: boolean };
+                const data = JSON.parse(jsonStr) as { type: string; content?: string; error?: string; message?: string; toolName?: string; toolArgs?: Record<string, unknown>; toolsUsed?: string[]; iterationCount?: number; iteration?: number; success?: boolean; totalTokens?: number; estimatedCostUsd?: number };
                 
                 switch (data.type) {
                   case 'thinking': {
@@ -255,6 +262,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                       'get_document_content': 'Reading document',
                       'get_delay_events_by_document': 'Checking delay events',
                       'get_schedule_activity_details': 'Looking up schedule activities',
+                      'list_delay_events': 'Listing delay events',
                     };
                     const displayName = toolDisplayNames[toolName] || `Using ${toolName}`;
                     setMessages((prev) =>
@@ -315,6 +323,25 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                           : msg
                       )
                     );
+                    break;
+                  }
+                  case 'usage': {
+                    if (data.totalTokens && data.estimatedCostUsd !== undefined) {
+                      setMessages((prev) =>
+                        prev.map((msg) =>
+                          msg.id === assistantMessageId
+                            ? {
+                                ...msg,
+                                costInfo: {
+                                  totalTokens: data.totalTokens!,
+                                  estimatedCostUsd: data.estimatedCostUsd!,
+                                  iterationCount: data.iterationCount || 1,
+                                },
+                              }
+                            : msg
+                        )
+                      );
+                    }
                     break;
                   }
                   case 'error': {
@@ -951,6 +978,19 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                       </>
                     )}
                   </div>
+                  )}
+                  {!message.isStreaming && message.costInfo && (
+                    <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground/60 select-none">
+                      <span>${message.costInfo.estimatedCostUsd < 0.01 ? message.costInfo.estimatedCostUsd.toFixed(4) : message.costInfo.estimatedCostUsd.toFixed(3)}</span>
+                      <span>·</span>
+                      <span>{message.costInfo.totalTokens.toLocaleString()} tokens</span>
+                      {message.costInfo.iterationCount > 1 && (
+                        <>
+                          <span>·</span>
+                          <span>{message.costInfo.iterationCount} steps</span>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

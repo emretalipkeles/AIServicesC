@@ -109,6 +109,13 @@ export function registerAgentLoopRoutes(app: Express, container: AppContainer): 
 
             await container.repositories.aiTokenUsage.save(usage);
             console.log(`[AgentLoopStream] Saved token usage: ${result.tokenUsage.totalTokens} tokens, $${cost.toFixed(6)} (${result.tokenUsage.apiCalls} API calls)`);
+
+            sendEvent({
+              type: 'usage',
+              totalTokens: result.tokenUsage.totalTokens,
+              estimatedCostUsd: cost,
+              iterationCount: result.iterationCount,
+            });
           } catch (usageError) {
             console.error('[AgentLoopStream] Failed to save token usage:', usageError);
           }
