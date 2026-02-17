@@ -19,6 +19,7 @@ export class CompositeChatToolExecutor implements IChatToolExecutor {
   async execute(toolCall: ChatToolCall): Promise<ChatToolResult> {
     const tool = this.toolMap.get(toolCall.toolName);
     if (!tool) {
+      console.warn(`[CompositeChatToolExecutor] Unknown tool requested: "${toolCall.toolName}" (available: ${Array.from(this.toolMap.keys()).join(', ')})`);
       return {
         toolCallId: toolCall.toolCallId,
         toolName: toolCall.toolName,
@@ -26,7 +27,34 @@ export class CompositeChatToolExecutor implements IChatToolExecutor {
         error: `Unknown tool: ${toolCall.toolName}`
       };
     }
-    return tool.execute(toolCall);
+
+    const argsJson = JSON.stringify(toolCall.arguments);
+    const argsSummary = argsJson.length > 200 ? argsJson.substring(0, 200) + '...' : argsJson;
+    console.log(`[CompositeChatToolExecutor] Dispatching tool: "${toolCall.toolName}" with args: ${argsSummary}`);
+    const startTime = Date.now();
+
+    try {
+      const result = await tool.execute(toolCall);
+      const elapsed = Date.now() - startTime;
+
+      if (result.error) {
+        console.warn(`[CompositeChatToolExecutor] Tool "${toolCall.toolName}" returned error (${elapsed}ms): ${result.error}`);
+      } else {
+        const resultSummary = Array.isArray(result.result) ? `${result.result.length} items` : typeof result.result;
+        console.log(`[CompositeChatToolExecutor] Tool "${toolCall.toolName}" completed (${elapsed}ms): ${resultSummary}`);
+      }
+
+      return result;
+    } catch (error) {
+      const elapsed = Date.now() - startTime;
+      console.error(`[CompositeChatToolExecutor] Tool "${toolCall.toolName}" threw exception (${elapsed}ms):`, error);
+      return {
+        toolCallId: toolCall.toolCallId,
+        toolName: toolCall.toolName,
+        result: null,
+        error: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
   }
 
   getAvailableTools(): ChatToolDefinition[] {

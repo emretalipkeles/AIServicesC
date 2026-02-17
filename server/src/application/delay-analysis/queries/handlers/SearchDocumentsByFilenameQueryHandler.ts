@@ -16,11 +16,15 @@ export class SearchDocumentsByFilenameQueryHandler {
   ) {}
 
   async execute(query: SearchDocumentsByFilenameQuery): Promise<SearchDocumentsByFilenameDto[]> {
+    console.log(`[SearchDocumentsByFilenameQueryHandler] Searching for pattern "${query.filenamePattern}" in project ${query.projectId}`);
+
     const documents = await this.documentRepository.findByFilenamePattern(
       query.projectId,
       query.tenantId,
       query.filenamePattern
     );
+
+    console.log(`[SearchDocumentsByFilenameQueryHandler] Found ${documents.length} documents matching "${query.filenamePattern}"${documents.length > 0 ? ': ' + documents.map(d => d.filename).join(', ') : ''}`);
 
     return documents.map(doc => ({
       id: doc.id,

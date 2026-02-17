@@ -33,6 +33,7 @@ export class GetDelayEventsByDocumentTool implements IChatToolExecutor {
     const documentId = toolCall.arguments.document_id as string;
 
     if (!documentId) {
+      console.warn(`[GetDelayEventsByDocumentTool] Missing required argument: document_id`);
       return {
         toolCallId: toolCall.toolCallId,
         toolName: toolCall.toolName,

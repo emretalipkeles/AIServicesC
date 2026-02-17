@@ -33,6 +33,7 @@ export class SearchDocumentsByFilenameTool implements IChatToolExecutor {
     const filenamePattern = toolCall.arguments.filename_pattern as string;
 
     if (!filenamePattern) {
+      console.warn(`[SearchDocumentsByFilenameTool] Missing required argument: filename_pattern`);
       return {
         toolCallId: toolCall.toolCallId,
         toolName: toolCall.toolName,

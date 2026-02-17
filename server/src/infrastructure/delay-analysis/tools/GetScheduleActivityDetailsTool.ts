@@ -32,6 +32,7 @@ export class GetScheduleActivityDetailsTool implements IChatToolExecutor {
     const activityIds = toolCall.arguments.activity_ids as string[];
 
     if (!activityIds || !Array.isArray(activityIds) || activityIds.length === 0) {
+      console.warn(`[GetScheduleActivityDetailsTool] Invalid activity_ids argument:`, toolCall.arguments.activity_ids);
       return {
         toolCallId: toolCall.toolCallId,
         toolName: toolCall.toolName,

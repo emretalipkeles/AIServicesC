@@ -22,12 +22,16 @@ export class GetDelayEventsByDocumentQueryHandler {
   ) {}
 
   async execute(query: GetDelayEventsByDocumentQuery): Promise<DelayEventByDocumentDto[]> {
+    console.log(`[GetDelayEventsByDocumentQueryHandler] Looking up delay events for document ${query.documentId} in project ${query.projectId}`);
+
     const events = await this.delayEventRepository.findByDocumentId(
       query.documentId,
       query.tenantId
     );
 
     const projectScopedEvents = events.filter(e => e.projectId === query.projectId);
+
+    console.log(`[GetDelayEventsByDocumentQueryHandler] Found ${events.length} total events, ${projectScopedEvents.length} in project scope`);
 
     return projectScopedEvents.map(event => ({
       id: event.id,
