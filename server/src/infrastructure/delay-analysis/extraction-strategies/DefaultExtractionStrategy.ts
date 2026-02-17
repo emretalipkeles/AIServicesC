@@ -4,16 +4,27 @@ import type {
   ExtractionStrategyResult 
 } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
-import { DEFAULT_DELAY_DEFINITION } from '../../../domain/delay-analysis/config/DelayDefinitionConfig';
+import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
 
-const DEFAULT_EXTRACTION_PROMPT = `You are an expert construction delay analyst. Analyze the following document and extract any contractor-caused delay events.
+export class DefaultExtractionStrategy implements IDocumentExtractionStrategy {
+  readonly documentType: ProjectDocumentType = 'other';
+  readonly strategyName: string = 'Default Extraction Strategy';
 
-Look specifically for:
-1. Delays caused by contractor actions or inaction
-2. Work stoppages due to contractor issues
-3. Material or equipment delays from contractor
-4. Subcontractor coordination failures
-5. Quality issues requiring rework
+  constructor(private readonly knowledgePromptBuilder: DelayKnowledgePromptBuilder) {}
+
+  buildExtractionPrompt(context: DocumentExtractionContext): ExtractionStrategyResult {
+    const truncatedContent = context.documentContent.slice(0, 30000);
+    const knowledgeBasePrompt = this.knowledgePromptBuilder.buildPromptForDocumentType('other');
+
+    const prompt = `You are an expert construction delay analyst. Analyze the following document and extract any contractor-caused delay events.
+
+${knowledgeBasePrompt}
+
+=============================================================================
+EXTRACTION INSTRUCTIONS
+=============================================================================
+
+Using the knowledge base above, analyze the document and extract delay events.
 
 For each delay event found, extract:
 - eventDescription: Clear description of the delay event
@@ -22,31 +33,16 @@ For each delay event found, extract:
 - impactDurationHours: Estimated hours of impact if mentioned
 - sourceReference: Include DSC/NCR/RFI number if mentioned (e.g., 'DSC 293') AND page/section reference
 - extractedFromCode: Any delay code if present, otherwise "GENERAL"
-- delayEventConfidence: Your confidence that this is truly a delay event (0.0-1.0). Assess using the following definition and indicators:
-
-DELAY DEFINITION:
-${DEFAULT_DELAY_DEFINITION.definition}
-
-HIGH CONFIDENCE INDICATORS (score 0.7-1.0):
-${DEFAULT_DELAY_DEFINITION.highConfidenceIndicators.map(i => `- ${i}`).join('\n')}
-
-LOW CONFIDENCE INDICATORS (score 0.0-0.5):
-${DEFAULT_DELAY_DEFINITION.lowConfidenceIndicators.map(i => `- ${i}`).join('\n')}
+- confidenceScore: Your confidence this is a real contractor delay (0.0-1.0)
+- delayEventConfidence: Your confidence that this is truly a delay event vs. a routine observation (0.0-1.0). Use the knowledge base categories, exclusions, and decision framework to assess.
 
 Return a JSON array of extracted events. If no delays are found, return an empty array.
 
 Document content:
-`;
+${truncatedContent}`;
 
-export class DefaultExtractionStrategy implements IDocumentExtractionStrategy {
-  readonly documentType: ProjectDocumentType = 'other';
-  readonly strategyName: string = 'Default Extraction Strategy';
-
-  buildExtractionPrompt(context: DocumentExtractionContext): ExtractionStrategyResult {
-    const truncatedContent = context.documentContent.slice(0, 30000);
-    
     return {
-      prompt: DEFAULT_EXTRACTION_PROMPT + truncatedContent,
+      prompt,
       baseConfidence: 0.5,
       requiresNarrativeVerification: true,
       delayIsCertain: false,

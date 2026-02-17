@@ -4,20 +4,32 @@ import type {
   ExtractionStrategyResult 
 } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
-import { DEFAULT_DELAY_DEFINITION } from '../../../domain/delay-analysis/config/DelayDefinitionConfig';
+import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
 
-const IDR_EXTRACTION_PROMPT = `You are an expert construction delay analyst specializing in Inspector Daily Reports (IDRs).
+export class IDRExtractionStrategy implements IDocumentExtractionStrategy {
+  readonly documentType: ProjectDocumentType = 'idr';
+  readonly strategyName: string = 'IDR Extraction Strategy';
+
+  constructor(private readonly knowledgePromptBuilder: DelayKnowledgePromptBuilder) {}
+
+  buildExtractionPrompt(context: DocumentExtractionContext): ExtractionStrategyResult {
+    const truncatedContent = context.documentContent.slice(0, 30000);
+    const knowledgeBasePrompt = this.knowledgePromptBuilder.buildPromptForDocumentType('idr');
+
+    const prompt = `You are an expert construction delay analyst specializing in Inspector Daily Reports (IDRs).
 
 DOCUMENT TYPE: Inspector Daily Report (IDR)
 CONTEXT: IDRs are daily field observations written by inspectors. They capture what's happening on site day-to-day. Inspectors flag potential contractor delays with code "CODE_CIE" (Contractor Initiated Events).
 
+${knowledgeBasePrompt}
+
+=============================================================================
 YOUR TASK: Analyze this IDR and extract TWO things:
 1. **Contractor's Work Activity** - The schedule activities listed in the "Contractor's Work Activity" table (if present)
 2. **Delay Events** - Contractor-caused delay events from the document
+=============================================================================
 
-=============================================================================
 PART 1: EXTRACT CONTRACTOR'S WORK ACTIVITY TABLE
-=============================================================================
 
 Many IDRs contain a "Contractor's Work Activity" section/table that lists the schedule activities being worked on that day. This table typically has columns like:
 - Schedule Activity # (e.g., "2-W-0471", "3-W-1042")
@@ -39,12 +51,8 @@ EXTRACTION PRIORITIES (in order):
 6. Quality issues observed that may require rework
 
 **CRITICAL: extractedFromCode FIELD RULES**
-This is the MOST IMPORTANT field for IDR documents. You MUST follow these rules exactly:
-
 1. If the delay was identified from a CODE_CIE entry in the document:
    - Set extractedFromCode to EXACTLY "CODE_CIE"
-   - Do NOT use "IDR_OBSERVATION" for CODE_CIE entries
-
 2. If the delay was identified from general narrative observation (NOT tagged with CODE_CIE):
    - Set extractedFromCode to "IDR_OBSERVATION"
 
@@ -55,8 +63,8 @@ EXAMPLES:
 
 CRITICAL ANALYSIS REQUIREMENTS:
 - CONFIDENCE SCORING: Since IDR observations are subjective, you must assess:
-  * Is this really a delay event or routine observation?
-  * Is the contractor clearly responsible, or is it ambiguous?
+  * Is this really a delay event or routine observation? Apply the knowledge base decision framework.
+  * Is the contractor clearly responsible, or is it ambiguous? Check the exclusions list.
   * Can delay duration be determined from the narrative?
 - DURATION ESTIMATION (REQUIRED): You MUST provide impactDurationHours for EVERY delay event.
   * If explicitly stated (e.g., "1.5 hour"): use that value
@@ -66,6 +74,7 @@ CRITICAL ANALYSIS REQUIREMENTS:
 - RESPONSIBILITY VERIFICATION: Analyze the narrative to confirm contractor responsibility
   * Some CODE_CIE entries might be false positives
   * Look for clear contractor-caused issues vs. external factors
+  * Apply the exclusions from the knowledge base - DSCs, owner-directed suspensions, etc.
 
 =============================================================================
 DIARY SECTION ANALYSIS (IMPORTANT)
@@ -102,16 +111,13 @@ Include the timestamp in sourceReference: "Diary, 1415: [brief description]" or 
 DELAY EVENT CONFIDENCE ASSESSMENT
 =============================================================================
 
-For each delay event you extract, assess your confidence that this is truly a delay event (not a routine observation or normal progress note). Use the following definition and indicators:
-
-DELAY DEFINITION:
-${DEFAULT_DELAY_DEFINITION.definition}
-
-HIGH CONFIDENCE INDICATORS (score 0.7-1.0):
-${DEFAULT_DELAY_DEFINITION.highConfidenceIndicators.map(i => `- ${i}`).join('\n')}
-
-LOW CONFIDENCE INDICATORS (score 0.0-0.5):
-${DEFAULT_DELAY_DEFINITION.lowConfidenceIndicators.map(i => `- ${i}`).join('\n')}
+For each delay event you extract, assess your confidence that this is truly a delay event (not a routine observation or normal progress note). Use the knowledge base above including:
+- The core test: Was the Contractor doing everything within its power to diligently prosecute the Work?
+- The delay categories and what to look for
+- The exclusions list (what is NOT a contractor delay)
+- The decision framework (if-yes/if-no logic)
+- The worked examples for reference
+- The gray area scenarios for borderline cases
 
 Set "delayEventConfidence" as a number between 0.0 and 1.0 for each event.
 
@@ -149,17 +155,10 @@ NOTES:
 - delayEvents: Extract delay events as described above. Return empty array [] if no delays are found.
 
 Document content:
-`;
+${truncatedContent}`;
 
-export class IDRExtractionStrategy implements IDocumentExtractionStrategy {
-  readonly documentType: ProjectDocumentType = 'idr';
-  readonly strategyName: string = 'IDR Extraction Strategy';
-
-  buildExtractionPrompt(context: DocumentExtractionContext): ExtractionStrategyResult {
-    const truncatedContent = context.documentContent.slice(0, 30000);
-    
     return {
-      prompt: IDR_EXTRACTION_PROMPT + truncatedContent,
+      prompt,
       baseConfidence: 0.6,
       requiresNarrativeVerification: true,
       delayIsCertain: false,

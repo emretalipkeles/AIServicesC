@@ -4,9 +4,14 @@ import { NCRExtractionStrategy } from '../extraction-strategies/NCRExtractionStr
 import { FieldMemoExtractionStrategy } from '../extraction-strategies/FieldMemoExtractionStrategy';
 import { DefaultExtractionStrategy } from '../extraction-strategies/DefaultExtractionStrategy';
 import { DocumentExtractionStrategyFactory } from '../extraction-strategies/DocumentExtractionStrategyFactory';
+import { ContractorDelayTrainingGuide } from '../../../domain/delay-analysis/config/ContractorDelayTrainingGuide';
+import { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
 import type { DocumentExtractionContext } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 
 describe('Extraction Strategies', () => {
+  const knowledgeBase = new ContractorDelayTrainingGuide();
+  const promptBuilder = new DelayKnowledgePromptBuilder(knowledgeBase);
+
   const createContext = (documentType: 'idr' | 'ncr' | 'field_memo' | 'other', content: string): DocumentExtractionContext => ({
     documentContent: content,
     documentFilename: `test-document.pdf`,
@@ -15,7 +20,7 @@ describe('Extraction Strategies', () => {
   });
 
   describe('IDRExtractionStrategy', () => {
-    const strategy = new IDRExtractionStrategy();
+    const strategy = new IDRExtractionStrategy(promptBuilder);
 
     it('should have correct document type', () => {
       expect(strategy.documentType).toBe('idr');
@@ -56,10 +61,32 @@ describe('Extraction Strategies', () => {
       const result = strategy.buildExtractionPrompt(createContext('idr', longContent));
       expect(result.prompt.length).toBeLessThan(longContent.length);
     });
+
+    it('should include training guide knowledge base content', () => {
+      const result = strategy.buildExtractionPrompt(createContext('idr', 'test content'));
+      expect(result.prompt).toContain('CONTRACTOR DELAY IDENTIFICATION KNOWLEDGE BASE');
+      expect(result.prompt).toContain('WHAT IS A CONTRACTOR-CAUSED DELAY');
+      expect(result.prompt).toContain('CATEGORIES OF CONTRACTOR-CAUSED DELAYS');
+      expect(result.prompt).toContain('WHAT IS NOT A CONTRACTOR-CAUSED DELAY');
+      expect(result.prompt).toContain('DECISION FRAMEWORK');
+      expect(result.prompt).toContain('QUICK-REFERENCE CHEAT SHEET');
+    });
+
+    it('should include worked examples for IDR documents', () => {
+      const result = strategy.buildExtractionPrompt(createContext('idr', 'test content'));
+      expect(result.prompt).toContain('CONTRACTOR-CAUSED DELAY EXAMPLES');
+      expect(result.prompt).toContain('EVENTS THAT ARE NOT CONTRACTOR-CAUSED DELAYS');
+      expect(result.prompt).toContain('GRAY AREAS REQUIRING VERIFICATION');
+    });
+
+    it('should include gray area scenarios for IDR documents', () => {
+      const result = strategy.buildExtractionPrompt(createContext('idr', 'test content'));
+      expect(result.prompt).toContain('GRAY AREAS & BORDERLINE SCENARIOS');
+    });
   });
 
   describe('NCRExtractionStrategy', () => {
-    const strategy = new NCRExtractionStrategy();
+    const strategy = new NCRExtractionStrategy(promptBuilder);
 
     it('should have correct document type', () => {
       expect(strategy.documentType).toBe('ncr');
@@ -94,10 +121,17 @@ describe('Extraction Strategies', () => {
       const result = strategy.buildExtractionPrompt(createContext('ncr', 'test content'));
       expect(result.prompt).toContain('DEFINITIVE DELAY');
     });
+
+    it('should include training guide knowledge base but NOT worked examples', () => {
+      const result = strategy.buildExtractionPrompt(createContext('ncr', 'test content'));
+      expect(result.prompt).toContain('CONTRACTOR DELAY IDENTIFICATION KNOWLEDGE BASE');
+      expect(result.prompt).toContain('WHAT IS NOT A CONTRACTOR-CAUSED DELAY');
+      expect(result.prompt).not.toContain('CONTRACTOR-CAUSED DELAY EXAMPLES');
+    });
   });
 
   describe('FieldMemoExtractionStrategy', () => {
-    const strategy = new FieldMemoExtractionStrategy();
+    const strategy = new FieldMemoExtractionStrategy(promptBuilder);
 
     it('should have correct document type', () => {
       expect(strategy.documentType).toBe('field_memo');
@@ -117,10 +151,16 @@ describe('Extraction Strategies', () => {
       const result = strategy.buildExtractionPrompt(createContext('field_memo', 'test content'));
       expect(result.delayIsCertain).toBe(false);
     });
+
+    it('should include gray areas but NOT worked examples', () => {
+      const result = strategy.buildExtractionPrompt(createContext('field_memo', 'test content'));
+      expect(result.prompt).toContain('GRAY AREAS & BORDERLINE SCENARIOS');
+      expect(result.prompt).not.toContain('CONTRACTOR-CAUSED DELAY EXAMPLES');
+    });
   });
 
   describe('DefaultExtractionStrategy', () => {
-    const strategy = new DefaultExtractionStrategy();
+    const strategy = new DefaultExtractionStrategy(promptBuilder);
 
     it('should have other document type', () => {
       expect(strategy.documentType).toBe('other');

@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use ContractorDelayTrainingGuide and IDelayKnowledgeBase instead.
+ * This file is retained for backward compatibility only.
+ * The comprehensive training guide in ContractorDelayTrainingGuide.ts supersedes this config.
+ */
 export interface DelayDefinitionCriteria {
   definition: string;
   highConfidenceIndicators: string[];

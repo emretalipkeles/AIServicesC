@@ -8,8 +8,14 @@ import type { DelayEventCategory } from '../../domain/delay-analysis/entities/Co
 import type { IDocumentExtractionStrategyFactory } from '../../domain/delay-analysis/interfaces/IDocumentExtractionStrategyFactory';
 import type { IDRWorkActivity } from '../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { IExtractionToolExecutor } from '../../domain/delay-analysis/interfaces/IExtractionToolExecutor';
+import type { ProjectDocumentType } from '../../domain/delay-analysis/entities/ProjectDocument';
 import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
+import { ContractorDelayTrainingGuide } from '../../domain/delay-analysis/config/ContractorDelayTrainingGuide';
+import { DelayKnowledgePromptBuilder } from './DelayKnowledgePromptBuilder';
+import { OPENAI_MODELS } from '../../domain/value-objects/ModelId';
 import OpenAI from 'openai';
+
+const TOOL_EXTRACTION_MODEL = OPENAI_MODELS['gpt-5.2'];
 
 export interface ExtractionWithToolsOptions extends ExtractionOptions {
   tenantId: string;
@@ -39,7 +45,15 @@ interface ExtractedEventRaw {
   delayEventConfidence?: number;
 }
 
-const TOOL_ENABLED_SYSTEM_PROMPT = `You are a construction delay analysis expert. Your task is to extract contractor-caused delay events from construction documents and match them to schedule activities.
+const knowledgeBaseInstance = new ContractorDelayTrainingGuide();
+const knowledgePromptBuilder = new DelayKnowledgePromptBuilder(knowledgeBaseInstance);
+
+function buildToolEnabledSystemPrompt(documentType: ProjectDocumentType): string {
+  const knowledgeBaseContent = knowledgePromptBuilder.buildPromptForDocumentType(documentType);
+
+  return `You are a construction delay analysis expert. Your task is to extract contractor-caused delay events from construction documents and match them to schedule activities.
+
+${knowledgeBaseContent}
 
 ## CRITICAL FIRST STEP - FIND ACTIVITY IDs:
 
@@ -129,6 +143,8 @@ Examples:
 - "Waiting on SPU direction" (no resolution noted) → impactDurationHours: 2 (or more based on context)
 - "Large roots encountered, excavation stopped" → impactDurationHours: 1 (estimate)
 `;
+}
+
 
 export class AIDelayEventExtractorWithTools implements IDelayEventExtractor {
   private readonly strategyFactory: IDocumentExtractionStrategyFactory;
@@ -214,7 +230,7 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
 
     try {
       let messages: OpenAI.ChatCompletionMessageParam[] = [
-        { role: 'system', content: TOOL_ENABLED_SYSTEM_PROMPT },
+        { role: 'system', content: buildToolEnabledSystemPrompt(documentType) },
         { role: 'user', content: userPrompt }
       ];
 
@@ -235,7 +251,7 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
         console.log(`[AI] TOOL-EXTRACTION: Calling OpenAI API with function calling enabled...`);
         
         const response = await this.openai.chat.completions.create({
-          model: 'gpt-4.1',
+          model: TOOL_EXTRACTION_MODEL,
           messages,
           tools,
           max_tokens: 4000,
@@ -317,7 +333,7 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
         await options.onTokenUsage({
           runId: options.runId,
           operation: 'delay_event_extraction_with_tools',
-          model: 'gpt-4.1',
+          model: TOOL_EXTRACTION_MODEL,
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
           metadata: {

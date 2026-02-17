@@ -4,12 +4,28 @@ import type {
   ExtractionStrategyResult 
 } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
-import { DEFAULT_DELAY_DEFINITION } from '../../../domain/delay-analysis/config/DelayDefinitionConfig';
+import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
 
-const NCR_EXTRACTION_PROMPT = `You are an expert construction delay analyst specializing in Non-Conformance Reports (NCRs).
+export class NCRExtractionStrategy implements IDocumentExtractionStrategy {
+  readonly documentType: ProjectDocumentType = 'ncr';
+  readonly strategyName: string = 'NCR Extraction Strategy';
+
+  constructor(private readonly knowledgePromptBuilder: DelayKnowledgePromptBuilder) {}
+
+  buildExtractionPrompt(context: DocumentExtractionContext): ExtractionStrategyResult {
+    const truncatedContent = context.documentContent.slice(0, 30000);
+    const knowledgeBasePrompt = this.knowledgePromptBuilder.buildPromptForDocumentType('ncr');
+
+    const prompt = `You are an expert construction delay analyst specializing in Non-Conformance Reports (NCRs).
 
 DOCUMENT TYPE: Non-Conformance Report (NCR)
 CONTEXT: NCRs are formal documentation of quality failures or work that doesn't meet specifications. NCRs trigger mandatory rework or corrective action. An NCR = work failed = rework required = DEFINITE delay.
+
+${knowledgeBasePrompt}
+
+=============================================================================
+EXTRACTION INSTRUCTIONS
+=============================================================================
 
 YOUR TASK: Extract delay events from this NCR. NCRs are high-confidence delay indicators because:
 - Work failed inspection, requiring rework
@@ -34,6 +50,7 @@ CRITICAL ANALYSIS REQUIREMENTS:
   * Design defect
   * Owner-directed change
   * Third-party damage
+  (Per the exclusions in the knowledge base above)
 
 For each delay event found, extract:
 - eventDescription: Clear description including what failed and corrective action
@@ -46,25 +63,13 @@ For each delay event found, extract:
 - delayEventConfidence: Your confidence that this is truly a delay event (0.0-1.0). For NCRs, this should typically be 0.85-1.0 since NCRs document definite quality failures requiring corrective action.
 - reworkDescription: Specific corrective action required
 
-DELAY EVENT CONFIDENCE ASSESSMENT:
-${DEFAULT_DELAY_DEFINITION.definition}
-
-For NCRs, confidence should typically be 0.85-1.0 since they document definite quality failures.
-
 Return a JSON array of extracted events. If no delays are found (rare for NCRs), return an empty array.
 
 Document content:
-`;
+${truncatedContent}`;
 
-export class NCRExtractionStrategy implements IDocumentExtractionStrategy {
-  readonly documentType: ProjectDocumentType = 'ncr';
-  readonly strategyName: string = 'NCR Extraction Strategy';
-
-  buildExtractionPrompt(context: DocumentExtractionContext): ExtractionStrategyResult {
-    const truncatedContent = context.documentContent.slice(0, 30000);
-    
     return {
-      prompt: NCR_EXTRACTION_PROMPT + truncatedContent,
+      prompt,
       baseConfidence: 0.85,
       requiresNarrativeVerification: false,
       delayIsCertain: true,
