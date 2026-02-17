@@ -101,6 +101,7 @@ import { SearchDocumentsByFilenameTool as AgentSearchDocsTool } from "./delay-an
 import { GetDocumentContentTool as AgentGetDocContentTool } from "./delay-analysis/agent/tools/GetDocumentContentTool";
 import { GetDelayEventsByDocumentTool as AgentGetDelayEventsTool } from "./delay-analysis/agent/tools/GetDelayEventsByDocumentTool";
 import { GetScheduleActivityDetailsTool as AgentGetActivityDetailsTool } from "./delay-analysis/agent/tools/GetScheduleActivityDetailsTool";
+import { ListDelayEventsTool as AgentListDelayEventsTool } from "./delay-analysis/agent/tools/ListDelayEventsTool";
 import { ContractorDelayTrainingGuide } from "../domain/delay-analysis/config/ContractorDelayTrainingGuide";
 import { DelayKnowledgePromptBuilder } from "./delay-analysis/DelayKnowledgePromptBuilder";
 import type { IDelayEventExtractor } from "../domain/delay-analysis/interfaces/IDelayEventExtractor";
@@ -207,11 +208,12 @@ function createAgentLoop(
   toolRegistry.register(new AgentGetDocContentTool(getDocContentQH));
   toolRegistry.register(new AgentGetDelayEventsTool(getDelayEventsQH));
   toolRegistry.register(new AgentGetActivityDetailsTool(getActivitiesByIdsHandler));
+  toolRegistry.register(new AgentListDelayEventsTool(contractorDelayEventRepository));
 
   const toolUseClient = new OpenAIToolUseClient(openAiKey, 'gpt-4.1');
   const loop = new ReactAgentLoop(toolRegistry, toolUseClient);
 
-  console.log('[Bootstrap] ReactAgentLoop initialized with 4 tools');
+  console.log('[Bootstrap] ReactAgentLoop initialized with 5 tools');
 
   const knowledgeBase = new ContractorDelayTrainingGuide();
   const promptBuilder = new DelayKnowledgePromptBuilder(knowledgeBase);
@@ -227,6 +229,7 @@ You have access to the following tools to investigate delay events:
 2. **get_document_content** - Retrieve the full text of a source document
 3. **get_delay_events_by_document** - Find all delay events extracted from a specific document
 4. **get_schedule_activity_details** - Look up CPM schedule activity details by activity ID
+5. **list_delay_events** - List all delay events for the project, optionally filtered by month/year and category. Use when the user asks to see events for a time period (e.g., "show me August 2025 events") or wants an overview of all delays.
 
 ## ANALYTICAL METHODOLOGY:
 
@@ -235,6 +238,7 @@ When a user asks you to verify or analyze a delay event, follow this exact workf
 ### Step 1: LOCATE THE SOURCE
 - If the user mentions a document filename, use search_documents_by_filename to find it
 - If they mention a delay event, use get_delay_events_by_document to find events from that document
+- If the user asks to see all events or events for a specific time period, use list_delay_events with optional month/year filters
 
 ### Step 2: READ THE EVIDENCE
 - Use get_document_content to retrieve the full document text

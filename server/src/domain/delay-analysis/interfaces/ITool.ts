@@ -7,6 +7,7 @@ export interface ToolDefinition {
       type: string;
       description: string;
       items?: { type: string };
+      enum?: (string | number)[];
     }>;
     required: string[];
   };
