@@ -1,0 +1,31 @@
+Event ada04047-1c15-43a7-8f07-1242b0b8d713 comes from IDR 2023-002_IDR_260115_TMR.pdf (1/15/2026). In that document, the only explicit CPM activity IDs shown in the “Contractor’s Work Activity / Schedule Activity #” table are:
+
+2-RW-0574 (Roadway demo/common ex/type 2 grading/compacting, Allison–Harvard/Eastlake)
+3-RW-1099 (Remove Market driveway, Lynn/Eastlake)
+plus a line labeled “NCR Remove concrete, trench Garfield/Eastlake” (this is not a CPM ID in the same format)
+There is no “1-RW-0090” printed anywhere in the IDR.
+
+Why the matcher likely chose 1-RW-0090 anyway
+The event narrative is:
+
+09:30 AM – Lead Inspector and Inspector were onsite at Newton/Eastlake to meet someone from Jansen to look at the grade. They did not appear. (Page 2)
+
+That “Newton/Eastlake grade review” is not directly tied to either 2-RW-0574 (Allison–Harvard/Eastlake) or 3-RW-1099 (Market driveway Lynn/Eastlake) by the document’s schedule table.
+
+So the system appears to have fallen back to an inferred/guessed activity based on location/work type context (roadway/panels/grade issues around the Eastlake corridor) and selected 1-RW-0090 (Pour Roadway - 11th & Eastlake (West)).
+
+That is consistent with your concern: it’s behaving like a fallback inference, not a strict “use IDs in the document” match.
+
+Is that correct per the logic you described?
+Your rule is sound: match to an activity ID explicitly in the document; only infer if none exists.
+
+Here, activity IDs do exist in the document (2-RW-0574, 3-RW-1099), but none of them explicitly correspond to the Newton/Eastlake meeting. That’s the key nuance:
+
+If the intended rule is “always pick one of the IDs present in the document if any exist”, then matching to 1-RW-0090 is wrong.
+If the intended rule is “use an explicit ID only when the event text is clearly about that activity; otherwise infer”, then the fallback inference is understandable, but it should be flagged as inferred/low confidence and ideally not override explicit IDs without a clear link.
+My verification verdict (matching quality)
+Document-evidence match to 1-RW-0090: Not supported (the ID is not in the document).
+Better options:
+Leave CPM activity blank / “unassigned” and flag for manual mapping, or
+Map to 2-RW-0574 only if you adopt a rule like “Newton/Eastlake grade review supports the broader roadway demo/type 2 grading work that day” (but that linkage is not explicit in the schedule table).
+If you tell me what your system’s intended hierarchy is (strict “must be in document” vs “must be relevant”), I can recommend the exact correction rule and how to handle cases like this (multiple IDs present but event is about a different location).

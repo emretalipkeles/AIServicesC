@@ -119,7 +119,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
     {
       id: "1",
       role: "assistant",
-      content: "Welcome! I'm AI Assistant, here to help you get FP&A Plus up and running smoothly. What do you need?",
+      content: "Welcome! I'm your AI Assistant, here to help you understand contractor delays better. What do you need?",
       timestamp: new Date(),
     },
   ]);
