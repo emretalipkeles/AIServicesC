@@ -107,6 +107,8 @@ import { DelayKnowledgePromptBuilder } from "./delay-analysis/DelayKnowledgeProm
 import type { IDelayEventExtractor } from "../domain/delay-analysis/interfaces/IDelayEventExtractor";
 import type { IActivityMatcher } from "../domain/delay-analysis/interfaces/IActivityMatcher";
 import type { IIDRMatchEnforcementPolicy } from "../domain/delay-analysis/interfaces/IIDRMatchEnforcementPolicy";
+import type { IAnalysisRunTracker } from "../domain/delay-analysis/interfaces/IAnalysisRunTracker";
+import { InMemoryAnalysisRunTracker } from "./delay-analysis/InMemoryAnalysisRunTracker";
 import { IDRMatchEnforcementPolicy } from "../domain/delay-analysis/config/IDRMatchEnforcementPolicy";
 import type { IDocumentContentProvider } from "../domain/delay-analysis/interfaces/IDocumentContentProvider";
 import type { IDocumentHashService } from "../domain/delay-analysis/interfaces/IDocumentHashService";
@@ -176,6 +178,7 @@ export interface AppContainer {
     delayEventExtractor: IDelayEventExtractor | null;
     activityMatcher: IActivityMatcher | null;
     idrMatchPolicy: IIDRMatchEnforcementPolicy;
+    analysisRunTracker: IAnalysisRunTracker;
     documentContentProvider: IDocumentContentProvider;
     documentHashService: IDocumentHashService;
     delayEventDeduplicationService: IDelayEventDeduplicationService;
@@ -545,6 +548,7 @@ export function createAppContainer(): AppContainer {
       delayEventExtractor,
       activityMatcher,
       idrMatchPolicy: new IDRMatchEnforcementPolicy(),
+      analysisRunTracker: new InMemoryAnalysisRunTracker(),
       documentContentProvider: new DocumentContentProvider(),
       documentHashService: new SHA256DocumentHashService(),
       delayEventDeduplicationService: new DelayEventDeduplicationService(),

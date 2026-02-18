@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Activity, Play, Download, Loader2, DollarSign, CheckCircle, AlertCircle, Clock, Zap, Calendar } from "lucide-react";
-import { useDelayEvents, runAnalysisWithProgress, fetchRunTokenUsage } from "@/lib/analysis-api";
+import { useDelayEvents, runAnalysisWithProgress, fetchRunTokenUsage, fetchAnalysisStatus } from "@/lib/analysis-api";
 import { useProjectDocuments } from "@/lib/project-documents-api";
 import { useUploadState } from "@/contexts/upload-state-context";
 import { useToast } from "@/hooks/use-toast";
@@ -60,6 +60,84 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
     completeAnalysis,
     failAnalysis,
   } = useUploadState(projectId);
+
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasCheckedRef = useRef(false);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const pollForStatus = useCallback(async () => {
+    try {
+      const status = await fetchAnalysisStatus(projectId);
+      if (!status) {
+        stopPolling();
+        return;
+      }
+
+      if (status.status === 'running') {
+        if (!analysis.isAnalyzing) {
+          startAnalysis();
+        }
+        updateAnalysisProgress({
+          type: 'progress',
+          stage: status.stage,
+          message: status.message,
+          percentage: status.percentage,
+        });
+      } else if (status.status === 'completed') {
+        stopPolling();
+        let cost = null;
+        if (status.runId) {
+          try {
+            cost = await fetchRunTokenUsage(status.runId);
+          } catch {}
+        }
+        completeAnalysis(cost);
+        queryClient.invalidateQueries({ queryKey: ["delay-events", projectId] });
+      } else if (status.status === 'failed') {
+        stopPolling();
+        failAnalysis(status.errorMessage || 'Analysis failed');
+      }
+    } catch {
+      stopPolling();
+    }
+  }, [projectId, analysis.isAnalyzing, startAnalysis, updateAnalysisProgress, completeAnalysis, failAnalysis, stopPolling, queryClient]);
+
+  useEffect(() => {
+    if (hasCheckedRef.current) return;
+    hasCheckedRef.current = true;
+
+    fetchAnalysisStatus(projectId).then(async (status) => {
+      if (!status) return;
+
+      if (status.status === 'running') {
+        startAnalysis();
+        updateAnalysisProgress({
+          type: 'progress',
+          stage: status.stage,
+          message: status.message,
+          percentage: status.percentage,
+        });
+        pollingRef.current = setInterval(pollForStatus, 2000);
+      } else if (status.status === 'completed' && status.result) {
+        let cost = null;
+        if (status.runId) {
+          try { cost = await fetchRunTokenUsage(status.runId); } catch {}
+        }
+        completeAnalysis(cost);
+        queryClient.invalidateQueries({ queryKey: ["delay-events", projectId] });
+      } else if (status.status === 'failed') {
+        failAnalysis(status.errorMessage || 'Analysis failed');
+      }
+    }).catch(() => {});
+
+    return () => stopPolling();
+  }, [projectId, startAnalysis, updateAnalysisProgress, pollForStatus, stopPolling]);
 
   const matchedEvents = events.filter(e => e.cpmActivityId !== null);
   const highConfidence = matchedEvents.filter(e => (e.matchConfidence ?? 0) >= 80);

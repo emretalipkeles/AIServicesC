@@ -6,6 +6,7 @@ import { ListDelayEventsQueryHandler } from '../../application/delay-analysis/qu
 import { RecordTokenUsageCommandHandler } from '../../application/delay-analysis/commands/handlers/RecordTokenUsageCommandHandler';
 import { GetTokenUsageByRunIdQuery } from '../../application/delay-analysis/queries/GetTokenUsageByRunIdQuery';
 import { SSEProgressReporter } from '../../infrastructure/document-parsing/SSEProgressReporter';
+import { GetAnalysisRunStatusQueryHandler } from '../../application/delay-analysis/queries/handlers/GetAnalysisRunStatusQueryHandler';
 import type { TokenUsageCallback, TokenUsageRecord } from '../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
 import { runAnalysisParamsSchema, runAnalysisBodySchema, listDelayEventsParamsSchema } from '../validators/analysisValidators';
 import ExcelJS from 'exceljs';
@@ -50,6 +51,31 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
 
         console.error('Error listing delay events:', error);
         res.status(500).json({ success: false, error: 'Failed to list delay events' });
+      }
+    }
+  );
+
+  const runStatusHandler = new GetAnalysisRunStatusQueryHandler(
+    container.services.analysisRunTracker
+  );
+
+  app.get(
+    '/api/delay-analysis/projects/:projectId/analysis/status',
+    (req: Request, res: Response) => {
+      try {
+        const projectId = req.params.projectId;
+        const status = runStatusHandler.execute({
+          projectId,
+          tenantId: DEFAULT_TENANT_ID,
+        });
+
+        res.json({
+          success: true,
+          data: status,
+        });
+      } catch (error) {
+        console.error('Error checking analysis status:', error);
+        res.status(500).json({ success: false, error: 'Failed to check analysis status' });
       }
     }
   );
@@ -255,7 +281,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
     container.services.delayEventExtractor!,
     container.services.activityMatcher!,
     container.services.delayEventDeduplicationService,
-    container.services.idrMatchPolicy
+    container.services.idrMatchPolicy,
+    container.services.analysisRunTracker
   );
 
   const createTokenCallback = (projectId: string): TokenUsageCallback => {

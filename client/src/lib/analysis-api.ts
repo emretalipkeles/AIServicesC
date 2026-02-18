@@ -16,6 +16,7 @@ export interface DelayEventDto {
   extractedFromCode: string | null;
   matchConfidence: number | null;
   matchReasoning: string | null;
+  delayEventConfidence: number | null;
   verificationStatus: string;
   createdAt: string;
 }
@@ -264,6 +265,31 @@ export async function streamDelayEventsChat(
   }
 
   return accumulatedContent;
+}
+
+export interface AnalysisRunStatusDto {
+  runId: string;
+  status: 'running' | 'completed' | 'failed';
+  stage: string;
+  message: string;
+  percentage: number;
+  startedAt: string;
+  completedAt: string | null;
+  result?: {
+    eventsExtracted: number;
+    eventsMatched: number;
+    documentsProcessed: number;
+  };
+  errorMessage?: string;
+}
+
+export async function fetchAnalysisStatus(projectId: string): Promise<AnalysisRunStatusDto | null> {
+  const response = await fetch(`/api/delay-analysis/projects/${projectId}/analysis/status`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch analysis status");
+  }
+  const result = await response.json();
+  return result.data;
 }
 
 export interface AnalysisOptions {

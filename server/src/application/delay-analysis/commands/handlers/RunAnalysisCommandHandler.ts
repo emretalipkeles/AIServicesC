@@ -14,9 +14,32 @@ import type {
   ExtractedEventWithSource 
 } from '../../../../domain/delay-analysis/interfaces/IDelayEventDeduplicationService';
 import type { IIDRMatchEnforcementPolicy } from '../../../../domain/delay-analysis/interfaces/IIDRMatchEnforcementPolicy';
+import type { IAnalysisRunTracker } from '../../../../domain/delay-analysis/interfaces/IAnalysisRunTracker';
+import type { ProgressEvent } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 import { extractReportDateFromIDR } from '../../../../infrastructure/delay-analysis/ReportDateExtractor';
+
+class TrackingProgressReporter implements IProgressReporter {
+  constructor(
+    private readonly delegate: IProgressReporter,
+    private readonly tracker: IAnalysisRunTracker,
+    private readonly runId: string
+  ) {}
+
+  report(event: ProgressEvent): void {
+    this.delegate.report(event);
+    this.tracker.updateProgress(this.runId, event.stage, event.message, event.percentage);
+  }
+
+  complete(message: string, result?: unknown): void {
+    this.delegate.complete(message, result);
+  }
+
+  error(message: string, error?: Error): void {
+    this.delegate.error(message, error);
+  }
+}
 
 interface DocumentExtractionContext {
   workActivities: IDRWorkActivity[];
@@ -86,12 +109,43 @@ export class RunAnalysisCommandHandler {
     private readonly extractor: IDelayEventExtractor,
     private readonly matcher: IActivityMatcher,
     private readonly deduplicationService: IDelayEventDeduplicationService,
-    private readonly idrMatchPolicy?: IIDRMatchEnforcementPolicy
+    private readonly idrMatchPolicy?: IIDRMatchEnforcementPolicy,
+    private readonly runTracker?: IAnalysisRunTracker
   ) {}
 
   async execute(command: RunAnalysisCommand, options?: RunAnalysisOptions): Promise<RunAnalysisResult> {
-    const progress = options?.progressReporter || new NoOpProgressReporter();
+    const baseProgress = options?.progressReporter || new NoOpProgressReporter();
+    const runId = options?.runId || `run-${Date.now()}`;
 
+    const progress = this.runTracker
+      ? new TrackingProgressReporter(baseProgress, this.runTracker, runId)
+      : baseProgress;
+
+    if (this.runTracker) {
+      this.runTracker.start(runId, command.projectId, command.tenantId);
+    }
+
+    try {
+      const result = await this.executeInternal(command, options, progress);
+
+      if (this.runTracker) {
+        this.runTracker.complete(runId, result);
+      }
+
+      return result;
+    } catch (error) {
+      if (this.runTracker) {
+        this.runTracker.fail(runId, error instanceof Error ? error.message : 'Unknown error');
+      }
+      throw error;
+    }
+  }
+
+  private async executeInternal(
+    command: RunAnalysisCommand,
+    options: RunAnalysisOptions | undefined,
+    progress: IProgressReporter,
+  ): Promise<RunAnalysisResult> {
     progress.report({
       stage: 'loading_documents',
       message: 'Starting analysis...',
