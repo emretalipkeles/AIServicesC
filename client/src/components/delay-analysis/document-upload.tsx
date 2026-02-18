@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useProjectDocuments, useDeleteDocument, useDeleteAllDocuments, uploadDocumentsInBatches, type ProjectDocumentDto, type ProjectDocumentType, type BatchUploadProgress } from "@/lib/project-documents-api";
 import { runSingleDocAnalysisWithProgress, type AnalysisProgressEvent } from "@/lib/analysis-api";
@@ -16,6 +16,15 @@ import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader2, Fil
 import { format } from "date-fns";
 import { GlassCard, SectionHeader, UploadZone, StatCard, selectTriggerStyles } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
+
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
 
 interface DocumentUploadProps {
   projectId: string;
@@ -51,6 +60,7 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
   const [selectedType, setSelectedType] = useState<ProjectDocumentType>("idr");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [searchText, setSearchText] = useState("");
+  const debouncedSearch = useDebouncedValue(searchText, 300);
   const [isDragOver, setIsDragOver] = useState(false);
   const [lastFailedFiles, setLastFailedFiles] = useState<Array<{ filename: string; error: string }>>([]);
   const [showFailedFiles, setShowFailedFiles] = useState(false);
@@ -71,16 +81,19 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
     uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  let filteredDocuments = filterType === "all" 
-    ? documents 
-    : documents.filter(d => d.documentType === filterType);
+  const filteredDocuments = useMemo(() => {
+    let result = filterType === "all" 
+      ? documents 
+      : documents.filter(d => d.documentType === filterType);
 
-  if (searchText.trim()) {
-    const search = searchText.trim().toLowerCase();
-    filteredDocuments = filteredDocuments.filter(d =>
-      d.filename.toLowerCase().includes(search)
-    );
-  }
+    if (debouncedSearch.trim()) {
+      const search = debouncedSearch.trim().toLowerCase();
+      result = result.filter(d =>
+        d.filename.toLowerCase().includes(search)
+      );
+    }
+    return result;
+  }, [documents, filterType, debouncedSearch]);
   
   const completedDocs = documents.filter(d => d.status === 'completed').length;
   const pendingDocs = documents.filter(d => d.status === 'pending' || d.status === 'processing').length;
@@ -287,7 +300,7 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
                   ))}
                 </SelectContent>
               </Select>
-              {(filterType !== "all" || searchText.trim()) && (
+              {(filterType !== "all" || debouncedSearch.trim()) && (
                 <span className="text-xs text-muted-foreground">
                   Showing {filteredDocuments.length} of {documents.length}
                 </span>
