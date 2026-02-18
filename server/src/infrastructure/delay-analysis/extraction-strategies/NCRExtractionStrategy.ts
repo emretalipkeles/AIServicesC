@@ -14,15 +14,19 @@ export class NCRExtractionStrategy implements IDocumentExtractionStrategy {
 
   buildExtractionPrompt(context: DocumentExtractionContext): ExtractionStrategyResult {
     const truncatedContent = context.documentContent.slice(0, 30000);
-    const knowledgeBasePrompt = this.knowledgePromptBuilder.buildPromptForDocumentType('ncr');
+    const knowledgeBasePrompt = context.skipKnowledgeBase
+      ? ''
+      : this.knowledgePromptBuilder.buildPromptForDocumentType('ncr');
+
+    const knowledgeBaseSection = knowledgeBasePrompt
+      ? `\n${knowledgeBasePrompt}\n`
+      : '\n(Knowledge base provided in system prompt - refer to it for delay definitions, categories, exclusions, decision framework, worked examples, and gray areas.)\n';
 
     const prompt = `You are an expert construction delay analyst specializing in Non-Conformance Reports (NCRs).
 
 DOCUMENT TYPE: Non-Conformance Report (NCR)
 CONTEXT: NCRs are formal documentation of quality failures or work that doesn't meet specifications. NCRs trigger mandatory rework or corrective action. An NCR = work failed = rework required = DEFINITE delay.
-
-${knowledgeBasePrompt}
-
+${knowledgeBaseSection}
 =============================================================================
 EXTRACTION INSTRUCTIONS
 =============================================================================

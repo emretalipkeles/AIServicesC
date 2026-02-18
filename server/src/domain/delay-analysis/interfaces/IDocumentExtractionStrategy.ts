@@ -5,6 +5,7 @@ export interface DocumentExtractionContext {
   documentFilename: string;
   documentId: string;
   documentType: ProjectDocumentType;
+  skipKnowledgeBase?: boolean;
 }
 
 /**

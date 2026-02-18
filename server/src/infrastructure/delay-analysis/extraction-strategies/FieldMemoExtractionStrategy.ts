@@ -14,15 +14,19 @@ export class FieldMemoExtractionStrategy implements IDocumentExtractionStrategy 
 
   buildExtractionPrompt(context: DocumentExtractionContext): ExtractionStrategyResult {
     const truncatedContent = context.documentContent.slice(0, 30000);
-    const knowledgeBasePrompt = this.knowledgePromptBuilder.buildPromptForDocumentType('field_memo');
+    const knowledgeBasePrompt = context.skipKnowledgeBase
+      ? ''
+      : this.knowledgePromptBuilder.buildPromptForDocumentType('field_memo');
+
+    const knowledgeBaseSection = knowledgeBasePrompt
+      ? `\n${knowledgeBasePrompt}\n`
+      : '\n(Knowledge base provided in system prompt - refer to it for delay definitions, categories, exclusions, decision framework, worked examples, and gray areas.)\n';
 
     const prompt = `You are an expert construction delay analyst specializing in Field Memos and general project correspondence.
 
 DOCUMENT TYPE: Field Memo
 CONTEXT: Field memos are broader, less structured documents that may contain delay-related information. They often document issues, decisions, or incidents that could indicate contractor-caused delays.
-
-${knowledgeBasePrompt}
-
+${knowledgeBaseSection}
 =============================================================================
 EXTRACTION INSTRUCTIONS
 =============================================================================

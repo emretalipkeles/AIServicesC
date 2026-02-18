@@ -14,12 +14,16 @@ export class DefaultExtractionStrategy implements IDocumentExtractionStrategy {
 
   buildExtractionPrompt(context: DocumentExtractionContext): ExtractionStrategyResult {
     const truncatedContent = context.documentContent.slice(0, 30000);
-    const knowledgeBasePrompt = this.knowledgePromptBuilder.buildPromptForDocumentType('other');
+    const knowledgeBasePrompt = context.skipKnowledgeBase
+      ? ''
+      : this.knowledgePromptBuilder.buildPromptForDocumentType('other');
+
+    const knowledgeBaseSection = knowledgeBasePrompt
+      ? `\n${knowledgeBasePrompt}\n`
+      : '\n(Knowledge base provided in system prompt - refer to it for delay definitions, categories, exclusions, decision framework, worked examples, and gray areas.)\n';
 
     const prompt = `You are an expert construction delay analyst. Analyze the following document and extract any contractor-caused delay events.
-
-${knowledgeBasePrompt}
-
+${knowledgeBaseSection}
 =============================================================================
 EXTRACTION INSTRUCTIONS
 =============================================================================

@@ -14,15 +14,19 @@ export class IDRExtractionStrategy implements IDocumentExtractionStrategy {
 
   buildExtractionPrompt(context: DocumentExtractionContext): ExtractionStrategyResult {
     const truncatedContent = context.documentContent.slice(0, 30000);
-    const knowledgeBasePrompt = this.knowledgePromptBuilder.buildPromptForDocumentType('idr');
+    const knowledgeBasePrompt = context.skipKnowledgeBase
+      ? ''
+      : this.knowledgePromptBuilder.buildPromptForDocumentType('idr');
+
+    const knowledgeBaseSection = knowledgeBasePrompt
+      ? `\n${knowledgeBasePrompt}\n`
+      : '\n(Knowledge base provided in system prompt - refer to it for delay definitions, categories, exclusions, decision framework, worked examples, and gray areas.)\n';
 
     const prompt = `You are an expert construction delay analyst specializing in Inspector Daily Reports (IDRs).
 
 DOCUMENT TYPE: Inspector Daily Report (IDR)
 CONTEXT: IDRs are daily field observations written by inspectors. They capture what's happening on site day-to-day. Inspectors flag potential contractor delays with code "CODE_CIE" (Contractor Initiated Events).
-
-${knowledgeBasePrompt}
-
+${knowledgeBaseSection}
 =============================================================================
 YOUR TASK: Analyze this IDR and extract TWO things:
 1. **Contractor's Work Activity** - The schedule activities listed in the "Contractor's Work Activity" table (if present)
