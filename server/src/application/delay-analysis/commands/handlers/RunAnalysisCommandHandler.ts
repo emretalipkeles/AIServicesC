@@ -163,6 +163,7 @@ export class RunAnalysisCommandHandler {
         });
 
         const allExtractedEvents: ExtractedEventWithSource[] = [];
+        const successfulDocIds = new Set<string>();
 
         for (let i = 0; i < fieldReports.length; i++) {
           const doc = fieldReports[i];
@@ -189,6 +190,8 @@ export class RunAnalysisCommandHandler {
                 enableToolBasedMatching: options?.enableToolBasedMatching ?? true,
               }
             );
+
+            successfulDocIds.add(doc.id);
 
             const reportDate = doc.reportDate ?? (doc.documentType === 'idr' 
               ? extractReportDateFromIDR(doc.rawContent!) 
@@ -264,6 +267,24 @@ export class RunAnalysisCommandHandler {
             stage: 'deduplicating_events',
             message: `Removed ${duplicatesRemoved} duplicate events (same delay mentioned in multiple documents)`,
             percentage: 45,
+          });
+        }
+
+        let totalCleared = 0;
+        for (const docId of Array.from(successfulDocIds)) {
+          const existingEvents = await this.eventRepository.findByDocumentId(docId, command.tenantId);
+          if (existingEvents.length > 0) {
+            await this.eventRepository.deleteByDocumentId(docId, command.tenantId);
+            totalCleared += existingEvents.length;
+          }
+        }
+
+        if (totalCleared > 0) {
+          console.log(`[RunAnalysisCommandHandler] Cleared ${totalCleared} previous events from ${successfulDocIds.size} successfully re-processed documents`);
+          progress.report({
+            stage: 'saving_events',
+            message: `Cleared ${totalCleared} previous events before saving new results`,
+            percentage: 46,
           });
         }
 
