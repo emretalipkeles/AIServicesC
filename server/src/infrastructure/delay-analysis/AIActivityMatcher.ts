@@ -20,16 +20,18 @@ These are the ONLY CPM activity IDs found in the Inspector's Daily Report for th
 
 The reasoning is simple: these are the activities the contractor was working on that day per the official report. The delay happened during one of these activities, even if the connection is indirect.
 
-## Confidence Scoring (be honest about alignment quality):
-- **85-100%**: Work type in delay clearly matches the activity description (e.g., "excavation delay" matches "Excavate Services")
-- **70-84%**: Work type is related but not exact match (e.g., "equipment breakdown" during "Excavate Services" - equipment was used for that work)
-- **50-69%**: Weak match - the delay happened during this work but activity description doesn't describe the delay's work type (e.g., "grade review at nearby location" during "Roadway demo at different intersection")
-- **40-49%**: Forced match - no logical connection but this was the contractor's work that day, so the delay is associated with it by proximity/timing
+## Confidence Scoring:
+Because these activity IDs come directly from the official Inspector's Daily Report, matching to them is inherently high-confidence (90%+). The exact score within 90-100 reflects how well the delay event DESCRIPTION aligns with the activity DESCRIPTION:
+- **99-100%**: The delay event description clearly and directly matches the activity description — same work type AND same location (e.g., "excavation delay at Allison/Eastlake" matches "Roadway demo/excavation Allison–Harvard/Eastlake")
+- **95-98%**: Strong alignment — same work type OR same location, with the other being closely related (e.g., "equipment breakdown" during "Excavate Services" — equipment was used for that work)
+- **90-94%**: Weak description alignment — the delay event doesn't clearly match this activity's description, but this was the contractor's work that day per the IDR so the match is still valid (e.g., "grade review at nearby intersection" during "Roadway demo at different intersection")
+
+The minimum confidence is 90% because the activity ID was found in the document itself.
 
 ## Response Format (JSON only):
 {
   "activityId": "the EXACT Activity ID from the list above — must be one of the IDs shown",
-  "confidence": <number between 40-100>,
+  "confidence": <number between 90-100>,
   "reasoning": "Brief explanation of why this activity was selected from the IDR list"
 }
 
@@ -112,8 +114,8 @@ export class AIActivityMatcher implements IActivityMatcher {
         cpmActivityId: fallbackActivity.activityId,
         cpmActivityDescription: fallbackActivity.description,
         wbs: scheduleMatch?.wbs ?? null,
-        confidence: 40,
-        reasoning: `[IDR Activity Fallback] AI force-match failed to produce a result. Defaulting to first IDR activity ${fallbackActivity.activityId} ("${fallbackActivity.description}") because this activity was listed in the document. Manual verification recommended.`,
+        confidence: 90,
+        reasoning: `[IDR Activity Fallback] AI force-match failed to produce a parseable result. Defaulting to first IDR activity ${fallbackActivity.activityId} ("${fallbackActivity.description}") because this activity was listed in the document. Confidence is 90% because the activity ID comes from the IDR.`,
         matchedViaIDRActivity: true,
       };
     }
@@ -143,8 +145,8 @@ export class AIActivityMatcher implements IActivityMatcher {
         cpmActivityId: firstIDRActivity.activityId,
         cpmActivityDescription: firstIDRActivity.description,
         wbs: null,
-        confidence: 35,
-        reasoning: `[IDR Activity - not in schedule] Activity ${firstIDRActivity.activityId} was listed in the IDR as being worked on this day, but is not found in the uploaded schedule. Manual verification recommended.`,
+        confidence: 90,
+        reasoning: `[IDR Activity - not in schedule] Activity ${firstIDRActivity.activityId} was listed in the IDR as being worked on this day, but is not found in the uploaded schedule. Confidence is 90% because the activity ID comes directly from the IDR document. Manual verification of schedule alignment recommended.`,
         matchedViaIDRActivity: true,
       };
     }
@@ -182,10 +184,9 @@ export class AIActivityMatcher implements IActivityMatcher {
       const result = this.parseIDRForceMatchResponse(response.content, idrWorkActivities, allActivities);
       
       if (result) {
-        const confidenceLevel = result.confidence >= 85 ? 'high' : 
-                               result.confidence >= 70 ? 'good' :
-                               result.confidence >= 50 ? 'weak' : 'forced';
-        console.log(`[AI] MATCHING: IDR force-match succeeded -> ${result.cpmActivityId} (${result.confidence}% confidence, ${confidenceLevel} alignment)`);
+        const confidenceLevel = result.confidence >= 99 ? 'exact' : 
+                               result.confidence >= 95 ? 'strong' : 'valid';
+        console.log(`[AI] MATCHING: IDR force-match succeeded -> ${result.cpmActivityId} (${result.confidence}% confidence, ${confidenceLevel} description alignment)`);
         return {
           ...result,
           matchedViaIDRActivity: true,
@@ -345,8 +346,8 @@ export class AIActivityMatcher implements IActivityMatcher {
       }
 
       const confidence = typeof parsed.confidence === 'number'
-        ? Math.min(100, Math.max(40, parsed.confidence))
-        : 50;
+        ? Math.min(100, Math.max(90, parsed.confidence))
+        : 90;
 
       const scheduleActivity = allScheduleActivities.find(a => a.activityId === aiActivityId);
 
@@ -367,7 +368,7 @@ export class AIActivityMatcher implements IActivityMatcher {
         cpmActivityId: idrActivity.activityId,
         cpmActivityDescription: idrActivity.description,
         wbs: null,
-        confidence: Math.max(40, Math.min(confidence, 50)),
+        confidence,
         reasoning: `[IDR Activity - not in schedule] ${String(parsed.reasoning || '')} Activity ${idrActivity.activityId} was listed in the IDR but is not found in the uploaded schedule. Manual verification recommended.`,
       };
     } catch (error) {
