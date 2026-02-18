@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useProjectDocuments, useDeleteDocument, useDeleteAllDocuments, uploadDocumentsInBatches, type ProjectDocumentDto, type ProjectDocumentType, type BatchUploadProgress } from "@/lib/project-documents-api";
 import { runSingleDocAnalysisWithProgress, type AnalysisProgressEvent } from "@/lib/analysis-api";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,7 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
   const [selectedType, setSelectedType] = useState<ProjectDocumentType>("idr");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [searchText, setSearchText] = useState("");
-  const debouncedSearch = useDebouncedValue(searchText, 300);
+  const debouncedSearch = useDebouncedValue(searchText, 150);
   const [isDragOver, setIsDragOver] = useState(false);
   const [lastFailedFiles, setLastFailedFiles] = useState<Array<{ filename: string; error: string }>>([]);
   const [showFailedFiles, setShowFailedFiles] = useState(false);
@@ -380,19 +380,16 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
           ) : (
             <ScrollArea className="h-[400px] pr-4">
               <div className="space-y-2">
-                <AnimatePresence>
-                  {filteredDocuments.map((doc, index) => (
-                    <DocumentRow 
-                      key={doc.id} 
-                      doc={doc} 
-                      index={index}
-                      onDelete={() => handleDelete(doc.id)}
-                      onAnalyze={() => handleRunSingleDocAnalysis(doc.id, doc.filename)}
-                      isAnalyzing={analyzingDocId === doc.id}
-                      isAnalysisDisabled={isAnyAnalysisRunning}
-                    />
-                  ))}
-                </AnimatePresence>
+                {filteredDocuments.map((doc) => (
+                  <DocumentRow 
+                    key={doc.id} 
+                    doc={doc} 
+                    onDelete={() => handleDelete(doc.id)}
+                    onAnalyze={() => handleRunSingleDocAnalysis(doc.id, doc.filename)}
+                    isAnalyzing={analyzingDocId === doc.id}
+                    isAnalysisDisabled={isAnyAnalysisRunning}
+                  />
+                ))}
               </div>
             </ScrollArea>
           )}
@@ -525,25 +522,20 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
 
 interface DocumentRowProps {
   doc: ProjectDocumentDto;
-  index: number;
   onDelete: () => void;
   onAnalyze: () => void;
   isAnalyzing: boolean;
   isAnalysisDisabled: boolean;
 }
 
-function DocumentRow({ doc, index, onDelete, onAnalyze, isAnalyzing, isAnalysisDisabled }: DocumentRowProps) {
+const DocumentRow = React.memo(function DocumentRow({ doc, onDelete, onAnalyze, isAnalyzing, isAnalysisDisabled }: DocumentRowProps) {
   const status = statusConfig[doc.status] || statusConfig.pending;
   const StatusIcon = status.icon;
 
   const canAnalyze = doc.status === 'completed' && analyzableDocTypes.includes(doc.documentType);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      transition={{ delay: index * 0.05 }}
+    <div
       className={cn(
         "group flex items-center justify-between p-4 rounded-xl",
         "bg-gradient-to-r from-muted/30 to-transparent",
@@ -618,6 +610,6 @@ function DocumentRow({ doc, index, onDelete, onAnalyze, isAnalyzing, isAnalysisD
           <Trash2 className="w-4 h-4" />
         </Button>
       </div>
-    </motion.div>
+    </div>
   );
-}
+});
