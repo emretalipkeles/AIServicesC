@@ -49,7 +49,7 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
         model: ModelId.gpt52(),
         messages: [AIMessage.user(strategyResult.prompt)],
         maxTokens: 4000,
-        temperature: 0.1,
+        temperature: 0,
       });
       
       console.log(`[AI] EXTRACTION: Completed - used ${response.inputTokens} input + ${response.outputTokens} output tokens`);

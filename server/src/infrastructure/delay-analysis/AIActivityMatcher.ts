@@ -167,7 +167,7 @@ export class AIActivityMatcher implements IActivityMatcher {
         model: ModelId.gpt52(),
         messages: [AIMessage.user(prompt)],
         maxTokens: 500,
-        temperature: 0.1,
+        temperature: 0,
       });
 
       if (options?.onTokenUsage && options?.runId) {
@@ -246,7 +246,7 @@ export class AIActivityMatcher implements IActivityMatcher {
         model: ModelId.gpt52(),
         messages: [AIMessage.user(prompt)],
         maxTokens: 1000,
-        temperature: 0.1,
+        temperature: 0,
       });
 
       console.log(`[AI] MATCHING: Completed - used ${response.inputTokens} input + ${response.outputTokens} output tokens`);
