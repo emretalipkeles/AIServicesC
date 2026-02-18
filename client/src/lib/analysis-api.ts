@@ -292,6 +292,47 @@ export async function fetchAnalysisStatus(projectId: string): Promise<AnalysisRu
   return result.data;
 }
 
+export interface SingleDocAnalysisResult {
+  eventsExtracted: number;
+  eventsMatched: number;
+  errors: string[];
+  runId?: string;
+}
+
+export function runSingleDocAnalysisWithProgress(
+  projectId: string,
+  documentId: string,
+  onProgress: (event: AnalysisProgressEvent) => void
+): Promise<SingleDocAnalysisResult> {
+  return new Promise((resolve, reject) => {
+    const url = `/api/delay-analysis/projects/${projectId}/documents/${documentId}/analyze/stream`;
+    const eventSource = new EventSource(url);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as AnalysisProgressEvent;
+        onProgress(data);
+
+        if (data.type === 'complete') {
+          eventSource.close();
+          resolve((data.result as unknown as SingleDocAnalysisResult) || { eventsExtracted: 0, eventsMatched: 0, errors: [] });
+        } else if (data.type === 'error') {
+          eventSource.close();
+          reject(new Error(data.message));
+        }
+      } catch (err) {
+        console.error('Error parsing single-doc SSE message:', err, event.data);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('Single-doc SSE connection error:', error);
+      eventSource.close();
+      reject(new Error('Connection to single-document analysis stream failed'));
+    };
+  });
+}
+
 export interface AnalysisOptions {
   extractFromDocuments?: boolean;
   matchToActivities?: boolean;

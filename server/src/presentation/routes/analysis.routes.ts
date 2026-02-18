@@ -2,13 +2,14 @@ import { randomUUID } from 'crypto';
 import type { Express, Request, Response } from 'express';
 import type { AppContainer } from '../../infrastructure/bootstrap';
 import { RunAnalysisCommandHandler } from '../../application/delay-analysis/commands/handlers/RunAnalysisCommandHandler';
+import { RunSingleDocumentAnalysisCommandHandler } from '../../application/delay-analysis/commands/handlers/RunSingleDocumentAnalysisCommandHandler';
 import { ListDelayEventsQueryHandler } from '../../application/delay-analysis/queries/handlers/ListDelayEventsQueryHandler';
 import { RecordTokenUsageCommandHandler } from '../../application/delay-analysis/commands/handlers/RecordTokenUsageCommandHandler';
 import { GetTokenUsageByRunIdQuery } from '../../application/delay-analysis/queries/GetTokenUsageByRunIdQuery';
 import { SSEProgressReporter } from '../../infrastructure/document-parsing/SSEProgressReporter';
 import { GetAnalysisRunStatusQueryHandler } from '../../application/delay-analysis/queries/handlers/GetAnalysisRunStatusQueryHandler';
 import type { TokenUsageCallback, TokenUsageRecord } from '../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
-import { runAnalysisParamsSchema, runAnalysisBodySchema, listDelayEventsParamsSchema } from '../validators/analysisValidators';
+import { runAnalysisParamsSchema, runAnalysisBodySchema, runSingleDocAnalysisParamsSchema, listDelayEventsParamsSchema } from '../validators/analysisValidators';
 import ExcelJS from 'exceljs';
 
 const DEFAULT_TENANT_ID = 'default';
@@ -397,6 +398,61 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
         });
         res.write(`data: ${errorData}\n\n`);
         res.end();
+      }
+    }
+  );
+
+  const singleDocAnalysisHandler = new RunSingleDocumentAnalysisCommandHandler(
+    container.repositories.delayAnalysisProject,
+    container.repositories.projectDocument,
+    container.repositories.scheduleActivity,
+    container.repositories.contractorDelayEvent,
+    container.services.delayEventExtractor!,
+    container.services.activityMatcher!,
+    container.services.idrMatchPolicy
+  );
+
+  app.get(
+    '/api/delay-analysis/projects/:projectId/documents/:documentId/analyze/stream',
+    async (req: Request, res: Response) => {
+      try {
+        const params = runSingleDocAnalysisParamsSchema.parse(req.params);
+        const progressReporter = new SSEProgressReporter(res);
+        const runId = randomUUID();
+
+        console.log(`[Analysis] Starting single-document analysis: ${runId} for document: ${params.documentId} in project: ${params.projectId}`);
+
+        await singleDocAnalysisHandler.execute(
+          {
+            projectId: params.projectId,
+            documentId: params.documentId,
+            tenantId: DEFAULT_TENANT_ID,
+          },
+          {
+            runId,
+            progressReporter,
+            onTokenUsage: createTokenCallback(params.projectId),
+          }
+        );
+      } catch (error) {
+        if (error instanceof Error && error.name === 'ZodError') {
+          const errorData = JSON.stringify({ type: 'error', message: 'Invalid request parameters' });
+          res.write(`data: ${errorData}\n\n`);
+          res.end();
+          return;
+        }
+
+        console.error('Error in single-document analysis stream:', error);
+        if (!res.headersSent) {
+          const errorData = JSON.stringify({
+            type: 'error',
+            message: error instanceof Error ? error.message : 'Failed to run single-document analysis',
+          });
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.write(`data: ${errorData}\n\n`);
+          res.end();
+        }
       }
     }
   );

@@ -9,6 +9,11 @@ export const runAnalysisBodySchema = z.object({
   matchToActivities: z.boolean().optional().default(true),
 });
 
+export const runSingleDocAnalysisParamsSchema = z.object({
+  projectId: z.string().uuid('Invalid project ID'),
+  documentId: z.string().uuid('Invalid document ID'),
+});
+
 export const listDelayEventsParamsSchema = z.object({
   projectId: z.string().uuid('Invalid project ID'),
 });

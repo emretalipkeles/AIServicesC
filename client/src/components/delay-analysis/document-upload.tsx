@@ -1,7 +1,9 @@
 import React, { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useProjectDocuments, useDeleteDocument, useDeleteAllDocuments, uploadDocumentsInBatches, type ProjectDocumentDto, type ProjectDocumentType, type BatchUploadProgress } from "@/lib/project-documents-api";
+import { runSingleDocAnalysisWithProgress, type AnalysisProgressEvent } from "@/lib/analysis-api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useUploadState } from "@/contexts/upload-state-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader2, File, FolderOpen } from "lucide-react";
+import { Upload, FileText, Trash2, CheckCircle, AlertCircle, Clock, Loader2, File, FolderOpen, Search, Play } from "lucide-react";
 import { format } from "date-fns";
 import { GlassCard, SectionHeader, UploadZone, StatCard, selectTriggerStyles } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
@@ -35,6 +37,8 @@ const statusConfig: Record<string, { icon: typeof Clock; color: string; bgColor:
   failed: { icon: AlertCircle, color: "text-red-600 dark:text-red-400", bgColor: "bg-red-500/10", label: "Failed" },
 };
 
+const analyzableDocTypes = ['idr', 'ncr', 'field_memo'];
+
 type FilterType = ProjectDocumentType | "all";
 
 export function DocumentUpload({ projectId }: DocumentUploadProps) {
@@ -46,14 +50,17 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
 
   const [selectedType, setSelectedType] = useState<ProjectDocumentType>("idr");
   const [filterType, setFilterType] = useState<FilterType>("all");
+  const [searchText, setSearchText] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const [lastFailedFiles, setLastFailedFiles] = useState<Array<{ filename: string; error: string }>>([]);
   const [showFailedFiles, setShowFailedFiles] = useState(false);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [analyzingDocId, setAnalyzingDocId] = useState<string | null>(null);
   const uploadSectionRef = useRef<HTMLDivElement>(null);
 
   const {
     documentUpload,
+    analysis,
     startDocumentUpload,
     updateDocumentProgress,
     completeDocumentUpload,
@@ -64,13 +71,50 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
     uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const filteredDocuments = filterType === "all" 
+  let filteredDocuments = filterType === "all" 
     ? documents 
     : documents.filter(d => d.documentType === filterType);
+
+  if (searchText.trim()) {
+    const search = searchText.trim().toLowerCase();
+    filteredDocuments = filteredDocuments.filter(d =>
+      d.filename.toLowerCase().includes(search)
+    );
+  }
   
   const completedDocs = documents.filter(d => d.status === 'completed').length;
   const pendingDocs = documents.filter(d => d.status === 'pending' || d.status === 'processing').length;
   const failedDocs = documents.filter(d => d.status === 'failed').length;
+
+  const isAnyAnalysisRunning = analysis.isAnalyzing || analyzingDocId !== null;
+
+  const handleRunSingleDocAnalysis = useCallback(async (docId: string, filename: string) => {
+    if (isAnyAnalysisRunning) return;
+
+    setAnalyzingDocId(docId);
+    try {
+      const result = await runSingleDocAnalysisWithProgress(
+        projectId,
+        docId,
+        (_event: AnalysisProgressEvent) => {}
+      );
+
+      queryClient.invalidateQueries({ queryKey: ["delay-events", projectId] });
+
+      toast({
+        title: "Analysis complete",
+        description: `${filename}: ${result.eventsExtracted} events extracted, ${result.eventsMatched} matched`,
+      });
+    } catch (error) {
+      toast({
+        title: "Analysis failed",
+        description: error instanceof Error ? error.message : "Failed to analyze document",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalyzingDocId(null);
+    }
+  }, [projectId, isAnyAnalysisRunning, queryClient, toast]);
 
   const handleFileDrop = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -222,8 +266,16 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
         />
         <div className="p-6 space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Filter by type:</label>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="pl-9 w-[200px] h-9 text-sm"
+                />
+              </div>
               <Select value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
                 <SelectTrigger className={cn(selectTriggerStyles, "w-[260px]")}>
                   <SelectValue placeholder="All Documents" />
@@ -235,7 +287,7 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
                   ))}
                 </SelectContent>
               </Select>
-              {filterType !== "all" && (
+              {(filterType !== "all" || searchText.trim()) && (
                 <span className="text-xs text-muted-foreground">
                   Showing {filteredDocuments.length} of {documents.length}
                 </span>
@@ -321,7 +373,10 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
                       key={doc.id} 
                       doc={doc} 
                       index={index}
-                      onDelete={() => handleDelete(doc.id)} 
+                      onDelete={() => handleDelete(doc.id)}
+                      onAnalyze={() => handleRunSingleDocAnalysis(doc.id, doc.filename)}
+                      isAnalyzing={analyzingDocId === doc.id}
+                      isAnalysisDisabled={isAnyAnalysisRunning}
                     />
                   ))}
                 </AnimatePresence>
@@ -459,11 +514,16 @@ interface DocumentRowProps {
   doc: ProjectDocumentDto;
   index: number;
   onDelete: () => void;
+  onAnalyze: () => void;
+  isAnalyzing: boolean;
+  isAnalysisDisabled: boolean;
 }
 
-function DocumentRow({ doc, index, onDelete }: DocumentRowProps) {
+function DocumentRow({ doc, index, onDelete, onAnalyze, isAnalyzing, isAnalysisDisabled }: DocumentRowProps) {
   const status = statusConfig[doc.status] || statusConfig.pending;
   const StatusIcon = status.icon;
+
+  const canAnalyze = doc.status === 'completed' && analyzableDocTypes.includes(doc.documentType);
 
   return (
     <motion.div
@@ -475,12 +535,17 @@ function DocumentRow({ doc, index, onDelete }: DocumentRowProps) {
         "group flex items-center justify-between p-4 rounded-xl",
         "bg-gradient-to-r from-muted/30 to-transparent",
         "border border-border/30 hover:border-border/60",
-        "hover:shadow-md transition-all duration-200"
+        "hover:shadow-md transition-all duration-200",
+        isAnalyzing && "border-primary/40 bg-primary/5"
       )}
     >
       <div className="flex items-center gap-4 min-w-0 flex-1">
         <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <FileText className="w-5 h-5 text-primary" />
+          {isAnalyzing ? (
+            <Loader2 className="w-5 h-5 text-primary animate-spin" />
+          ) : (
+            <FileText className="w-5 h-5 text-primary" />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-medium truncate text-foreground">{doc.filename}</p>
@@ -488,10 +553,16 @@ function DocumentRow({ doc, index, onDelete }: DocumentRowProps) {
             <span>{documentTypeLabels[doc.documentType as ProjectDocumentType] || doc.documentType}</span>
             <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
             <span>{format(new Date(doc.createdAt), "MMM d, yyyy")}</span>
+            {isAnalyzing && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                <span className="text-primary font-medium">Analyzing...</span>
+              </>
+            )}
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <div className={cn(
           "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
           status.bgColor, status.color
@@ -503,6 +574,27 @@ function DocumentRow({ doc, index, onDelete }: DocumentRowProps) {
           <span className="text-xs text-destructive max-w-[150px] truncate" title={doc.errorMessage}>
             {doc.errorMessage}
           </span>
+        )}
+        {canAnalyze && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-8 w-8 transition-opacity",
+              isAnalyzing
+                ? "opacity-100 text-primary"
+                : "opacity-0 group-hover:opacity-100 text-primary hover:text-primary hover:bg-primary/10"
+            )}
+            onClick={onAnalyze}
+            disabled={isAnalysisDisabled}
+            title="Run AI analysis on this document"
+          >
+            {isAnalyzing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Play className="w-4 h-4" />
+            )}
+          </Button>
         )}
         <Button
           variant="ghost"
