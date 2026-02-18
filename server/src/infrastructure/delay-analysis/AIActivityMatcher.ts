@@ -5,33 +5,35 @@ import type { IDRWorkActivity } from '../../domain/delay-analysis/interfaces/IDo
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 import { ModelId } from '../../domain/value-objects/ModelId';
 
-const IDR_FORCE_MATCH_PROMPT = `You are an expert construction schedule analyst. Match this delay event to the BEST activity from the ones being worked on that day.
+const IDR_FORCE_MATCH_PROMPT = `You are an expert construction schedule analyst. Match this delay event to the BEST activity from the ones listed in the Inspector's Daily Report (IDR).
 
 ## Delay Event:
 {eventDescription}
 
 ## Event Date: {eventDate}
 
-## Activities Being Worked On (from Inspector's Report):
+## Activities Listed in the IDR Document:
 {activitiesList}
 
-## CRITICAL RULE: YOU MUST MATCH TO ONE OF THESE ACTIVITIES.
-The contractor was working on ONLY these activities on the day of this delay. Even if the delay description doesn't perfectly align with the activity descriptions, you MUST select the most relevant one.
+## ABSOLUTE RULE — NO EXCEPTIONS:
+These are the ONLY CPM activity IDs found in the Inspector's Daily Report for this day. You MUST select one of these activity IDs. Do NOT invent, guess, or use any activity ID that is not in the list above. Even if the delay event description does not perfectly match any of these activities, you MUST pick the closest one from this list.
 
-## Confidence Scoring:
+The reasoning is simple: these are the activities the contractor was working on that day per the official report. The delay happened during one of these activities, even if the connection is indirect.
+
+## Confidence Scoring (be honest about alignment quality):
 - **85-100%**: Work type in delay clearly matches the activity description (e.g., "excavation delay" matches "Excavate Services")
 - **70-84%**: Work type is related but not exact match (e.g., "equipment breakdown" during "Excavate Services" - equipment was used for that work)
-- **50-69%**: Weak match - the delay happened during this work but activity description doesn't describe the delay's work type (e.g., "signal alignment issue" during "water main excavation")
-- **40-49%**: Forced match - no logical connection but this was the contractor's work that day
+- **50-69%**: Weak match - the delay happened during this work but activity description doesn't describe the delay's work type (e.g., "grade review at nearby location" during "Roadway demo at different intersection")
+- **40-49%**: Forced match - no logical connection but this was the contractor's work that day, so the delay is associated with it by proximity/timing
 
 ## Response Format (JSON only):
 {
-  "activityId": "the exact Activity ID from the list above",
+  "activityId": "the EXACT Activity ID from the list above — must be one of the IDs shown",
   "confidence": <number between 40-100>,
-  "reasoning": "Brief explanation of why this activity was selected"
+  "reasoning": "Brief explanation of why this activity was selected from the IDR list"
 }
 
-YOU MUST RETURN A MATCH. Do not respond with null.
+YOU MUST RETURN A MATCH from the list above. Do not respond with null. Do not use any activity ID not shown above.
 `;
 
 const MATCHING_PROMPT = `You are an expert construction schedule analyst specializing in delay claims for heavy civil and transit projects. Your task is to match a contractor-caused delay event to the most relevant CPM schedule activity.
@@ -89,7 +91,7 @@ export class AIActivityMatcher implements IActivityMatcher {
     }
 
     if (options?.idrWorkActivities && options.idrWorkActivities.length > 0) {
-      console.log(`[AI] MATCHING: Force-matching to ${options.idrWorkActivities.length} IDR work activities...`);
+      console.log(`[AI] MATCHING: IDR activities present (${options.idrWorkActivities.length}) — will ONLY match to document activities, no fallback to full schedule`);
       const forceMatchResult = await this.tryForceMatchToIDRActivities(
         eventDescription,
         eventDate,
@@ -102,7 +104,18 @@ export class AIActivityMatcher implements IActivityMatcher {
         return forceMatchResult;
       }
 
-      console.log('[AI] MATCHING: No IDR activities found in schedule, falling back to date-filtered full schedule...');
+      console.log('[AI] MATCHING: IDR force-match returned null unexpectedly — creating deterministic fallback to first IDR activity (NEVER falling back to full schedule)');
+      const fallbackActivity = options.idrWorkActivities[0];
+      const scheduleMatch = activities.find(a => a.activityId === fallbackActivity.activityId);
+      return {
+        matchedActivityId: scheduleMatch?.id ?? fallbackActivity.activityId,
+        cpmActivityId: fallbackActivity.activityId,
+        cpmActivityDescription: fallbackActivity.description,
+        wbs: scheduleMatch?.wbs ?? null,
+        confidence: 40,
+        reasoning: `[IDR Activity Fallback] AI force-match failed to produce a result. Defaulting to first IDR activity ${fallbackActivity.activityId} ("${fallbackActivity.description}") because this activity was listed in the document. Manual verification recommended.`,
+        matchedViaIDRActivity: true,
+      };
     }
 
     return this.matchAgainstFullSchedule(eventDescription, eventDate, activities, options);
@@ -136,7 +149,7 @@ export class AIActivityMatcher implements IActivityMatcher {
       };
     }
 
-    console.log(`[AI] MATCHING: Force-matching to ${priorityActivities.length} IDR activities (description alignment will affect confidence)`);
+    console.log(`[AI] MATCHING: Force-matching to ${priorityActivities.length} schedule-matched IDR activities out of ${idrWorkActivities.length} total IDR activities`);
 
     const activitiesList = idrWorkActivities
       .map(wa => `${wa.activityId} | ${wa.description} | ${wa.comments || '-'}`)
@@ -162,11 +175,11 @@ export class AIActivityMatcher implements IActivityMatcher {
           model: response.model,
           inputTokens: response.inputTokens,
           outputTokens: response.outputTokens,
-          metadata: { idrActivitiesCount: priorityActivities.length },
+          metadata: { idrActivitiesCount: idrWorkActivities.length },
         });
       }
 
-      const result = this.parseMatchResponse(response.content, priorityActivities);
+      const result = this.parseIDRForceMatchResponse(response.content, idrWorkActivities, allActivities);
       
       if (result) {
         const confidenceLevel = result.confidence >= 85 ? 'high' : 
@@ -180,7 +193,7 @@ export class AIActivityMatcher implements IActivityMatcher {
         };
       }
 
-      console.log('[AIActivityMatcher] Force-match returned no result (unexpected)');
+      console.log('[AIActivityMatcher] Force-match AI response could not be parsed — will use deterministic fallback');
       return null;
     } catch (error) {
       console.error('[AIActivityMatcher] Error in force-match:', error);
@@ -284,6 +297,84 @@ export class AIActivityMatcher implements IActivityMatcher {
     }
 
     return results;
+  }
+
+  private parseIDRForceMatchResponse(
+    response: string,
+    idrWorkActivities: IDRWorkActivity[],
+    allScheduleActivities: ScheduleActivity[]
+  ): MatchResult | null {
+    try {
+      if (response.trim().toLowerCase() === 'null') {
+        console.log('[AIActivityMatcher] AI returned null for IDR force-match (should not happen)');
+        return null;
+      }
+
+      let cleanResponse = response;
+      const codeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        cleanResponse = codeBlockMatch[1].trim();
+      }
+
+      const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.log('[AIActivityMatcher] No JSON found in IDR force-match response');
+        return null;
+      }
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch {
+        const cleanedJson = jsonMatch[0]
+          .replace(/,\s*}/g, '}')
+          .replace(/,\s*]/g, ']');
+        parsed = JSON.parse(cleanedJson);
+      }
+
+      if (!parsed || parsed === null) {
+        return null;
+      }
+
+      const aiActivityId = String(parsed.activityId || '');
+      const idrActivity = idrWorkActivities.find(wa => wa.activityId === aiActivityId);
+
+      if (!idrActivity) {
+        console.log(`[AIActivityMatcher] AI returned activity "${aiActivityId}" which is NOT in the IDR list: [${idrWorkActivities.map(wa => wa.activityId).join(', ')}]`);
+        return null;
+      }
+
+      const confidence = typeof parsed.confidence === 'number'
+        ? Math.min(100, Math.max(40, parsed.confidence))
+        : 50;
+
+      const scheduleActivity = allScheduleActivities.find(a => a.activityId === aiActivityId);
+
+      if (scheduleActivity) {
+        return {
+          matchedActivityId: scheduleActivity.id,
+          cpmActivityId: scheduleActivity.activityId,
+          cpmActivityDescription: scheduleActivity.activityDescription,
+          wbs: scheduleActivity.wbs,
+          confidence,
+          reasoning: String(parsed.reasoning || 'Matched to IDR document activity'),
+        };
+      }
+
+      console.log(`[AIActivityMatcher] IDR activity "${aiActivityId}" matched by AI but not found in schedule DB — returning as IDR-only match`);
+      return {
+        matchedActivityId: idrActivity.activityId,
+        cpmActivityId: idrActivity.activityId,
+        cpmActivityDescription: idrActivity.description,
+        wbs: null,
+        confidence: Math.max(40, Math.min(confidence, 50)),
+        reasoning: `[IDR Activity - not in schedule] ${String(parsed.reasoning || '')} Activity ${idrActivity.activityId} was listed in the IDR but is not found in the uploaded schedule. Manual verification recommended.`,
+      };
+    } catch (error) {
+      console.error('[AIActivityMatcher] Error parsing IDR force-match response:', error);
+      console.error('Raw response:', response.substring(0, 500));
+      return null;
+    }
   }
 
   private parseMatchResponse(
