@@ -13,6 +13,7 @@ import type {
   IDelayEventDeduplicationService,
   ExtractedEventWithSource 
 } from '../../../../domain/delay-analysis/interfaces/IDelayEventDeduplicationService';
+import type { IIDRMatchEnforcementPolicy } from '../../../../domain/delay-analysis/interfaces/IIDRMatchEnforcementPolicy';
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 import { extractReportDateFromIDR } from '../../../../infrastructure/delay-analysis/ReportDateExtractor';
@@ -84,7 +85,8 @@ export class RunAnalysisCommandHandler {
     private readonly eventRepository: IContractorDelayEventRepository,
     private readonly extractor: IDelayEventExtractor,
     private readonly matcher: IActivityMatcher,
-    private readonly deduplicationService: IDelayEventDeduplicationService
+    private readonly deduplicationService: IDelayEventDeduplicationService,
+    private readonly idrMatchPolicy?: IIDRMatchEnforcementPolicy
   ) {}
 
   async execute(command: RunAnalysisCommand, options?: RunAnalysisOptions): Promise<RunAnalysisResult> {
@@ -299,16 +301,37 @@ export class RunAnalysisCommandHandler {
         }
 
         let preMatchedCount = 0;
+        let idrPolicyRejections = 0;
         const preMatchedEvents: ContractorDelayEvent[] = [];
         for (const deduped of deduplicatedEvents) {
           const now = new Date();
           const activityCode = deduped.event.matchedActivityId;
           const activityUuid = activityCode ? activityCodeToUuidMap.get(activityCode) : undefined;
-          const hasPreMatch = activityCode && 
+          let hasPreMatch = activityCode && 
             activityUuid &&
             deduped.event.matchConfidence !== undefined &&
             deduped.event.matchConfidence >= MIN_MATCH_CONFIDENCE_FOR_SKIP / 100;
           
+          let enforcedConfidence: number | undefined;
+          if (hasPreMatch && this.idrMatchPolicy) {
+            const docContext = documentContexts.get(deduped.primarySourceDocumentId);
+            if (docContext && docContext.workActivities.length > 0) {
+              const validation = this.idrMatchPolicy.validatePreMatch(
+                activityCode!,
+                Math.round(deduped.event.matchConfidence! * 100),
+                docContext.workActivities
+              );
+              if (!validation.isValid) {
+                console.log(`[RunAnalysisCommandHandler] IDR policy rejected pre-match: ${validation.reason}`);
+                hasPreMatch = false;
+                idrPolicyRejections++;
+              } else if (validation.correctedConfidence !== undefined) {
+                enforcedConfidence = validation.correctedConfidence;
+                console.log(`[RunAnalysisCommandHandler] IDR policy enforced confidence floor: ${Math.round(deduped.event.matchConfidence! * 100)}% -> ${enforcedConfidence}%`);
+              }
+            }
+          }
+
           const eventId = randomUUID();
           if (hasPreMatch) {
             preMatchedCount++;
@@ -330,7 +353,7 @@ export class RunAnalysisCommandHandler {
             impactDurationHours: normalizeImpactDuration(deduped.event.impactDurationHours),
             sourceReference: deduped.event.sourceReference,
             extractedFromCode: deduped.event.extractedFromCode,
-            matchConfidence: hasPreMatch ? Math.round(deduped.event.matchConfidence! * 100) : null,
+            matchConfidence: hasPreMatch ? (enforcedConfidence ?? Math.round(deduped.event.matchConfidence! * 100)) : null,
             matchReasoning: hasPreMatch ? (deduped.event.matchReasoning ?? '[Pre-matched during extraction]') : null,
             delayEventConfidence: deduped.event.delayEventConfidence 
               ? Math.round(deduped.event.delayEventConfidence * 100) 
@@ -399,6 +422,15 @@ export class RunAnalysisCommandHandler {
               console.log(`[RunAnalysisCommandHandler] Invalidated ${invalidatedCount} pre-matched events due to date validation`);
             }
           }
+        }
+
+        if (idrPolicyRejections > 0) {
+          console.log(`[RunAnalysisCommandHandler] IDR enforcement policy rejected ${idrPolicyRejections} pre-matches (matched to non-IDR activities). These events will be re-matched via the strict IDR matcher.`);
+          progress.report({
+            stage: 'saving_events',
+            message: `${idrPolicyRejections} pre-matches corrected by IDR enforcement policy`,
+            percentage: 47,
+          });
         }
 
         if (preMatchedCount > 0) {

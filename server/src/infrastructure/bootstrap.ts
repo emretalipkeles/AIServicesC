@@ -106,6 +106,8 @@ import { ContractorDelayTrainingGuide } from "../domain/delay-analysis/config/Co
 import { DelayKnowledgePromptBuilder } from "./delay-analysis/DelayKnowledgePromptBuilder";
 import type { IDelayEventExtractor } from "../domain/delay-analysis/interfaces/IDelayEventExtractor";
 import type { IActivityMatcher } from "../domain/delay-analysis/interfaces/IActivityMatcher";
+import type { IIDRMatchEnforcementPolicy } from "../domain/delay-analysis/interfaces/IIDRMatchEnforcementPolicy";
+import { IDRMatchEnforcementPolicy } from "../domain/delay-analysis/config/IDRMatchEnforcementPolicy";
 import type { IDocumentContentProvider } from "../domain/delay-analysis/interfaces/IDocumentContentProvider";
 import type { IDocumentHashService } from "../domain/delay-analysis/interfaces/IDocumentHashService";
 import type { IDelayEventDeduplicationService } from "../domain/delay-analysis/interfaces/IDelayEventDeduplicationService";
@@ -173,6 +175,7 @@ export interface AppContainer {
     scheduleParserFactory: IScheduleParserFactory;
     delayEventExtractor: IDelayEventExtractor | null;
     activityMatcher: IActivityMatcher | null;
+    idrMatchPolicy: IIDRMatchEnforcementPolicy;
     documentContentProvider: IDocumentContentProvider;
     documentHashService: IDocumentHashService;
     delayEventDeduplicationService: IDelayEventDeduplicationService;
@@ -541,6 +544,7 @@ export function createAppContainer(): AppContainer {
       scheduleParserFactory,
       delayEventExtractor,
       activityMatcher,
+      idrMatchPolicy: new IDRMatchEnforcementPolicy(),
       documentContentProvider: new DocumentContentProvider(),
       documentHashService: new SHA256DocumentHashService(),
       delayEventDeduplicationService: new DelayEventDeduplicationService(),

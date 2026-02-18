@@ -254,7 +254,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
     container.repositories.contractorDelayEvent,
     container.services.delayEventExtractor!,
     container.services.activityMatcher!,
-    container.services.delayEventDeduplicationService
+    container.services.delayEventDeduplicationService,
+    container.services.idrMatchPolicy
   );
 
   const createTokenCallback = (projectId: string): TokenUsageCallback => {

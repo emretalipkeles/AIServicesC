@@ -106,12 +106,16 @@ Return a JSON object with the structure:
   ]
 }
 
-## MATCHING RULES:
-- **Priority: Match to activities from the document's "Contractor's Work Activity" table** - these are the activities being worked on when the delay occurred
-- If a delay clearly relates to work described in the activity table (e.g., excavation delay matches "Excavate Services" activity), match with HIGH confidence (90%+)
-- Use tool results to get full activity descriptions and verify IDs exist in the schedule
-- Only set matchedActivityId if you are 70%+ confident the delay affects that specific activity
-- If an activity ID was mentioned in the document but not found in the schedule database, still include it with a note in matchReasoning
+## MATCHING RULES — STRICT IDR-FIRST ENFORCEMENT:
+- **ABSOLUTE RULE: If you found activity IDs in the "Contractor's Work Activity" table, you MUST ONLY match delay events to those activity IDs.** Do NOT match to any other activity from the schedule database lookup, even if it seems like a better description match. The IDR activities are what the contractor was working on that day — the delay happened during one of those activities.
+- Use tool results ONLY to verify IDR activity IDs exist in the schedule and to get their full descriptions. Never use tool results to find alternative activities outside the IDR list.
+- **Confidence scoring for IDR-sourced matches (90-100%)**:
+  - 99-100%: Delay description clearly matches the activity description — same work type AND same location
+  - 95-98%: Strong alignment — same work type OR same location, closely related
+  - 90-94%: Weak description alignment, but the activity was in the IDR so the match is valid
+  - The MINIMUM confidence for any IDR-sourced match is 90% because the activity ID comes from the document itself
+- If an activity ID was mentioned in the document but not found in the schedule database, still match to it with a note in matchReasoning
+- Only use the full schedule for matching when ZERO activity IDs are found in the document (non-IDR documents like NCRs or Field Memos)
 
 ## DIARY SECTION - DO NOT SKIP:
 IDRs contain "Diary" sections with timestamped narratives. These are CRITICAL delay sources - do NOT skip them while focusing on DSC entries.

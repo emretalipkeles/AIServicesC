@@ -17,8 +17,9 @@ export interface MatchOptions {
   onTokenUsage?: TokenUsageCallback;
   /**
    * IDR work activities extracted from the document.
-   * When provided, the matcher will first attempt to match against these
-   * specific activities (fast-path) before falling back to the full schedule.
+   * When provided, the matcher MUST ONLY match against these activities.
+   * It will NEVER fall back to the full schedule. All matches will use
+   * 90-100% confidence because the activity IDs come from the document itself.
    */
   idrWorkActivities?: IDRWorkActivity[];
   /**
