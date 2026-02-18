@@ -202,11 +202,13 @@ export class AIDelayEventExtractorWithTools implements IDelayEventExtractor {
     const documentType = options?.documentType ?? 'other';
     const strategy = this.strategyFactory.getStrategy(documentType);
     
+    console.log(`[Knowledge Base] skipKnowledgeBase=true for strategy prompt (KB already in system prompt for tool-based extraction)`);
     const strategyResult = strategy.buildExtractionPrompt({
       documentContent,
       documentFilename,
       documentId,
       documentType,
+      skipKnowledgeBase: true,
     });
 
     const userPrompt = `Analyze the following ${documentType.toUpperCase()} document and extract all contractor-caused delay events.

@@ -28,7 +28,7 @@ ${knowledgeBaseSection}
 EXTRACTION INSTRUCTIONS
 =============================================================================
 
-Using the knowledge base above, analyze the document and extract delay events.
+Using the knowledge base, analyze the document and extract delay events.
 
 For each delay event found, extract:
 - eventDescription: Clear description of the delay event
