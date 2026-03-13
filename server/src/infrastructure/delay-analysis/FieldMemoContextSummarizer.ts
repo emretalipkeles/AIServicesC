@@ -36,12 +36,13 @@ export class FieldMemoContextSummarizer implements IFieldMemoContextProvider {
     let filteredMemos = completedMemos;
     if (filterMonth !== undefined && filterYear !== undefined) {
       filteredMemos = completedMemos.filter(fm => {
-        if (!fm.reportDate) return true;
+        if (!fm.reportDate) return false;
         const d = new Date(fm.reportDate);
         return d.getMonth() + 1 === filterMonth && d.getFullYear() === filterYear;
       });
       if (filteredMemos.length === 0) {
-        filteredMemos = completedMemos;
+        console.log(`[FieldMemoContextSummarizer] No field memos found for period ${filterMonth}/${filterYear}`);
+        return null;
       }
     }
 

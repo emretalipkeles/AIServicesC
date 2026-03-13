@@ -129,9 +129,14 @@ export class RunSingleDocumentAnalysisCommandHandler {
     let fieldMemoContext: string | null = null;
     if (doc.documentType === 'idr' && this.fieldMemoContextProvider) {
       try {
+        const docDate = doc.reportDate ? new Date(doc.reportDate) : null;
+        const docMonth = docDate ? docDate.getMonth() + 1 : undefined;
+        const docYear = docDate ? docDate.getFullYear() : undefined;
         fieldMemoContext = await this.fieldMemoContextProvider.getConsolidatedContext(
           command.projectId,
-          command.tenantId
+          command.tenantId,
+          docMonth,
+          docYear
         );
         if (fieldMemoContext) {
           console.log(`[SingleDocAnalysis] Field memo context loaded (${fieldMemoContext.length} chars)`);
