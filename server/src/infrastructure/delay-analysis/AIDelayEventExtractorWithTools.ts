@@ -211,11 +211,19 @@ export class AIDelayEventExtractorWithTools implements IDelayEventExtractor {
       skipKnowledgeBase: true,
     });
 
+    const fieldMemoContextBlock = options?.fieldMemoContext
+      ? `\n--- FIELD MEMO CONTEXT (Background Information) ---
+The following is a summary of Field Memos from this project. Use this context to better understand ongoing site conditions, corrective actions, and known issues when evaluating potential delay events.
+
+${options.fieldMemoContext}
+--- END FIELD MEMO CONTEXT ---\n`
+      : '';
+
     const userPrompt = `Analyze the following ${documentType.toUpperCase()} document and extract all contractor-caused delay events.
 
 Document Filename: ${documentFilename}
 Document ID: ${documentId}
-
+${fieldMemoContextBlock}
 --- DOCUMENT CONTENT ---
 ${documentContent}
 --- END DOCUMENT ---

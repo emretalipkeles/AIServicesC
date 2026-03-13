@@ -10,6 +10,7 @@ import type { IProgressReporter } from '../../../../domain/delay-analysis/interf
 import type { TokenUsageCallback } from '../../../../domain/delay-analysis/interfaces/ITokenUsageRecorder';
 import type { IDRWorkActivity } from '../../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { IIDRMatchEnforcementPolicy } from '../../../../domain/delay-analysis/interfaces/IIDRMatchEnforcementPolicy';
+import type { IFieldMemoContextProvider } from '../../../../domain/delay-analysis/interfaces/IFieldMemoContextProvider';
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 import { extractReportDateFromIDR } from '../../../../infrastructure/delay-analysis/ReportDateExtractor';
@@ -69,7 +70,8 @@ export class RunSingleDocumentAnalysisCommandHandler {
     private readonly eventRepository: IContractorDelayEventRepository,
     private readonly extractor: IDelayEventExtractor,
     private readonly matcher: IActivityMatcher,
-    private readonly idrMatchPolicy?: IIDRMatchEnforcementPolicy
+    private readonly idrMatchPolicy?: IIDRMatchEnforcementPolicy,
+    private readonly fieldMemoContextProvider?: IFieldMemoContextProvider
   ) {}
 
   async execute(
@@ -124,6 +126,21 @@ export class RunSingleDocumentAnalysisCommandHandler {
       percentage: 10,
     });
 
+    let fieldMemoContext: string | null = null;
+    if (doc.documentType === 'idr' && this.fieldMemoContextProvider) {
+      try {
+        fieldMemoContext = await this.fieldMemoContextProvider.getConsolidatedContext(
+          command.projectId,
+          command.tenantId
+        );
+        if (fieldMemoContext) {
+          console.log(`[SingleDocAnalysis] Field memo context loaded (${fieldMemoContext.length} chars)`);
+        }
+      } catch (error) {
+        console.warn('[SingleDocAnalysis] Failed to load field memo context:', error);
+      }
+    }
+
     let workActivities: IDRWorkActivity[] = [];
     let reportDate: Date | null = null;
 
@@ -139,6 +156,7 @@ export class RunSingleDocumentAnalysisCommandHandler {
           tenantId: command.tenantId,
           projectId: command.projectId,
           enableToolBasedMatching: options?.enableToolBasedMatching ?? true,
+          fieldMemoContext: fieldMemoContext ?? undefined,
         }
       );
 

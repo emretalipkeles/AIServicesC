@@ -40,6 +40,7 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
       documentFilename,
       documentId,
       documentType,
+      fieldMemoContext: options?.fieldMemoContext,
     });
 
     try {

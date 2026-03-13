@@ -15,6 +15,7 @@ import type {
 } from '../../../../domain/delay-analysis/interfaces/IDelayEventDeduplicationService';
 import type { IIDRMatchEnforcementPolicy } from '../../../../domain/delay-analysis/interfaces/IIDRMatchEnforcementPolicy';
 import type { IAnalysisRunTracker } from '../../../../domain/delay-analysis/interfaces/IAnalysisRunTracker';
+import type { IFieldMemoContextProvider } from '../../../../domain/delay-analysis/interfaces/IFieldMemoContextProvider';
 import type { ProgressEvent } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
@@ -110,7 +111,8 @@ export class RunAnalysisCommandHandler {
     private readonly matcher: IActivityMatcher,
     private readonly deduplicationService: IDelayEventDeduplicationService,
     private readonly idrMatchPolicy?: IIDRMatchEnforcementPolicy,
-    private readonly runTracker?: IAnalysisRunTracker
+    private readonly runTracker?: IAnalysisRunTracker,
+    private readonly fieldMemoContextProvider?: IFieldMemoContextProvider
   ) {}
 
   async execute(command: RunAnalysisCommand, options?: RunAnalysisOptions): Promise<RunAnalysisResult> {
@@ -216,6 +218,23 @@ export class RunAnalysisCommandHandler {
           details: { total: fieldReports.length },
         });
 
+        let fieldMemoContext: string | null = null;
+        if (this.fieldMemoContextProvider) {
+          try {
+            fieldMemoContext = await this.fieldMemoContextProvider.getConsolidatedContext(
+              command.projectId,
+              command.tenantId,
+              command.filterMonth,
+              command.filterYear
+            );
+            if (fieldMemoContext) {
+              console.log(`[RunAnalysisCommandHandler] Field memo context loaded (${fieldMemoContext.length} chars)`);
+            }
+          } catch (error) {
+            console.warn('[RunAnalysisCommandHandler] Failed to load field memo context:', error);
+          }
+        }
+
         const allExtractedEvents: ExtractedEventWithSource[] = [];
         const successfulDocIds = new Set<string>();
 
@@ -242,6 +261,7 @@ export class RunAnalysisCommandHandler {
                 tenantId: command.tenantId,
                 projectId: command.projectId,
                 enableToolBasedMatching: options?.enableToolBasedMatching ?? true,
+                fieldMemoContext: doc.documentType === 'idr' && fieldMemoContext ? fieldMemoContext : undefined,
               }
             );
 

@@ -6,6 +6,7 @@ export interface DocumentExtractionContext {
   documentId: string;
   documentType: ProjectDocumentType;
   skipKnowledgeBase?: boolean;
+  fieldMemoContext?: string;
 }
 
 /**

@@ -22,11 +22,26 @@ export class IDRExtractionStrategy implements IDocumentExtractionStrategy {
       ? `\n${knowledgeBasePrompt}\n`
       : '\n(Knowledge base provided in system prompt - refer to it for delay definitions, categories, exclusions, decision framework, worked examples, and gray areas.)\n';
 
+    const fieldMemoSection = context.fieldMemoContext
+      ? `\n=============================================================================
+FIELD MEMO CONTEXT (Background Information)
+=============================================================================
+The following is a summary of Field Memos from this project. Use this context to better understand ongoing site conditions, corrective actions, and known issues when evaluating potential delay events. This context may help you:
+- Identify delays related to known corrective actions or rework directives
+- Understand site constraints that affect contractor performance
+- Distinguish between new delays and previously documented issues
+- Assess whether observed issues are part of an ongoing pattern
+
+${context.fieldMemoContext}
+=============================================================================
+\n`
+      : '';
+
     const prompt = `You are an expert construction delay analyst specializing in Inspector Daily Reports (IDRs).
 
 DOCUMENT TYPE: Inspector Daily Report (IDR)
 CONTEXT: IDRs are daily field observations written by inspectors. They capture what's happening on site day-to-day. Inspectors flag potential contractor delays with code "CODE_CIE" (Contractor Initiated Events).
-${knowledgeBaseSection}
+${knowledgeBaseSection}${fieldMemoSection}
 =============================================================================
 YOUR TASK: Analyze this IDR and extract TWO things:
 1. **Contractor's Work Activity** - The schedule activities listed in the "Contractor's Work Activity" table (if present)

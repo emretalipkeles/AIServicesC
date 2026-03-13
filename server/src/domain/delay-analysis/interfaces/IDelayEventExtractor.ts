@@ -42,6 +42,7 @@ export interface ExtractionOptions {
   tenantId?: string;
   projectId?: string;
   enableToolBasedMatching?: boolean;
+  fieldMemoContext?: string;
 }
 
 export interface IDelayEventExtractor {

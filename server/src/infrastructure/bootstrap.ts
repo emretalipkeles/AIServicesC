@@ -113,6 +113,8 @@ import { IDRMatchEnforcementPolicy } from "../domain/delay-analysis/config/IDRMa
 import type { IDocumentContentProvider } from "../domain/delay-analysis/interfaces/IDocumentContentProvider";
 import type { IDocumentHashService } from "../domain/delay-analysis/interfaces/IDocumentHashService";
 import type { IDelayEventDeduplicationService } from "../domain/delay-analysis/interfaces/IDelayEventDeduplicationService";
+import type { IFieldMemoContextProvider } from "../domain/delay-analysis/interfaces/IFieldMemoContextProvider";
+import { FieldMemoContextSummarizer } from "./delay-analysis/FieldMemoContextSummarizer";
 import { GetDocumentContentQueryHandler } from "../application/delay-analysis/queries/handlers/GetDocumentContentQueryHandler";
 
 import { DrizzleDelayAnalysisProjectRepository } from "./database/repositories/delay-analysis/DrizzleDelayAnalysisProjectRepository";
@@ -182,6 +184,7 @@ export interface AppContainer {
     documentContentProvider: IDocumentContentProvider;
     documentHashService: IDocumentHashService;
     delayEventDeduplicationService: IDelayEventDeduplicationService;
+    fieldMemoContextProvider: IFieldMemoContextProvider | null;
   };
 
   agentLoop: {
@@ -409,6 +412,12 @@ export function createAppContainer(): AppContainer {
     console.log('[Bootstrap] Using AIDelayEventExtractorWithTools for extraction with real-time schedule lookup');
     activityMatcher = new AIActivityMatcher(aiClient);
   }
+
+  let fieldMemoContextProvider: IFieldMemoContextProvider | null = null;
+  if (aiClient) {
+    fieldMemoContextProvider = new FieldMemoContextSummarizer(projectDocumentRepository, aiClient);
+    console.log('[Bootstrap] FieldMemoContextSummarizer initialized for IDR context injection');
+  }
   
   const pretCommandExecutor = intentClassifier 
     ? new PretCommandExecutor(
@@ -552,6 +561,7 @@ export function createAppContainer(): AppContainer {
       documentContentProvider: new DocumentContentProvider(),
       documentHashService: new SHA256DocumentHashService(),
       delayEventDeduplicationService: new DelayEventDeduplicationService(),
+      fieldMemoContextProvider,
     },
     agentLoop: createAgentLoop(projectDocumentRepository, contractorDelayEventRepository, getActivitiesByIdsHandler),
   };
