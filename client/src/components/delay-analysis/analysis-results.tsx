@@ -6,7 +6,7 @@ import { useDelayEvents } from "@/lib/analysis-api";
 import { useProjectDocuments } from "@/lib/project-documents-api";
 import { GlassCard, SectionHeader, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles, TruncatedTextWithTooltip } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
-import { exportDelayEventsToExcel } from "@/lib/excel-export";
+import { exportDelayEventsToExcel, isNoDelayEvent } from "@/lib/excel-export";
 
 interface AnalysisResultsProps {
   projectId: string;
@@ -29,6 +29,9 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
 
   const filteredEvents = useMemo(() => {
     return events.filter(e => {
+      if (isNoDelayEvent(e.eventDescription)) {
+        return false;
+      }
       const confidence = e.delayEventConfidence;
       if (confidence !== null && confidence !== undefined && confidence < DELAY_EVENT_CONFIDENCE_THRESHOLD) {
         return false;

@@ -46,12 +46,25 @@ function formatCriticalPath(value: string | null | undefined): string {
 
 const DELAY_EVENT_CONFIDENCE_THRESHOLD = 20;
 
+const NO_DELAY_PATTERNS = [
+  /^no contractor[- ]caused delay/i,
+  /^no contractor delays/i,
+  /^no delays? (?:were |was )?(?:found|identified|documented|observed|recorded|noted|detected)/i,
+  /^there (?:are|were) no (?:contractor[- ]caused )?delay/i,
+  /^no (?:delay|contractor) (?:events?|issues?) (?:were |was )?(?:found|identified|documented|observed|recorded|noted|detected)/i,
+];
+
+export function isNoDelayEvent(eventDescription: string): boolean {
+  const trimmed = eventDescription.trim();
+  return NO_DELAY_PATTERNS.some(pattern => pattern.test(trimmed));
+}
+
 export async function exportDelayEventsToExcel(
   events: DelayEventData[], 
   documentNameMap?: Map<string, string>
 ): Promise<void> {
   const filteredEvents = events.filter(e => {
-    if (e.cpmActivityId === null || e.cpmActivityId === undefined) {
+    if (isNoDelayEvent(e.eventDescription)) {
       return false;
     }
     const confidence = e.delayEventConfidence;
