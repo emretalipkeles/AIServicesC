@@ -440,7 +440,14 @@ Remember: First scan for activity IDs and use the tool to look them up, then ext
       const eventsArray = parsed.delayEvents || parsed.events || [];
       const events: ExtractedDelayEvent[] = eventsArray
         .map((item: ExtractedEventRaw) => this.mapToDelayEvent(item, baseConfidence, documentType))
-        .filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0);
+        .filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0)
+        .filter((e: ExtractedDelayEvent) => {
+          if (e.delayEventConfidence !== null && e.delayEventConfidence !== undefined && e.delayEventConfidence < 0.10) {
+            console.log(`[AIDelayEventExtractorWithTools] Dropping low-confidence event (${e.delayEventConfidence}): ${e.eventDescription.substring(0, 80)}`);
+            return false;
+          }
+          return true;
+        });
 
       return { events, workActivities };
     } catch (error) {

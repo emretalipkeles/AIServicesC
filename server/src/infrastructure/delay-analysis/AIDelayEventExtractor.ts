@@ -204,7 +204,14 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
             ? String(item.reworkDescription) 
             : undefined,
         };
-      }).filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0);
+      }).filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0)
+        .filter((e: ExtractedDelayEvent) => {
+          if (e.delayEventConfidence !== null && e.delayEventConfidence !== undefined && e.delayEventConfidence < 0.10) {
+            console.log(`[AIDelayEventExtractor] Dropping low-confidence event (${e.delayEventConfidence}): ${e.eventDescription.substring(0, 80)}`);
+            return false;
+          }
+          return true;
+        });
 
       return { events, workActivities };
     } catch (error) {

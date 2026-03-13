@@ -154,6 +154,15 @@ Return a JSON object with TWO arrays:
   ]
 }
 
+CRITICAL RULE — NO CONTRACTOR DELAYS DETECTED:
+If the document clearly indicates there are NO contractor-caused delays — for example:
+- The "Contractor Inefficiencies" field says "N/A", "None", or is empty
+- The "Contractor's Work Activity" table is empty or absent
+- The narrative explicitly states no contractor delays or issues occurred
+- There are no CODE_CIE entries and no observable contractor-caused delays in the diary/narrative
+Then you MUST return an EMPTY delayEvents array: "delayEvents": []
+Do NOT fabricate or invent delay events with default durations. If no real contractor delay is evident, return zero events.
+
 NOTES:
 - workActivities: Extract from "Contractor's Work Activity" table. Return empty array [] if no such table exists.
 - delayEvents: Extract delay events as described above. Return empty array [] if no delays are found.

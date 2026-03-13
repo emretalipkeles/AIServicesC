@@ -12,6 +12,8 @@ interface AnalysisResultsProps {
   projectId: string;
 }
 
+const DELAY_EVENT_CONFIDENCE_THRESHOLD = 20;
+
 export function AnalysisResults({ projectId }: AnalysisResultsProps) {
   const { data: events = [], isLoading } = useDelayEvents(projectId);
   const { data: documents = [] } = useProjectDocuments(projectId);
@@ -25,7 +27,17 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
     return map;
   }, [documents]);
 
-  const matchedEvents = events.filter(e => e.cpmActivityId !== null);
+  const filteredEvents = useMemo(() => {
+    return events.filter(e => {
+      const confidence = e.delayEventConfidence;
+      if (confidence !== null && confidence !== undefined && confidence < DELAY_EVENT_CONFIDENCE_THRESHOLD) {
+        return false;
+      }
+      return true;
+    });
+  }, [events]);
+
+  const matchedEvents = filteredEvents.filter(e => e.cpmActivityId !== null);
   const highConfidence = matchedEvents.filter(e => (e.matchConfidence ?? 0) >= 80);
   const mediumConfidence = matchedEvents.filter(e => {
     const conf = e.matchConfidence ?? 0;
@@ -37,7 +49,7 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
   });
 
   const handleExport = async () => {
-    await exportDelayEventsToExcel(events, documentNameMap);
+    await exportDelayEventsToExcel(filteredEvents, documentNameMap);
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -48,9 +60,9 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard label="Total Events" value={events.length} icon={BarChart3} />
+        <StatCard label="Total Events" value={filteredEvents.length} icon={BarChart3} />
         <StatCard label="Matched" value={matchedEvents.length} icon={CheckCircle} color="success" />
-        <StatCard label="Unmatched" value={events.length - matchedEvents.length} icon={AlertCircle} color="warning" />
+        <StatCard label="Unmatched" value={filteredEvents.length - matchedEvents.length} icon={AlertCircle} color="warning" />
         <StatCard label="High Confidence" value={highConfidence.length} icon={TrendingUp} color="success" />
       </div>
 

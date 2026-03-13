@@ -44,10 +44,20 @@ function formatCriticalPath(value: string | null | undefined): string {
   return value;
 }
 
+const DELAY_EVENT_CONFIDENCE_THRESHOLD = 20;
+
 export async function exportDelayEventsToExcel(
   events: DelayEventData[], 
   documentNameMap?: Map<string, string>
 ): Promise<void> {
+  const filteredEvents = events.filter(e => {
+    const confidence = e.delayEventConfidence;
+    if (confidence !== null && confidence !== undefined && confidence < DELAY_EVENT_CONFIDENCE_THRESHOLD) {
+      return false;
+    }
+    return true;
+  });
+
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Construction Delay Interpreter';
   workbook.created = new Date();
@@ -93,7 +103,7 @@ export async function exportDelayEventsToExcel(
     };
   });
 
-  events.forEach((event, index) => {
+  filteredEvents.forEach((event, index) => {
     const rowData = {
       activityId: event.cpmActivityId || '',
       activityDesc: event.cpmActivityDescription || '',
@@ -203,7 +213,7 @@ export async function exportDelayEventsToExcel(
 
   worksheet.autoFilter = {
     from: { row: 1, column: 1 },
-    to: { row: events.length + 1, column: 15 },
+    to: { row: filteredEvents.length + 1, column: 15 },
   };
 
   const today = new Date();
