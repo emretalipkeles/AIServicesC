@@ -51,6 +51,9 @@ export async function exportDelayEventsToExcel(
   documentNameMap?: Map<string, string>
 ): Promise<void> {
   const filteredEvents = events.filter(e => {
+    if (!e.cpmActivityId) {
+      return false;
+    }
     const confidence = e.delayEventConfidence;
     if (confidence !== null && confidence !== undefined && confidence < DELAY_EVENT_CONFIDENCE_THRESHOLD) {
       return false;
