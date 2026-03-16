@@ -25,8 +25,8 @@ NCRs are formal documentation of quality failures where work does not meet contr
 
 1. **Read the entire NCR** — Identify the non-conformance, what failed, and the corrective action
 2. **Extract the delay event** — The NCR itself is the delay event
-3. **AFTER extracting, use the get_schedule_activities tool** — Search for schedule activities related to the work type, location, or WBS code mentioned in the NCR
-4. **Match the event to the most relevant activity** from the tool results
+3. **Scan the NCR for any activity IDs or WBS codes** — Look for patterns like "X-XX-XXXX", "Activity XXXX", or "WBS XX.XX.XX". If found, use the get_schedule_activities tool to look them up.
+4. **If no activity IDs found** — Leave matchedActivityId as null. Do NOT fabricate activity IDs or pass descriptive text to the tool.
 5. **Output the final JSON**
 
 ## WHAT TO EXTRACT FROM NCRs:
@@ -64,10 +64,10 @@ Return a JSON object with the structure:
 }
 
 ## MATCHING RULES FOR NCRs:
-- NCRs do NOT contain activity tables like IDRs — use the schedule lookup tool to find matching activities
-- Search by work type, location, specification section, and WBS codes mentioned in the NCR
+- NCRs rarely contain activity IDs — if you find any activity IDs or WBS codes, use the get_schedule_activities tool to look them up
+- The tool only accepts activity IDs (e.g., "2-W-0471", "Activity 1234", "WBS 05.02.01") — do NOT pass descriptive text like "concrete" or "backfill"
+- If no activity IDs are found in the NCR, leave matchedActivityId as null — do not force a match
 - Match confidence should reflect alignment between the NCR's work area and the schedule activity
-- If no matching activity is found, leave matchedActivityId as null
 
 ## DURATION RULES FOR NCRs:
 - DO NOT estimate duration for NCRs
@@ -84,6 +84,6 @@ Return a JSON object with the structure:
   }
 
   buildUserPromptSuffix(): string {
-    return 'Extract all delay events from this NCR. After extraction, use the schedule lookup tool to find matching activities by searching for work types and locations mentioned in the NCR.';
+    return 'Extract all delay events from this NCR. If you find any activity IDs or WBS codes in the NCR, use the tool to look them up. Otherwise, leave matchedActivityId as null.';
   }
 }

@@ -30,8 +30,8 @@ Field Memos are formal written directives from the owner/engineer to the contrac
 
 1. **Read the entire memo** — Identify each distinct Issue/Corrective Action pair
 2. **Extract delay events** — Each issue + corrective action = one delay event
-3. **AFTER extracting events, use the get_schedule_activities tool** — Search for schedule activities related to the work area, location, or work type mentioned in the memo. Use descriptive search terms (e.g., "staging", "fence", "erosion control", "stormwater", "environmental").
-4. **Match events to activities** — Match each delay event to the most relevant schedule activity from the tool results
+3. **Scan the memo for any activity IDs** — Look for patterns like "X-XX-XXXX", "Activity XXXX", or "WBS XX.XX.XX". If found, use the get_schedule_activities tool to look them up.
+4. **If no activity IDs found** — Leave matchedActivityId as null. Do NOT fabricate activity IDs or pass descriptive text to the tool.
 5. **Output the final JSON**
 
 ## WHAT TO EXTRACT FROM FIELD MEMOS:
@@ -76,10 +76,10 @@ Return a JSON object with the structure:
 }
 
 ## MATCHING RULES FOR FIELD MEMOS:
-- Field Memos do NOT contain activity tables like IDRs — you must use the schedule lookup tool to find matching activities
-- Search by work area, location, and work type mentioned in the memo
+- Field Memos rarely contain activity IDs — if you find any, use the get_schedule_activities tool to look them up
+- The tool only accepts activity IDs (e.g., "2-W-0471", "Activity 1234", "WBS 05.02.01") — do NOT pass descriptive text like "staging" or "erosion control"
+- If no activity IDs are found in the memo, leave matchedActivityId as null — do not force a match
 - Match confidence should reflect how well the schedule activity description aligns with the corrective action
-- If no matching activity is found, leave matchedActivityId as null — do not force a match
 
 ## DURATION ESTIMATION FOR FIELD MEMOS:
 Field Memos rarely state explicit durations. Estimate based on scope:
@@ -100,6 +100,6 @@ Field Memos rarely state explicit durations. Estimate based on scope:
   }
 
   buildUserPromptSuffix(): string {
-    return 'Extract all contractor-caused delay events from each Issue/Corrective Action section. After extraction, use the schedule lookup tool to find matching activities by searching for work types and locations mentioned in the memo.';
+    return 'Extract all contractor-caused delay events from each Issue/Corrective Action section. If you find any activity IDs in the memo, use the tool to look them up. Otherwise, leave matchedActivityId as null.';
   }
 }
