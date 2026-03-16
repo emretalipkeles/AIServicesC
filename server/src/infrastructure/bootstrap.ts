@@ -87,6 +87,7 @@ import { ScheduleParserFactory } from "./document-parsing/ScheduleParserFactory"
 import type { IScheduleParserFactory } from "../domain/delay-analysis/interfaces/IScheduleParserFactory";
 import { AIDelayEventExtractor } from "./delay-analysis/AIDelayEventExtractor";
 import { AIDelayEventExtractorWithTools } from "./delay-analysis/AIDelayEventExtractorWithTools";
+import { ToolExtractionSystemPromptStrategyFactory } from "./delay-analysis/tool-extraction-prompts/ToolExtractionSystemPromptStrategyFactory";
 import { GetScheduleActivitiesTool } from "./delay-analysis/tools/GetScheduleActivitiesTool";
 import { GetActivitiesByIdsQueryHandler } from "../application/delay-analysis/queries/handlers/GetActivitiesByIdsQueryHandler";
 import { AIActivityMatcher } from "./delay-analysis/AIActivityMatcher";
@@ -408,8 +409,11 @@ export function createAppContainer(): AppContainer {
   if (aiClient) {
     intentClassifier = new AIIntentClassifier(aiClient);
     responseNarrator = new AIPretResponseNarrator(aiClient);
-    delayEventExtractor = new AIDelayEventExtractorWithTools(scheduleActivitiesTool);
-    console.log('[Bootstrap] Using AIDelayEventExtractorWithTools for extraction with real-time schedule lookup');
+    const extractionKnowledgeBase = new ContractorDelayTrainingGuide();
+    const extractionPromptBuilder = new DelayKnowledgePromptBuilder(extractionKnowledgeBase);
+    const systemPromptStrategyFactory = new ToolExtractionSystemPromptStrategyFactory(extractionPromptBuilder);
+    delayEventExtractor = new AIDelayEventExtractorWithTools(scheduleActivitiesTool, systemPromptStrategyFactory);
+    console.log('[Bootstrap] Using AIDelayEventExtractorWithTools with per-document-type system prompt strategies');
     activityMatcher = new AIActivityMatcher(aiClient);
   }
 
