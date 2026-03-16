@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDelayAnalysisProject, useUpdateProject, type DelayAnalysisProject } from "@/lib/delay-analysis-api";
 import { useProjectDocuments } from "@/lib/project-documents-api";
@@ -36,10 +36,26 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
   const { data: project, isLoading, error } = useDelayAnalysisProject(projectId);
   const { data: documents = [] } = useProjectDocuments(projectId);
   const { data: activities = [] } = useScheduleActivities(projectId);
-  const currentYear = new Date().getFullYear();
   const [filterMonth, setFilterMonth] = useState<number>(new Date().getMonth() + 1);
-  const [filterYear, setFilterYear] = useState<number>(currentYear);
-  const { data: delayEvents = [] } = useDelayEvents(projectId, filterMonth, filterYear);
+  const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
+  const [filterInitialized, setFilterInitialized] = useState(false);
+
+  const { data: allDelayEvents = [] } = useDelayEvents(projectId);
+
+  useEffect(() => {
+    if (!filterInitialized && allDelayEvents.length > 0) {
+      const dates = allDelayEvents
+        .map(e => e.eventStartDate)
+        .filter((d): d is string => d !== null)
+        .map(d => new Date(d));
+      if (dates.length > 0) {
+        const latest = dates.reduce((a, b) => (a > b ? a : b));
+        setFilterMonth(latest.getMonth() + 1);
+        setFilterYear(latest.getFullYear());
+      }
+      setFilterInitialized(true);
+    }
+  }, [allDelayEvents, filterInitialized]);
   const updateProject = useUpdateProject();
   const { toast } = useToast();
   const { scheduleUpload, documentUpload, analysis } = useUploadState(projectId);
@@ -77,7 +93,7 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
   };
 
   const completedDocs = documents.filter(d => d.status === 'completed').length;
-  const matchedEvents = delayEvents.filter(e => e.cpmActivityId !== null).length;
+  const matchedEvents = allDelayEvents.filter(e => e.cpmActivityId !== null).length;
 
   if (isLoading) {
     return (
@@ -112,7 +128,7 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
     { label: "Documents", value: documents.length, icon: FolderOpen },
     { label: "Processed", value: completedDocs, icon: CheckCircle2 },
     { label: "Activities", value: activities.length, icon: Calendar },
-    { label: "Delay Events", value: delayEvents.length, icon: Activity },
+    { label: "Delay Events", value: allDelayEvents.length, icon: Activity },
   ];
 
   return (
