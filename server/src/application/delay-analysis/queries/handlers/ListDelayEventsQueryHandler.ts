@@ -46,7 +46,37 @@ export class ListDelayEventsQueryHandler {
       this.fetchDocumentTypes(events, query.projectId, query.tenantId),
     ]);
 
-    return events.map(event => this.mapToDto(event, activityDataMap, documentTypeMap));
+    const filtered = this.applyDateFilter(events, documentTypeMap, query.filterMonth, query.filterYear);
+
+    return filtered.map(event => this.mapToDto(event, activityDataMap, documentTypeMap));
+  }
+
+  private applyDateFilter(
+    events: ContractorDelayEvent[],
+    documentTypeMap: Map<string, string>,
+    filterMonth?: number,
+    filterYear?: number
+  ): ContractorDelayEvent[] {
+    if (filterMonth === undefined || filterYear === undefined) {
+      return events;
+    }
+
+    return events.filter(event => {
+      const docType = event.sourceDocumentId
+        ? documentTypeMap.get(event.sourceDocumentId) ?? null
+        : null;
+
+      if (docType === 'field_memo' || docType === 'ncr') {
+        return true;
+      }
+
+      if (!event.eventStartDate) {
+        return false;
+      }
+
+      const d = new Date(event.eventStartDate);
+      return d.getMonth() + 1 === filterMonth && d.getFullYear() === filterYear;
+    });
   }
 
   private async fetchActivityData(

@@ -10,12 +10,14 @@ import { exportDelayEventsToExcel, isNoDelayEvent, formatSourceDocumentType } fr
 
 interface AnalysisResultsProps {
   projectId: string;
+  filterMonth: number;
+  filterYear: number;
 }
 
 const DELAY_EVENT_CONFIDENCE_THRESHOLD = 20;
 
-export function AnalysisResults({ projectId }: AnalysisResultsProps) {
-  const { data: events = [], isLoading } = useDelayEvents(projectId);
+export function AnalysisResults({ projectId, filterMonth, filterYear }: AnalysisResultsProps) {
+  const { data: events = [], isLoading } = useDelayEvents(projectId, filterMonth, filterYear);
   const { data: documents = [] } = useProjectDocuments(projectId);
   const [filterText, setFilterText] = useState("");
 

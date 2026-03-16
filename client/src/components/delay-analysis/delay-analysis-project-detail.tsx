@@ -36,7 +36,10 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
   const { data: project, isLoading, error } = useDelayAnalysisProject(projectId);
   const { data: documents = [] } = useProjectDocuments(projectId);
   const { data: activities = [] } = useScheduleActivities(projectId);
-  const { data: delayEvents = [] } = useDelayEvents(projectId);
+  const currentYear = new Date().getFullYear();
+  const [filterMonth, setFilterMonth] = useState<number>(new Date().getMonth() + 1);
+  const [filterYear, setFilterYear] = useState<number>(currentYear);
+  const { data: delayEvents = [] } = useDelayEvents(projectId, filterMonth, filterYear);
   const updateProject = useUpdateProject();
   const { toast } = useToast();
   const { scheduleUpload, documentUpload, analysis } = useUploadState(projectId);
@@ -229,8 +232,22 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
               >
                 {activeTab === "documents" && <DocumentUpload projectId={projectId} />}
                 {activeTab === "schedule" && <ScheduleUpload projectId={projectId} />}
-                {activeTab === "delays" && <DelayEvents projectId={projectId} />}
-                {activeTab === "results" && <AnalysisResults projectId={projectId} />}
+                {activeTab === "delays" && (
+                  <DelayEvents
+                    projectId={projectId}
+                    filterMonth={filterMonth}
+                    filterYear={filterYear}
+                    onFilterMonthChange={setFilterMonth}
+                    onFilterYearChange={setFilterYear}
+                  />
+                )}
+                {activeTab === "results" && (
+                  <AnalysisResults
+                    projectId={projectId}
+                    filterMonth={filterMonth}
+                    filterYear={filterYear}
+                  />
+                )}
               </motion.div>
             </AnimatePresence>
           </>

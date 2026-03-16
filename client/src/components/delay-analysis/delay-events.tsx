@@ -34,16 +34,18 @@ const YEARS = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
 
 interface DelayEventsProps {
   projectId: string;
+  filterMonth: number;
+  filterYear: number;
+  onFilterMonthChange: (month: number) => void;
+  onFilterYearChange: (year: number) => void;
 }
 
-export function DelayEvents({ projectId }: DelayEventsProps) {
+export function DelayEvents({ projectId, filterMonth, filterYear, onFilterMonthChange, onFilterYearChange }: DelayEventsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: events = [], isLoading } = useDelayEvents(projectId);
+  const { data: events = [], isLoading } = useDelayEvents(projectId, filterMonth, filterYear);
   const { data: documents = [] } = useProjectDocuments(projectId);
   const [filterText, setFilterText] = useState("");
-  const [filterMonth, setFilterMonth] = useState<number>(new Date().getMonth() + 1);
-  const [filterYear, setFilterYear] = useState<number>(currentYear);
 
   const documentNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -230,7 +232,7 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <Select
                   value={filterMonth.toString()}
-                  onValueChange={(v) => setFilterMonth(parseInt(v))}
+                  onValueChange={(v) => onFilterMonthChange(parseInt(v))}
                   disabled={analysis.isAnalyzing}
                 >
                   <SelectTrigger className={cn(selectTriggerStyles, "w-[130px]")}>
@@ -246,7 +248,7 @@ export function DelayEvents({ projectId }: DelayEventsProps) {
                 </Select>
                 <Select
                   value={filterYear.toString()}
-                  onValueChange={(v) => setFilterYear(parseInt(v))}
+                  onValueChange={(v) => onFilterYearChange(parseInt(v))}
                   disabled={analysis.isAnalyzing}
                 >
                   <SelectTrigger className={cn(selectTriggerStyles, "w-[90px]")}>

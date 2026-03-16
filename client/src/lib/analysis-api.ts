@@ -49,8 +49,21 @@ export async function fetchRunTokenUsage(runId: string): Promise<RunTokenUsageSu
   return result.data;
 }
 
-async function fetchDelayEvents(projectId: string): Promise<DelayEventDto[]> {
-  const response = await fetch(`/api/delay-analysis/projects/${projectId}/delay-events`);
+async function fetchDelayEvents(
+  projectId: string,
+  filterMonth?: number,
+  filterYear?: number
+): Promise<DelayEventDto[]> {
+  const params = new URLSearchParams();
+  if (filterMonth !== undefined) {
+    params.set('filterMonth', filterMonth.toString());
+  }
+  if (filterYear !== undefined) {
+    params.set('filterYear', filterYear.toString());
+  }
+  const qs = params.toString();
+  const url = `/api/delay-analysis/projects/${projectId}/delay-events${qs ? `?${qs}` : ''}`;
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error("Failed to fetch delay events");
   }
@@ -77,10 +90,10 @@ async function runAnalysis(
   return result.data;
 }
 
-export function useDelayEvents(projectId: string) {
+export function useDelayEvents(projectId: string, filterMonth?: number, filterYear?: number) {
   return useQuery({
-    queryKey: ["delay-events", projectId],
-    queryFn: () => fetchDelayEvents(projectId),
+    queryKey: ["delay-events", projectId, filterMonth, filterYear],
+    queryFn: () => fetchDelayEvents(projectId, filterMonth, filterYear),
     enabled: !!projectId,
   });
 }

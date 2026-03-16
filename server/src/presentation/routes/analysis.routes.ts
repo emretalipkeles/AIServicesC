@@ -40,9 +40,13 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
     async (req: Request, res: Response) => {
       try {
         const params = listDelayEventsParamsSchema.parse(req.params);
+        const filterMonth = req.query.filterMonth ? parseInt(req.query.filterMonth as string) : undefined;
+        const filterYear = req.query.filterYear ? parseInt(req.query.filterYear as string) : undefined;
         const events = await listEventsHandler.execute({
           projectId: params.projectId,
           tenantId: DEFAULT_TENANT_ID,
+          filterMonth,
+          filterYear,
         });
         res.json({ success: true, data: events, count: events.length });
       } catch (error) {
