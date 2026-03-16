@@ -312,38 +312,57 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
       const jsonBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
       const cleanedResponse = jsonBlockMatch ? jsonBlockMatch[1].trim() : response;
 
+      const arrayStartIndex = cleanedResponse.indexOf('[');
       const objectStartIndex = cleanedResponse.indexOf('{');
-      if (objectStartIndex === -1) {
-        console.warn('[AIDelayEventExtractorWithTools] No JSON object found in response');
+
+      if (objectStartIndex === -1 && arrayStartIndex === -1) {
+        console.warn('[AIDelayEventExtractorWithTools] No JSON object or array found in response');
         return { events: [] };
       }
 
-      let braceCount = 0;
-      let objectEndIndex = objectStartIndex;
-      for (let i = objectStartIndex; i < cleanedResponse.length; i++) {
-        if (cleanedResponse[i] === '{') braceCount++;
-        if (cleanedResponse[i] === '}') braceCount--;
-        if (braceCount === 0) {
-          objectEndIndex = i + 1;
-          break;
-        }
-      }
+      let parsed: Record<string, unknown>;
 
-      const objectStr = cleanedResponse.substring(objectStartIndex, objectEndIndex);
-      const parsed = JSON.parse(objectStr);
+      if (arrayStartIndex !== -1 && (objectStartIndex === -1 || arrayStartIndex < objectStartIndex)) {
+        console.log('[AIDelayEventExtractorWithTools] Response is a top-level JSON array — wrapping as {delayEvents: [...]}');
+        let bracketCount = 0;
+        let arrayEndIndex = arrayStartIndex;
+        for (let i = arrayStartIndex; i < cleanedResponse.length; i++) {
+          if (cleanedResponse[i] === '[') bracketCount++;
+          if (cleanedResponse[i] === ']') bracketCount--;
+          if (bracketCount === 0) {
+            arrayEndIndex = i + 1;
+            break;
+          }
+        }
+        const arrayStr = cleanedResponse.substring(arrayStartIndex, arrayEndIndex);
+        parsed = { delayEvents: JSON.parse(arrayStr) };
+      } else {
+        let braceCount = 0;
+        let objectEndIndex = objectStartIndex;
+        for (let i = objectStartIndex; i < cleanedResponse.length; i++) {
+          if (cleanedResponse[i] === '{') braceCount++;
+          if (cleanedResponse[i] === '}') braceCount--;
+          if (braceCount === 0) {
+            objectEndIndex = i + 1;
+            break;
+          }
+        }
+        const objectStr = cleanedResponse.substring(objectStartIndex, objectEndIndex);
+        parsed = JSON.parse(objectStr);
+      }
 
       let workActivities: IDRWorkActivity[] | undefined;
       if (parsed.workActivities && Array.isArray(parsed.workActivities)) {
-        workActivities = parsed.workActivities
-          .filter((wa: { activityId?: string }) => wa.activityId && wa.activityId.trim().length > 0)
-          .map((wa: { activityId?: string; description?: string; comments?: string }) => ({
+        workActivities = (parsed.workActivities as Array<{ activityId?: string; description?: string; comments?: string }>)
+          .filter((wa) => wa.activityId && wa.activityId.trim().length > 0)
+          .map((wa) => ({
             activityId: String(wa.activityId || '').trim(),
             description: String(wa.description || '').trim(),
             comments: wa.comments ? String(wa.comments).trim() : undefined,
           }));
       }
 
-      const eventsArray = parsed.delayEvents || parsed.events || [];
+      const eventsArray = (parsed.delayEvents || parsed.events || []) as ExtractedEventRaw[];
       const events: ExtractedDelayEvent[] = eventsArray
         .map((item: ExtractedEventRaw) => this.mapToDelayEvent(item, baseConfidence, documentType))
         .filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0)
