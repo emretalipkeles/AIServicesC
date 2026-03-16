@@ -193,6 +193,9 @@ export class RunAnalysisCommandHandler {
       if (command.filterMonth !== undefined && command.filterYear !== undefined) {
         const originalCount = fieldReports.length;
         fieldReports = fieldReports.filter(doc => {
+          if (doc.documentType === 'field_memo' || doc.documentType === 'ncr') {
+            return true;
+          }
           if (!doc.reportDate) return false;
           const docDate = new Date(doc.reportDate);
           return docDate.getMonth() + 1 === command.filterMonth && 

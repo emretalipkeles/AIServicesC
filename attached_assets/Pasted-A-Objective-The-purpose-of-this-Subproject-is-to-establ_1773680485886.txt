@@ -1,0 +1,153 @@
+A. Objective
+The purpose of this Subproject is to establish a consistent, repeatable, and defensible
+methodology for identifying Contractor cause delay events on the J-Line project since
+inception to date starting with issuance of Notice To Proceed on October 3 rd , 2024.
+The aim of this exercise is to identify Contractor cause delay events in order to be used
+for a future Delay Analysis in potential Claim Process.
+
+B. Contractor-caused Delay
+Contractor-caused delay, as referenced in AACE International Recommended Practice
+No. 29R-03: Forensic Schedule Analysis (RP 29R-03, revised April 25, 2011), is a delay
+event or period of delay attributable to the contractor (or parties for whom the contractor
+is responsible, such as subcontractors or suppliers under their control). It is classified as
+a non-excusable delay under the RP&#39;s framework for liability assessment
+Contractor-caused delays fall squarely under non-excusable category, meaning they do
+not entitle the contractor to an extension of time (EOT) or compensation, and they may
+expose the contractor to liquidated damages (LDs) or other remedies if they impact the
+critical path and extend project completion.
+Potential Contractor caused delay events for J Line BRT Project including but not
+limited to the below:
+1 Planning and Mobilization Delays
+1.1 Delayed mobilization of workforce or equipment to the site.
+1.2 Failure to secure necessary subcontractor agreements in time.
+1.3 Delays in obtaining contractor-required permits or approvals.
+1.4 Mismanagement of project phasing, failure to shift resources where require to
+effectively use remaining duration.
+2 Labor-Related Delays
+2.1 Staffing shortages or insufficient skilled labor for specialized tasks.
+2.2 Low productivity due to inadequate training for workers.
+2.3 Labor disputes or strikes within the contractor&#39;s workforce.
+2.4 Failure to coordinate labor shifts, causing idle time during multi-phase works.
+2.5 Inefficient crew allocation, such as assigning unqualified personnel.
+2.6 Delays from subcontractor labor issues.
+2.7 Poor management of labor resources during night shifts.
+3 Materials and Equipment Delays
+3.1 Delays in procuring materials, supply chain mismanagement.
+3.2 Equipment breakdowns or shortages.
+
+3.3 Late delivery of specialized equipment.
+3.4 Material quality issues requiring reordering, such as non-compliant materials.
+3.5 Failure to maintain equipment, leading to downtime.
+3.6 Double handling of materials (if durations expand).
+4 Subcontractor and Coordination Delays
+4.1 Ineffective handoffs between trades, such as between civil crew and pavement
+crew.
+4.2 Failure to coordinate with subcontractors for timely completion of works.
+4.3 Mismanagement of subcontractors for electrical tasks.
+5 Quality and Rework Delays
+5.1 Poor workmanship requiring rework that is already or can be an NCR.
+5.2 Non-compliance with ADA standards for curb ramps or sidewalks,
+necessitating corrections.
+5.3 Defects in utility installations due to contractor errors.
+5.4 Rework on electrical systems
+6 Site Management and Safety Delays
+6.1 Safety incidents or violations halting work on high-risk tasks.
+6.2 Inadequate traffic control measures causing shutdowns.
+6.3 Failure to mitigate minor weather impacts (e.g., not protecting exposed
+subgrade), turning them into contractor delays.
+6.4 Environmental non-compliance, such as improper handling of construction
+debris from roadway excavation causing resources to be used to correct these
+later.
+7 Utility and Infrastructure-Specific Delays
+7.1 Contractor errors in utility relocation or coordination with authorities for testing
+or acceptance
+7.2 Delays in subcontractor utility tie-ins ( need confirmation if under Contractor’s
+scope of work)
+7.3 Failure to protect existing utilities, causing utility strikes, damage and repairs.
+C. Output/Deliverable
+The purpose of the this exercise is to be able to produce the deliverable below which
+will be the main milestone for the concurrent delay exercise during the delay analysis for
+J Line BRT Project.
+WBS CPM
+Schedule
+Activity ID
+CPM
+Schedule
+Activity
+Descriptio
+n
+
+Contracte
+d Caused
+Event
+Descriptio
+n
+
+Contracte
+d Caused
+Event
+Start Date
+
+Contracte
+d Caused
+Event
+Finish
+Date
+
+Contracte
+d Caused
+Event
+Impact
+Duration
+(hrs.)
+
+Contracte
+d Caused
+Event
+Reference
+to the
+Project
+Document
+where
+Identified
+
+D. Methodology
+Contract 2023-002 Contract Plans, Volumes 1 through 4, will be uploaded to the project
+environment to establish familiarity with the overall project layout, design intent, and
+scope of work. These documents will serve as reference materials for understanding
+work spatial constraints, and planned construction operations.
+ Beginning in approximately Q2 2025 (anticipated around July 2025), Field
+Inspectors were requested to explicitly identify potential Contractor-caused delay
+activities in their Inspector Daily Reports (IDRs) using the designation
+“CODE_CIE.” Each identified item will be tracked and mapped to the
+corresponding CPM Schedule Activity IDs reflected as active in the applicable
+monthly CPM update. This targeted approach is intentional, as it avoids
+unnecessary review of activities that have not yet commenced or that were
+already complete during the relevant update period.
+ In parallel, all Non-Conformance Reports (NCRs) will be uploaded to the system
+and similarly tracked against the CPM Schedule Activity IDs that were in
+progress during the corresponding monthly schedule update. As with the IDR
+review process, this methodology focuses exclusively on activities actively being
+prosecuted during the relevant time period, rather than filtering or reviewing the
+entire CPM schedule.
+The IDR-based “CODE_CIE” entries and NCR records will form the backbone of the
+initial dataset used to train the AI system, as these inputs provide clearer, more direct
+indicators of potential contractor-caused issues. Each identified contractor-caused item
+and the resulting AI output will be manually verified against contemporaneous source
+documents to confirm accuracy and to ensure that no unsupported inferences or
+hallucinations are introduced into the analysis.
+Following this initial phase, Field Memos that includes documentation of observed
+issues/problems at site and Differing Site Condition (DSC) claims that were reviewed
+and NOT accepted by SDOT as contractor being responsible, will be incrementally
+incorporated into the system. Additional project records deemed relevant for training
+purposes may also be added. At each stage of data expansion, the AI outputs will be
+reviewed manually, and the reasoning process will be evaluated to confirm logical
+
+consistency, traceability to source documentation, and absence of hallucinated
+conclusions.
+Next, current IDRs for calendar year 2026 will be reviewed and processed to ensure
+that ongoing conditions and contractor performance issues are accurately captured and
+reflected in the dataset.
+Finally, historical IDRs from project inception (October 2024) through July 2025 will be
+uploaded to the AI system for retrospective analysis, applying the same verification and
+validation procedures to ensure consistency, accuracy, and defensibility of the results.

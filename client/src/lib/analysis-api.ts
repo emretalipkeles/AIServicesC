@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 export interface DelayEventDto {
   id: string;
   sourceDocumentId: string | null;
+  sourceDocumentType: string | null;
   matchedActivityId: string | null;
   wbs: string | null;
   cpmActivityId: string | null;

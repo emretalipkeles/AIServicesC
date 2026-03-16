@@ -1,11 +1,13 @@
 import type { ListDelayEventsQuery } from '../ListDelayEventsQuery';
 import type { IContractorDelayEventRepository } from '../../../../domain/delay-analysis/repositories/IContractorDelayEventRepository';
 import type { IScheduleActivityRepository } from '../../../../domain/delay-analysis/repositories/IScheduleActivityRepository';
+import type { IProjectDocumentRepository } from '../../../../domain/delay-analysis/repositories/IProjectDocumentRepository';
 import type { ContractorDelayEvent, DelayEventCategory, VerificationStatus } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 
 export interface DelayEventDto {
   id: string;
   sourceDocumentId: string | null;
+  sourceDocumentType: string | null;
   matchedActivityId: string | null;
   wbs: string | null;
   cpmActivityId: string | null;
@@ -29,7 +31,8 @@ export interface DelayEventDto {
 export class ListDelayEventsQueryHandler {
   constructor(
     private readonly eventRepository: IContractorDelayEventRepository,
-    private readonly scheduleActivityRepository?: IScheduleActivityRepository
+    private readonly scheduleActivityRepository?: IScheduleActivityRepository,
+    private readonly documentRepository?: IProjectDocumentRepository
   ) {}
 
   async execute(query: ListDelayEventsQuery): Promise<DelayEventDto[]> {
@@ -38,9 +41,12 @@ export class ListDelayEventsQueryHandler {
       query.tenantId
     );
 
-    const activityDataMap = await this.fetchActivityData(events, query.projectId, query.tenantId);
+    const [activityDataMap, documentTypeMap] = await Promise.all([
+      this.fetchActivityData(events, query.projectId, query.tenantId),
+      this.fetchDocumentTypes(events, query.projectId, query.tenantId),
+    ]);
 
-    return events.map(event => this.mapToDto(event, activityDataMap));
+    return events.map(event => this.mapToDto(event, activityDataMap, documentTypeMap));
   }
 
   private async fetchActivityData(
@@ -75,9 +81,38 @@ export class ListDelayEventsQueryHandler {
     return activityDataMap;
   }
 
+  private async fetchDocumentTypes(
+    events: ContractorDelayEvent[],
+    projectId: string,
+    tenantId: string
+  ): Promise<Map<string, string>> {
+    const docTypeMap = new Map<string, string>();
+
+    if (!this.documentRepository) {
+      return docTypeMap;
+    }
+
+    const sourceDocIds = events
+      .map(e => e.sourceDocumentId)
+      .filter((id): id is string => id !== null);
+
+    if (sourceDocIds.length === 0) {
+      return docTypeMap;
+    }
+
+    const documents = await this.documentRepository.findByProjectId(projectId, tenantId);
+
+    for (const doc of documents) {
+      docTypeMap.set(doc.id, doc.documentType);
+    }
+
+    return docTypeMap;
+  }
+
   private mapToDto(
     event: ContractorDelayEvent,
-    activityDataMap: Map<string, { isCriticalPath: string; totalFloat: number | null }>
+    activityDataMap: Map<string, { isCriticalPath: string; totalFloat: number | null }>,
+    documentTypeMap: Map<string, string>
   ): DelayEventDto {
     const activityData = event.matchedActivityId 
       ? activityDataMap.get(event.matchedActivityId) 
@@ -86,6 +121,7 @@ export class ListDelayEventsQueryHandler {
     return {
       id: event.id,
       sourceDocumentId: event.sourceDocumentId,
+      sourceDocumentType: event.sourceDocumentId ? documentTypeMap.get(event.sourceDocumentId) ?? null : null,
       matchedActivityId: event.matchedActivityId,
       wbs: event.wbs,
       cpmActivityId: event.cpmActivityId,

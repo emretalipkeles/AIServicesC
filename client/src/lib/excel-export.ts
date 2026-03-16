@@ -12,6 +12,7 @@ interface DelayEventData {
   impactDurationHours?: number | null;
   sourceReference?: string | null;
   sourceDocumentId?: string | null;
+  sourceDocumentType?: string | null;
   extractedFromCode?: string | null;
   delayEventConfidence?: number | null;
   matchConfidence?: number | null;
@@ -42,6 +43,19 @@ function formatCriticalPath(value: string | null | undefined): string {
   if (value === 'yes') return 'Yes';
   if (value === 'no') return 'No';
   return value;
+}
+
+export function formatSourceDocumentType(docType: string | null | undefined): string {
+  if (!docType) return '';
+  const typeLabels: Record<string, string> = {
+    'idr': 'IDR',
+    'ncr': 'NCR',
+    'field_memo': 'Field Memo',
+    'cpm_schedule': 'CPM Schedule',
+    'contract_plan': 'Contract Plan',
+    'dsc_claim': 'DSC Claim',
+  };
+  return typeLabels[docType] || docType;
 }
 
 const DELAY_EVENT_CONFIDENCE_THRESHOLD = 20;
@@ -92,6 +106,7 @@ export async function exportDelayEventsToExcel(
     { header: 'Category', key: 'category', width: 22 },
     { header: 'Date', key: 'date', width: 12 },
     { header: 'Delay Duration estimate (hrs)', key: 'duration', width: 22 },
+    { header: 'Source Type', key: 'sourceType', width: 14 },
     { header: 'Source Document', key: 'sourceDoc', width: 30 },
     { header: 'Extracted From Code', key: 'extractedCode', width: 18 },
     { header: 'Source Reference', key: 'sourceRef', width: 25 },
@@ -130,6 +145,7 @@ export async function exportDelayEventsToExcel(
       category: formatCategory(event.eventCategory),
       date: event.eventStartDate ? new Date(event.eventStartDate) : null,
       duration: event.impactDurationHours || null,
+      sourceType: formatSourceDocumentType(event.sourceDocumentType),
       sourceDoc: event.sourceDocumentId && documentNameMap ? documentNameMap.get(event.sourceDocumentId) || '' : '',
       extractedCode: event.extractedFromCode || '',
       sourceRef: event.sourceReference || '',
@@ -200,7 +216,7 @@ export async function exportDelayEventsToExcel(
         }
       }
 
-      if (colNumber === 13 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
+      if (colNumber === 14 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
         const confidence = event.matchConfidence;
         let bgColor: string;
         let textColor: string;
@@ -229,7 +245,7 @@ export async function exportDelayEventsToExcel(
 
   worksheet.autoFilter = {
     from: { row: 1, column: 1 },
-    to: { row: filteredEvents.length + 1, column: 15 },
+    to: { row: filteredEvents.length + 1, column: 16 },
   };
 
   const today = new Date();

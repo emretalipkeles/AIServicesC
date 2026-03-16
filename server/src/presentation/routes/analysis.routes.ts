@@ -17,7 +17,8 @@ const DEFAULT_TENANT_ID = 'default';
 export function registerAnalysisRoutes(app: Express, container: AppContainer): void {
   const listEventsHandler = new ListDelayEventsQueryHandler(
     container.repositories.contractorDelayEvent,
-    container.repositories.scheduleActivity
+    container.repositories.scheduleActivity,
+    container.repositories.projectDocument
   );
 
   const hasAiServices = !!(container.services.delayEventExtractor && container.services.activityMatcher);

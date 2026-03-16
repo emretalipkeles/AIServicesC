@@ -6,7 +6,7 @@ import { useDelayEvents } from "@/lib/analysis-api";
 import { useProjectDocuments } from "@/lib/project-documents-api";
 import { GlassCard, SectionHeader, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles, TruncatedTextWithTooltip } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
-import { exportDelayEventsToExcel, isNoDelayEvent } from "@/lib/excel-export";
+import { exportDelayEventsToExcel, isNoDelayEvent, formatSourceDocumentType } from "@/lib/excel-export";
 
 interface AnalysisResultsProps {
   projectId: string;
@@ -140,6 +140,7 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Category</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs min-w-[160px]")}>Delay Event</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs min-w-[100px]")}>Source Ref.</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Source Type</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Document</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs min-w-[120px]")}>Match Reason</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Date</th>
@@ -205,6 +206,19 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                                 className="text-xs text-muted-foreground"
                                 label="Source Reference"
                               />
+                            </td>
+                            <td className="p-2">
+                              {event.sourceDocumentType ? (
+                                <span className={cn(
+                                  "inline-flex px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap",
+                                  event.sourceDocumentType === 'idr' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+                                  event.sourceDocumentType === 'ncr' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+                                  event.sourceDocumentType === 'field_memo' && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+                                  !['idr', 'ncr', 'field_memo'].includes(event.sourceDocumentType) && "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                                )}>
+                                  {formatSourceDocumentType(event.sourceDocumentType)}
+                                </span>
+                              ) : "-"}
                             </td>
                             <td className="p-2 max-w-[100px]">
                               <TruncatedTextWithTooltip 
