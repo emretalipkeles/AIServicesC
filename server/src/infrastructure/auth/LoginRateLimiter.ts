@@ -44,10 +44,12 @@ export class LoginRateLimiter {
 
   private cleanup(): void {
     const now = Date.now();
-    for (const [key, record] of this.attempts) {
+    const expiredKeys: string[] = [];
+    this.attempts.forEach((record, key) => {
       if (now - record.firstAttempt > WINDOW_MS) {
-        this.attempts.delete(key);
+        expiredKeys.push(key);
       }
-    }
+    });
+    expiredKeys.forEach((key) => this.attempts.delete(key));
   }
 }

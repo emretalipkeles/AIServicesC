@@ -1,20 +1,34 @@
 import type { Request, Response } from 'express';
-import type { IUserRepository } from '../../domain/auth/interfaces/IUserRepository';
-import type { IPasswordHasher } from '../../domain/auth/interfaces/IPasswordHasher';
-import { LoginCommandHandler, LoginError } from '../../application/auth/commands/handlers/LoginCommandHandler';
-import { CreateUserCommandHandler } from '../../application/auth/commands/handlers/CreateUserCommandHandler';
-import { UpdateUserCommandHandler } from '../../application/auth/commands/handlers/UpdateUserCommandHandler';
-import { DeleteUserCommandHandler } from '../../application/auth/commands/handlers/DeleteUserCommandHandler';
-import { ListUsersQueryHandler } from '../../application/auth/queries/handlers/ListUsersQueryHandler';
-import { GetCurrentUserQueryHandler } from '../../application/auth/queries/handlers/GetCurrentUserQueryHandler';
+import type { LoginCommandHandler } from '../../application/auth/commands/handlers/LoginCommandHandler';
+import { LoginError } from '../../application/auth/commands/handlers/LoginCommandHandler';
+import type { CreateUserCommandHandler } from '../../application/auth/commands/handlers/CreateUserCommandHandler';
+import type { UpdateUserCommandHandler } from '../../application/auth/commands/handlers/UpdateUserCommandHandler';
+import type { DeleteUserCommandHandler } from '../../application/auth/commands/handlers/DeleteUserCommandHandler';
+import type { ListUsersQueryHandler } from '../../application/auth/queries/handlers/ListUsersQueryHandler';
+import type { GetCurrentUserQueryHandler } from '../../application/auth/queries/handlers/GetCurrentUserQueryHandler';
 import { LoginCommand } from '../../application/auth/commands/LoginCommand';
 import { CreateUserCommand } from '../../application/auth/commands/CreateUserCommand';
 import { UpdateUserCommand } from '../../application/auth/commands/UpdateUserCommand';
 import { DeleteUserCommand } from '../../application/auth/commands/DeleteUserCommand';
 import { ListUsersQuery } from '../../application/auth/queries/ListUsersQuery';
 import { GetCurrentUserQuery } from '../../application/auth/queries/GetCurrentUserQuery';
-import { LoginRateLimiter } from '../../infrastructure/auth/LoginRateLimiter';
+import type { LoginRateLimiter } from '../../infrastructure/auth/LoginRateLimiter';
 import { loginSchema, createUserSchema, updateUserSchema } from '../validators/authValidators';
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+export interface AuthControllerDeps {
+  loginHandler: LoginCommandHandler;
+  createUserHandler: CreateUserCommandHandler;
+  updateUserHandler: UpdateUserCommandHandler;
+  deleteUserHandler: DeleteUserCommandHandler;
+  listUsersHandler: ListUsersQueryHandler;
+  getCurrentUserHandler: GetCurrentUserQueryHandler;
+  rateLimiter: LoginRateLimiter;
+}
 
 export class AuthController {
   private loginHandler: LoginCommandHandler;
@@ -25,18 +39,14 @@ export class AuthController {
   private getCurrentUserHandler: GetCurrentUserQueryHandler;
   private rateLimiter: LoginRateLimiter;
 
-  constructor(
-    userRepository: IUserRepository,
-    passwordHasher: IPasswordHasher,
-    rateLimiter: LoginRateLimiter,
-  ) {
-    this.loginHandler = new LoginCommandHandler(userRepository, passwordHasher);
-    this.createUserHandler = new CreateUserCommandHandler(userRepository, passwordHasher);
-    this.updateUserHandler = new UpdateUserCommandHandler(userRepository, passwordHasher);
-    this.deleteUserHandler = new DeleteUserCommandHandler(userRepository);
-    this.listUsersHandler = new ListUsersQueryHandler(userRepository);
-    this.getCurrentUserHandler = new GetCurrentUserQueryHandler(userRepository);
-    this.rateLimiter = rateLimiter;
+  constructor(deps: AuthControllerDeps) {
+    this.loginHandler = deps.loginHandler;
+    this.createUserHandler = deps.createUserHandler;
+    this.updateUserHandler = deps.updateUserHandler;
+    this.deleteUserHandler = deps.deleteUserHandler;
+    this.listUsersHandler = deps.listUsersHandler;
+    this.getCurrentUserHandler = deps.getCurrentUserHandler;
+    this.rateLimiter = deps.rateLimiter;
   }
 
   async login(req: Request, res: Response): Promise<void> {
@@ -148,9 +158,10 @@ export class AuthController {
       );
       const user = await this.createUserHandler.handle(command);
       res.status(201).json({ user });
-    } catch (error: any) {
-      if (error.message?.includes('already exists')) {
-        res.status(409).json({ error: error.message });
+    } catch (error) {
+      const msg = getErrorMessage(error);
+      if (msg.includes('already exists')) {
+        res.status(409).json({ error: msg });
         return;
       }
       console.error('[Auth] Create user error:', error);
@@ -175,13 +186,14 @@ export class AuthController {
       );
       const user = await this.updateUserHandler.handle(command);
       res.json({ user });
-    } catch (error: any) {
-      if (error.message?.includes('not found')) {
-        res.status(404).json({ error: error.message });
+    } catch (error) {
+      const msg = getErrorMessage(error);
+      if (msg.includes('not found')) {
+        res.status(404).json({ error: msg });
         return;
       }
-      if (error.message?.includes('already exists')) {
-        res.status(409).json({ error: error.message });
+      if (msg.includes('already exists')) {
+        res.status(409).json({ error: msg });
         return;
       }
       console.error('[Auth] Update user error:', error);
@@ -199,9 +211,10 @@ export class AuthController {
       const command = new DeleteUserCommand(req.params.id);
       await this.deleteUserHandler.handle(command);
       res.json({ success: true });
-    } catch (error: any) {
-      if (error.message?.includes('not found')) {
-        res.status(404).json({ error: error.message });
+    } catch (error) {
+      const msg = getErrorMessage(error);
+      if (msg.includes('not found')) {
+        res.status(404).json({ error: msg });
         return;
       }
       console.error('[Auth] Delete user error:', error);

@@ -1,17 +1,15 @@
 import type { Express } from 'express';
 import { AuthController } from '../controllers/AuthController';
+import type { AuthControllerDeps } from '../controllers/AuthController';
 import { requireAuth, createRequireAdmin } from '../middleware/authMiddleware';
 import type { IUserRepository } from '../../domain/auth/interfaces/IUserRepository';
-import type { IPasswordHasher } from '../../domain/auth/interfaces/IPasswordHasher';
-import { LoginRateLimiter } from '../../infrastructure/auth/LoginRateLimiter';
 
 export function registerAuthRoutes(
   app: Express,
+  controllerDeps: AuthControllerDeps,
   userRepository: IUserRepository,
-  passwordHasher: IPasswordHasher,
 ): void {
-  const rateLimiter = new LoginRateLimiter();
-  const controller = new AuthController(userRepository, passwordHasher, rateLimiter);
+  const controller = new AuthController(controllerDeps);
   const requireAdmin = createRequireAdmin(userRepository);
 
   app.post('/api/auth/login', (req, res) => controller.login(req, res));

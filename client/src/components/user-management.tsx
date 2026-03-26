@@ -187,10 +187,10 @@ export function UserManagement() {
       setIsCreateOpen(false);
       toast({ title: "User created successfully" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Failed to create user",
-        description: error.message?.includes("409")
+        description: error.message.includes("409")
           ? "A user with this email already exists"
           : "Please try again",
         variant: "destructive",
@@ -213,10 +213,10 @@ export function UserManagement() {
       setEditingUser(null);
       toast({ title: "User updated successfully" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Failed to update user",
-        description: error.message?.includes("409")
+        description: error.message.includes("409")
           ? "A user with this email already exists"
           : "Please try again",
         variant: "destructive",
@@ -233,10 +233,10 @@ export function UserManagement() {
       setDeletingUser(null);
       toast({ title: "User deleted successfully" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Failed to delete user",
-        description: error.message?.includes("400")
+        description: error.message.includes("400")
           ? "Cannot delete your own account"
           : "Please try again",
         variant: "destructive",

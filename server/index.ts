@@ -102,9 +102,9 @@ app.use((req, res, next) => {
 (async () => {
   await initializeInfrastructure();
 
-  const { userRepository, passwordHasher } = createAuthDependencies();
+  const { userRepository, passwordHasher, controllerDeps } = createAuthDependencies();
 
-  registerAuthRoutes(app, userRepository, passwordHasher);
+  registerAuthRoutes(app, controllerDeps, userRepository);
 
   app.use('/api', requireAuth);
 
