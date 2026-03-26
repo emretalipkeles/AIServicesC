@@ -34,11 +34,14 @@ export function TabbedContent() {
   const allTabs = [...defaultTabs.map(t => ({ ...t, type: "static" as const })), ...dynamicTabs];
 
   useEffect(() => {
+    if (!indicatorRef.current) return;
     const activeTabEl = tabRefs.current.get(activeTab);
-    if (activeTabEl && indicatorRef.current) {
+    if (activeTabEl) {
       const { offsetLeft, offsetWidth } = activeTabEl;
       indicatorRef.current.style.left = `${offsetLeft}px`;
       indicatorRef.current.style.width = `${offsetWidth}px`;
+    } else {
+      indicatorRef.current.style.width = '0px';
     }
   }, [activeTab, allTabs]);
 
