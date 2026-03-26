@@ -13,7 +13,9 @@ import { DeleteUserCommand } from '../../application/auth/commands/DeleteUserCom
 import { ListUsersQuery } from '../../application/auth/queries/ListUsersQuery';
 import { GetCurrentUserQuery } from '../../application/auth/queries/GetCurrentUserQuery';
 import type { LoginRateLimiter } from '../../infrastructure/auth/LoginRateLimiter';
-import { loginSchema, createUserSchema, updateUserSchema } from '../validators/authValidators';
+import { loginSchema, createUserSchema, updateUserSchema, changePasswordSchema } from '../validators/authValidators';
+
+const SEED_ADMIN_EMAIL = 'emre.keles@axiompmp.com';
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -208,6 +210,14 @@ export class AuthController {
         return;
       }
 
+      const targetUser = await this.getCurrentUserHandler.handle(
+        new GetCurrentUserQuery(req.params.id),
+      );
+      if (targetUser?.email === SEED_ADMIN_EMAIL) {
+        res.status(403).json({ error: 'The primary admin account cannot be deleted' });
+        return;
+      }
+
       const command = new DeleteUserCommand(req.params.id);
       await this.deleteUserHandler.handle(command);
       res.json({ success: true });
@@ -218,6 +228,50 @@ export class AuthController {
         return;
       }
       console.error('[Auth] Delete user error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  async changePassword(req: Request, res: Response): Promise<void> {
+    try {
+      const parsed = changePasswordSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.errors[0].message });
+        return;
+      }
+
+      const userId = req.session?.userId;
+      if (!userId) {
+        res.status(401).json({ error: 'Not authenticated' });
+        return;
+      }
+
+      const query = new GetCurrentUserQuery(userId);
+      const currentUser = await this.getCurrentUserHandler.handle(query);
+      if (!currentUser) {
+        res.status(401).json({ error: 'User not found' });
+        return;
+      }
+
+      try {
+        const verifyCommand = new LoginCommand(currentUser.email, parsed.data.currentPassword);
+        await this.loginHandler.handle(verifyCommand);
+      } catch {
+        res.status(400).json({ error: 'Current password is incorrect' });
+        return;
+      }
+
+      const command = new UpdateUserCommand(
+        userId,
+        undefined,
+        undefined,
+        parsed.data.newPassword,
+        undefined,
+      );
+      await this.updateUserHandler.handle(command);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Auth] Change password error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

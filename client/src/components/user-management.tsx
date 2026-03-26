@@ -31,7 +31,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Users, Loader2, Shield, User as UserIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Loader2, Shield, User as UserIcon, Lock } from "lucide-react";
+
+const SEED_ADMIN_EMAIL = "emre.keles@axiompmp.com";
 
 interface User {
   id: string;
@@ -304,14 +306,16 @@ export function UserManagement() {
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDeletingUser(user)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {user.email !== SEED_ADMIN_EMAIL && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDeletingUser(user)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

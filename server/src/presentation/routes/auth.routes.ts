@@ -15,6 +15,7 @@ export function registerAuthRoutes(
   app.post('/api/auth/login', (req, res) => controller.login(req, res));
   app.post('/api/auth/logout', (req, res) => controller.logout(req, res));
   app.get('/api/auth/me', (req, res) => controller.getCurrentUser(req, res));
+  app.post('/api/auth/change-password', requireAuth, (req, res) => controller.changePassword(req, res));
 
   app.get('/api/users', requireAuth, requireAdmin, (req, res) => controller.listUsers(req, res));
   app.post('/api/users', requireAuth, requireAdmin, (req, res) => controller.createUser(req, res));

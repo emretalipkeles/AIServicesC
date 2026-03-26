@@ -96,7 +96,7 @@ export function TabbedContent() {
             {allTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
-              const isClosable = "type" in tab && tab.type === "package";
+              const isClosable = true;
               return (
                 <Button
                   key={tab.id}
