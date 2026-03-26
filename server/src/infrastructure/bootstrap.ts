@@ -1,4 +1,16 @@
 import { warmDatabaseConnection } from "./database";
+import { DrizzleUserRepository } from "./auth/DrizzleUserRepository";
+import { BcryptPasswordHasher } from "./auth/BcryptPasswordHasher";
+import { LoginRateLimiter } from "./auth/LoginRateLimiter";
+import { LoginCommandHandler } from "../application/auth/commands/handlers/LoginCommandHandler";
+import { CreateUserCommandHandler } from "../application/auth/commands/handlers/CreateUserCommandHandler";
+import { UpdateUserCommandHandler } from "../application/auth/commands/handlers/UpdateUserCommandHandler";
+import { DeleteUserCommandHandler } from "../application/auth/commands/handlers/DeleteUserCommandHandler";
+import { ListUsersQueryHandler } from "../application/auth/queries/handlers/ListUsersQueryHandler";
+import { GetCurrentUserQueryHandler } from "../application/auth/queries/handlers/GetCurrentUserQueryHandler";
+import type { IUserRepository } from "../domain/auth/interfaces/IUserRepository";
+import type { IPasswordHasher } from "../domain/auth/interfaces/IPasswordHasher";
+import type { AuthControllerDeps } from "../presentation/controllers/AuthController";
 import { InMemoryCommandBus } from "./messaging/InMemoryCommandBus";
 import { InMemoryQueryBus } from "./messaging/InMemoryQueryBus";
 import { bedrockClientProvider } from "./ai/AIClientProvider";
@@ -191,6 +203,12 @@ export interface AppContainer {
   agentLoop: {
     loop: IAgentLoop | null;
     systemPrompt: string;
+  };
+
+  auth: {
+    userRepository: IUserRepository;
+    passwordHasher: IPasswordHasher;
+    controllerDeps: AuthControllerDeps;
   };
 }
 
@@ -568,6 +586,27 @@ export function createAppContainer(): AppContainer {
       fieldMemoContextProvider,
     },
     agentLoop: createAgentLoop(projectDocumentRepository, contractorDelayEventRepository, getActivitiesByIdsHandler),
+    auth: createAuthSection(),
+  };
+}
+
+function createAuthSection(): AppContainer['auth'] {
+  const userRepository = new DrizzleUserRepository();
+  const passwordHasher = new BcryptPasswordHasher();
+  const rateLimiter = new LoginRateLimiter();
+
+  return {
+    userRepository,
+    passwordHasher,
+    controllerDeps: {
+      loginHandler: new LoginCommandHandler(userRepository, passwordHasher),
+      createUserHandler: new CreateUserCommandHandler(userRepository, passwordHasher),
+      updateUserHandler: new UpdateUserCommandHandler(userRepository, passwordHasher),
+      deleteUserHandler: new DeleteUserCommandHandler(userRepository),
+      listUsersHandler: new ListUsersQueryHandler(userRepository),
+      getCurrentUserHandler: new GetCurrentUserQueryHandler(userRepository),
+      rateLimiter,
+    },
   };
 }
 

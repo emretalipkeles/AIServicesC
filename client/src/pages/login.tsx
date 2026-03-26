@@ -23,8 +23,8 @@ export default function LoginPage() {
 
     try {
       await login({ email, password });
-    } catch (err: any) {
-      const msg = err?.message || "Login failed";
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Login failed";
       if (msg.includes("429")) {
         setError("Too many login attempts. Please try again later.");
       } else if (msg.includes("401")) {

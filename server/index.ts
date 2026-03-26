@@ -4,8 +4,7 @@ import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { initializeInfrastructure } from "./src/infrastructure/bootstrap";
-import { createAuthDependencies } from "./src/infrastructure/auth/authCompositionRoot";
+import { initializeInfrastructure, getAppContainer } from "./src/infrastructure/bootstrap";
 import { seedAdminUser } from "./src/infrastructure/auth/seedAdminUser";
 import { registerAuthRoutes } from "./src/presentation/routes/auth.routes";
 import { requireAuth } from "./src/presentation/middleware/authMiddleware";
@@ -102,7 +101,8 @@ app.use((req, res, next) => {
 (async () => {
   await initializeInfrastructure();
 
-  const { userRepository, passwordHasher, controllerDeps } = createAuthDependencies();
+  const container = getAppContainer();
+  const { userRepository, passwordHasher, controllerDeps } = container.auth;
 
   registerAuthRoutes(app, controllerDeps, userRepository);
 
