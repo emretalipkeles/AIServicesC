@@ -20,16 +20,17 @@ export function useAuth() {
   const { data, isLoading, error } = useQuery<AuthResponse | null>({
     queryKey: ["/api/auth/me"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
-        if (res.status === 401) return null;
-        if (!res.ok) throw new Error("Failed to check auth");
-        return res.json();
-      } catch {
-        return null;
-      }
+      const res = await fetch("/api/auth/me", { credentials: "include" });
+      if (res.status === 401) return null;
+      if (!res.ok) throw new Error("Failed to check auth");
+      return res.json();
     },
-    retry: false,
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.message === "Failed to check auth") {
+        return failureCount < 2;
+      }
+      return false;
+    },
     staleTime: 5 * 60 * 1000,
   });
 
