@@ -59,6 +59,20 @@ Preferred communication style: Simple, everyday language.
 - **Single-Document Analysis**: Allows running AI analysis on individual documents from the Documents tab, deleting existing events for that document before re-extraction.
 - **Analysis Progress Persistence**: Analysis run status persists across page refreshes, using an in-memory tracker to manage the run lifecycle.
 
+### Authentication & User Management
+- **Session-based auth**: Express sessions stored in PostgreSQL via `connect-pg-simple`
+- **Password hashing**: bcrypt with salt rounds
+- **Login rate limiting**: In-memory, 5 attempts per 15min per IP
+- **Session config**: 30min rolling expiry, httpOnly cookies, sameSite lax, secure in production
+- **Session secret**: Required via `SESSION_SECRET` env var in production; dev uses a default with warning
+- **Admin authorization**: Verified against DB per request (not cached from session) to handle role changes immediately
+- **Admin seed**: First admin user seeded on startup (emre.keles@axiompmp.com)
+- **Auth routes**: POST `/api/auth/login`, POST `/api/auth/logout`, GET `/api/auth/me`
+- **User CRUD routes**: GET/POST `/api/users`, PUT/DELETE `/api/users/:id` (admin-only)
+- **Frontend**: Login page with error handling, UserMenu dropdown (profile/logout), UserManagement tab (admin-only CRUD)
+- **Feature folder**: `server/src/domain/auth/`, `server/src/application/auth/`, `server/src/infrastructure/auth/`, `server/src/presentation/controllers/AuthController.ts`, `server/src/presentation/middleware/authMiddleware.ts`, `server/src/presentation/routes/auth.routes.ts`
+- **Client components**: `client/src/hooks/useAuth.ts`, `client/src/pages/login.tsx`, `client/src/components/user-management.tsx`, `client/src/components/user-menu.tsx`
+
 ## External Dependencies
 
 ### Database

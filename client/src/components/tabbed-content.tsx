@@ -1,12 +1,14 @@
 import { useRef, useEffect } from "react";
-import { Map as MapIcon, Bot, X, Activity, type LucideIcon } from "lucide-react";
+import { Map as MapIcon, Bot, X, Activity, Users, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { JourneyDashboard } from "./journey-dashboard";
 import { AgentSetup } from "./agent-setup";
 import { DelayAnalysis } from "./delay-analysis";
+import { UserManagement } from "./user-management";
 import { ThemeToggle } from "./theme-toggle";
 import { SettingsMenu } from "./settings-menu";
 import { AddMenu } from "./add-menu";
+import { UserMenu } from "./user-menu";
 import { useTabContext, type Tab } from "@/contexts/tab-context";
 import PackageVisualization from "@/pages/package-visualization";
 
@@ -21,6 +23,7 @@ const defaultTabs: StaticTab[] = [];
 const settingsTabMap: Record<string, Tab> = {
   "agent-setup": { id: "agent-setup", label: "Agent Setup", icon: Bot, type: "static" },
   "delay-analysis": { id: "delay-analysis", label: "Delay Interpretation", icon: Activity, type: "delay-analysis" },
+  "user-management": { id: "user-management", label: "User Management", icon: Users, type: "static" },
 };
 
 export function TabbedContent() {
@@ -72,6 +75,9 @@ export function TabbedContent() {
     }
     if (tab.id === "delay-analysis") {
       return <DelayAnalysis />;
+    }
+    if (tab.id === "user-management") {
+      return <UserManagement />;
     }
     if ("type" in tab && tab.type === "package" && tab.packageId) {
       return <PackageVisualization packageId={tab.packageId} embedded />;
@@ -127,8 +133,8 @@ export function TabbedContent() {
         </div>
         <div className="flex items-center gap-2">
           <AddMenu onNavigate={handleSettingsNavigate} />
-          {/* <SettingsMenu onNavigate={handleSettingsNavigate} /> */}
           <ThemeToggle />
+          <UserMenu onNavigate={handleSettingsNavigate} />
         </div>
       </header>
 

@@ -1,8 +1,15 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { initializeInfrastructure } from "./src/infrastructure/bootstrap";
+import { DrizzleUserRepository } from "./src/infrastructure/auth/DrizzleUserRepository";
+import { BcryptPasswordHasher } from "./src/infrastructure/auth/BcryptPasswordHasher";
+import { seedAdminUser } from "./src/infrastructure/auth/seedAdminUser";
+import { registerAuthRoutes } from "./src/presentation/routes/auth.routes";
+import { requireAuth } from "./src/presentation/middleware/authMiddleware";
 
 const app = express();
 const httpServer = createServer(app);
@@ -13,6 +20,8 @@ declare module "http" {
   }
 }
 
+app.set('trust proxy', 1);
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {
@@ -22,6 +31,37 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+const PgStore = connectPgSimple(session);
+app.use(
+  session({
+    store: new PgStore({
+      conString: process.env.AWS_DATABASE_URL,
+      tableName: 'session',
+      createTableIfMissing: true,
+    }),
+    secret: (() => {
+      const secret = process.env.SESSION_SECRET;
+      if (!secret) {
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error('SESSION_SECRET environment variable is required in production');
+        }
+        console.warn('[Auth] WARNING: Using default session secret. Set SESSION_SECRET in production.');
+        return 'dev-only-session-secret-not-for-production';
+      }
+      return secret;
+    })(),
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 30 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    },
+    rolling: true,
+  }),
+);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -62,7 +102,17 @@ app.use((req, res, next) => {
 
 (async () => {
   await initializeInfrastructure();
+
+  const userRepository = new DrizzleUserRepository();
+  const passwordHasher = new BcryptPasswordHasher();
+
+  registerAuthRoutes(app, userRepository, passwordHasher);
+
+  app.use('/api', requireAuth);
+
   await registerRoutes(httpServer, app);
+
+  await seedAdminUser(userRepository, passwordHasher);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -72,9 +122,6 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
@@ -82,10 +129,6 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
