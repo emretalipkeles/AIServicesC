@@ -113,10 +113,14 @@ export function TabbedContent() {
                   <Icon className="w-4 h-4" />
                   {tab.label}
                   {isClosable && (
-                    <X
-                      className="w-3 h-3 ml-1 hover:text-destructive"
+                    <span
+                      role="button"
+                      className="ml-1 p-1 rounded-sm hover:bg-destructive/10 hover:text-destructive inline-flex items-center justify-center"
                       onClick={(e) => handleCloseTab(e, tab.id)}
-                    />
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <X className="w-3 h-3" />
+                    </span>
                   )}
                 </Button>
               );
