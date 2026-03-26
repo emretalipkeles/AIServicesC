@@ -5,8 +5,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { initializeInfrastructure } from "./src/infrastructure/bootstrap";
-import { DrizzleUserRepository } from "./src/infrastructure/auth/DrizzleUserRepository";
-import { BcryptPasswordHasher } from "./src/infrastructure/auth/BcryptPasswordHasher";
+import { createAuthDependencies } from "./src/infrastructure/auth/authCompositionRoot";
 import { seedAdminUser } from "./src/infrastructure/auth/seedAdminUser";
 import { registerAuthRoutes } from "./src/presentation/routes/auth.routes";
 import { requireAuth } from "./src/presentation/middleware/authMiddleware";
@@ -103,8 +102,7 @@ app.use((req, res, next) => {
 (async () => {
   await initializeInfrastructure();
 
-  const userRepository = new DrizzleUserRepository();
-  const passwordHasher = new BcryptPasswordHasher();
+  const { userRepository, passwordHasher } = createAuthDependencies();
 
   registerAuthRoutes(app, userRepository, passwordHasher);
 
