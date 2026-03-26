@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,7 +11,7 @@ import PackageVisualization from "@/pages/package-visualization";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
-function AuthenticatedRouter() {
+function ProtectedRoute({ component: Component, ...rest }: { component: React.ComponentType<any>; path?: string }) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -23,17 +23,39 @@ function AuthenticatedRouter() {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage />;
+    return <Redirect to="/login" />;
+  }
+
+  return <Component {...rest} />;
+}
+
+function AppRouter() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
     <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/pret/:packageId" component={PackageVisualization} />
       <Route path="/login">
-        <Redirect to="/" />
+        {isAuthenticated ? <Redirect to="/" /> : <LoginPage />}
       </Route>
-      <Route component={NotFound} />
+      <Route path="/">
+        {isAuthenticated ? <Home /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/pret/:packageId">
+        {(params) =>
+          isAuthenticated ? <PackageVisualization {...params} /> : <Redirect to="/login" />
+        }
+      </Route>
+      <Route>
+        {isAuthenticated ? <NotFound /> : <Redirect to="/login" />}
+      </Route>
     </Switch>
   );
 }
@@ -44,7 +66,7 @@ function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster />
-          <AuthenticatedRouter />
+          <AppRouter />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
