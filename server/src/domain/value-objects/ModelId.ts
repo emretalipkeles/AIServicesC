@@ -108,6 +108,10 @@ export class ModelId {
     return this.value.startsWith('global.');
   }
 
+  getAzureDeploymentName(): string {
+    return process.env.AZURE_OPENAI_DEPLOYMENT || this.value;
+  }
+
   toString(): string {
     return this.value;
   }

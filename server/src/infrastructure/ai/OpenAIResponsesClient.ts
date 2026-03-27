@@ -21,8 +21,10 @@ export class OpenAIResponsesClient implements IAIClient {
   async chat(options: ChatOptions): Promise<ChatResponse> {
     const messages = this.buildMessages(options);
 
+    const deploymentName = options.model.getAzureDeploymentName();
+
     const response = await this.client.chat.completions.create({
-      model: options.model.getValue(),
+      model: deploymentName,
       messages,
       max_completion_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
     });
@@ -31,7 +33,7 @@ export class OpenAIResponsesClient implements IAIClient {
 
     return {
       content: choice?.message?.content ?? '',
-      model: options.model.getValue(),
+      model: deploymentName,
       inputTokens: response.usage?.prompt_tokens ?? 0,
       outputTokens: response.usage?.completion_tokens ?? 0,
       stopReason: choice?.finish_reason ?? null,
@@ -46,8 +48,10 @@ export class OpenAIResponsesClient implements IAIClient {
     const messages = this.buildMessages(options);
 
     try {
+      const deploymentName = options.model.getAzureDeploymentName();
+
       const stream = await this.client.chat.completions.create({
-        model: options.model.getValue(),
+        model: deploymentName,
         messages,
         max_completion_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
         stream: true,
@@ -87,9 +91,11 @@ export class OpenAIResponsesClient implements IAIClient {
   async testConnection(model: ModelId): Promise<TestConnectionResult> {
     const startTime = Date.now();
 
+    const deploymentName = model.getAzureDeploymentName();
+
     try {
       await this.client.chat.completions.create({
-        model: model.getValue(),
+        model: deploymentName,
         messages: [{ role: 'user', content: 'Hello' }],
         max_completion_tokens: 10,
       });
@@ -97,14 +103,14 @@ export class OpenAIResponsesClient implements IAIClient {
       return {
         success: true,
         authMethod: 'api-key',
-        model: model.getValue(),
+        model: deploymentName,
         latencyMs: Date.now() - startTime,
       };
     } catch (error) {
       return {
         success: false,
         authMethod: 'api-key',
-        model: model.getValue(),
+        model: deploymentName,
         latencyMs: Date.now() - startTime,
         error: error instanceof Error ? error.message : 'Unknown error',
       };

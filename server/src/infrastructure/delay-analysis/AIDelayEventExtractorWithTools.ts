@@ -11,9 +11,10 @@ import type { IExtractionToolExecutor } from '../../domain/delay-analysis/interf
 import type { IToolExtractionSystemPromptStrategyFactory } from '../../domain/delay-analysis/interfaces/IToolExtractionSystemPromptStrategy';
 import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
 import { OPENAI_MODELS } from '../../domain/value-objects/ModelId';
+import type OpenAI from 'openai';
 import type { AzureOpenAI } from 'openai';
 
-const TOOL_EXTRACTION_MODEL = OPENAI_MODELS['gpt-5.2'];
+const TOOL_EXTRACTION_MODEL = process.env.AZURE_OPENAI_DEPLOYMENT || OPENAI_MODELS['gpt-5.2'];
 
 export interface ExtractionWithToolsOptions extends ExtractionOptions {
   tenantId: string;
