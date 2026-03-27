@@ -14,7 +14,11 @@ import { OPENAI_MODELS } from '../../domain/value-objects/ModelId';
 import type OpenAI from 'openai';
 import type { AzureOpenAI } from 'openai';
 
-const TOOL_EXTRACTION_MODEL = process.env.AZURE_OPENAI_DEPLOYMENT || OPENAI_MODELS['gpt-5.2'];
+function getToolExtractionModel(): string {
+  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;
+  if (deployment) return deployment;
+  return OPENAI_MODELS['gpt-5.2'];
+}
 
 export interface ExtractionWithToolsOptions extends ExtractionOptions {
   tenantId: string;
@@ -164,7 +168,7 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
         console.log(`[AI] TOOL-EXTRACTION: Calling OpenAI API with function calling enabled...`);
         
         const response = await this.openai.chat.completions.create({
-          model: TOOL_EXTRACTION_MODEL,
+          model: getToolExtractionModel(),
           messages,
           tools,
           max_completion_tokens: 4000,

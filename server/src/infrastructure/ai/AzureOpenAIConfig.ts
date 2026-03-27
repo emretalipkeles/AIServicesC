@@ -11,9 +11,9 @@ export function getAzureOpenAISettings(): AzureOpenAISettings | null {
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
   const apiVersion = process.env.AZURE_OPENAI_API_VERSION || '2025-04-01-preview';
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || '';
+  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;
 
-  if (!endpoint || !apiKey) {
+  if (!endpoint || !apiKey || !deployment) {
     return null;
   }
 
@@ -21,7 +21,11 @@ export function getAzureOpenAISettings(): AzureOpenAISettings | null {
 }
 
 export function isAzureOpenAIConfigured(): boolean {
-  return !!(process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_API_KEY);
+  return !!(
+    process.env.AZURE_OPENAI_ENDPOINT &&
+    process.env.AZURE_OPENAI_API_KEY &&
+    process.env.AZURE_OPENAI_DEPLOYMENT
+  );
 }
 
 export function createAzureOpenAIClient(settings: AzureOpenAISettings): AzureOpenAI {

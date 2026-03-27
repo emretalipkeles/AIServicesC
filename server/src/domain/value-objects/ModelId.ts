@@ -109,7 +109,11 @@ export class ModelId {
   }
 
   getAzureDeploymentName(): string {
-    return process.env.AZURE_OPENAI_DEPLOYMENT || this.value;
+    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;
+    if (!deployment) {
+      throw new Error('AZURE_OPENAI_DEPLOYMENT environment variable is required for Azure OpenAI');
+    }
+    return deployment;
   }
 
   toString(): string {
