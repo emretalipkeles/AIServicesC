@@ -57,11 +57,17 @@ export class ModelId {
     return new ModelId(name);
   }
 
+  private static readonly LEGACY_MODEL_ALIASES: Record<string, ModelName> = {
+    'gpt-5.2': 'gpt-5.4',
+    'gpt-5.2-high': 'gpt-5.4-high',
+  };
+
   static fromString(name: string): ModelId {
-    if (!(name in SUPPORTED_MODELS)) {
+    const resolved = ModelId.LEGACY_MODEL_ALIASES[name] ?? name;
+    if (!(resolved in SUPPORTED_MODELS)) {
       throw new ValidationError(`Unsupported model: ${name}. Supported models: ${Object.keys(SUPPORTED_MODELS).join(', ')}`);
     }
-    return new ModelId(name as ModelName);
+    return new ModelId(resolved as ModelName);
   }
 
   static sonnet(): ModelId {
