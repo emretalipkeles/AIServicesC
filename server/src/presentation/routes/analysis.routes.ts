@@ -30,7 +30,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
         analysisAvailable: hasAiServices,
         message: hasAiServices 
           ? 'AI analysis services are available' 
-          : 'AI services not configured - set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY to enable analysis',
+          : 'AI services not configured - set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_DEPLOYMENT to enable analysis',
       },
     });
   });
@@ -268,7 +268,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
       (_req, res) => {
         res.status(503).json({
           success: false,
-          error: 'AI analysis services are not configured. Please set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY environment variables.',
+          error: 'AI analysis services are not configured. Please set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_DEPLOYMENT environment variables.',
         });
       }
     );

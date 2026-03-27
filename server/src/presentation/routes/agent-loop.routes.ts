@@ -48,7 +48,7 @@ export function registerAgentLoopRoutes(app: Express, container: AppContainer): 
         if (!container.agentLoop.loop) {
           res.status(503).json({
             success: false,
-            error: 'Agent loop not available - set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY to enable AI features',
+            error: 'Agent loop not available - set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_DEPLOYMENT to enable AI features',
           });
           return;
         }
