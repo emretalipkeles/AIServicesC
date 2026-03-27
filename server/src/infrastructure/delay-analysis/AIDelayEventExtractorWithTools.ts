@@ -90,7 +90,7 @@ export class AIDelayEventExtractorWithTools implements IDelayEventExtractor {
     options: ExtractionWithToolsOptions
   ): Promise<ExtractionResult> {
     if (!this.openai) {
-      console.error('[AIDelayEventExtractorWithTools] OpenAI API key not configured');
+      console.error('[AIDelayEventExtractorWithTools] Azure OpenAI client not configured');
       return {
         events: [],
         documentId,
@@ -250,7 +250,7 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
         await options.onTokenUsage({
           runId: options.runId,
           operation: 'delay_event_extraction_with_tools',
-          model: TOOL_EXTRACTION_MODEL,
+          model: getToolExtractionModel(),
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
           metadata: {
