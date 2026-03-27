@@ -1,12 +1,13 @@
-import OpenAI from 'openai';
+import type { AzureOpenAI } from 'openai';
+import type OpenAI from 'openai';
 import type { IToolUseClient, ToolUseRequest, ToolUseResponse, ToolCallBlock, TokenUsageInfo } from '../../../domain/delay-analysis/interfaces/IToolUseClient';
 
 export class OpenAIToolUseClient implements IToolUseClient {
-  private readonly openai: OpenAI;
+  private readonly openai: AzureOpenAI;
   private readonly model: string;
 
-  constructor(apiKey: string, model: string = 'gpt-5.2') {
-    this.openai = new OpenAI({ apiKey });
+  constructor(client: AzureOpenAI, model: string = 'gpt-5.2') {
+    this.openai = client;
     this.model = model;
   }
 

@@ -11,7 +11,7 @@ import type { IExtractionToolExecutor } from '../../domain/delay-analysis/interf
 import type { IToolExtractionSystemPromptStrategyFactory } from '../../domain/delay-analysis/interfaces/IToolExtractionSystemPromptStrategy';
 import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
 import { OPENAI_MODELS } from '../../domain/value-objects/ModelId';
-import OpenAI from 'openai';
+import type { AzureOpenAI } from 'openai';
 
 const TOOL_EXTRACTION_MODEL = OPENAI_MODELS['gpt-5.2'];
 
@@ -46,18 +46,17 @@ interface ExtractedEventRaw {
 export class AIDelayEventExtractorWithTools implements IDelayEventExtractor {
   private readonly strategyFactory: IDocumentExtractionStrategyFactory;
   private readonly systemPromptStrategyFactory: IToolExtractionSystemPromptStrategyFactory;
-  private readonly openai: OpenAI | null;
+  private readonly openai: AzureOpenAI | null;
 
   constructor(
     private readonly toolExecutor: IExtractionToolExecutor,
     systemPromptStrategyFactory: IToolExtractionSystemPromptStrategyFactory,
-    apiKey?: string,
+    client?: AzureOpenAI | null,
     strategyFactory?: IDocumentExtractionStrategyFactory
   ) {
     this.systemPromptStrategyFactory = systemPromptStrategyFactory;
     this.strategyFactory = strategyFactory ?? new DocumentExtractionStrategyFactory();
-    const key = apiKey || process.env.OPEN_AI_KEY;
-    this.openai = key ? new OpenAI({ apiKey: key }) : null;
+    this.openai = client ?? null;
   }
 
   async extractDelayEvents(

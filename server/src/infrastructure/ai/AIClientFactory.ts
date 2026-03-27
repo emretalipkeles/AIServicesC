@@ -2,6 +2,7 @@ import type { IAIClient } from '../../domain/interfaces/IAIClient';
 import type { ModelId } from '../../domain/value-objects/ModelId';
 import { BedrockClientFactory } from './BedrockClientFactory';
 import { OpenAIResponsesClient } from './OpenAIResponsesClient';
+import { getAzureOpenAISettings, createAzureOpenAIClient, isAzureOpenAIConfigured } from './AzureOpenAIConfig';
 
 export interface IAIClientFactory {
   getClientForModel(model: ModelId): IAIClient | null;
@@ -36,9 +37,10 @@ export class AIClientFactory implements IAIClientFactory {
 
   private getOpenAIClient(): IAIClient | null {
     if (!this.openAIInitialized) {
-      const apiKey = process.env.OPEN_AI_KEY;
-      if (apiKey) {
-        this.openAIClient = new OpenAIResponsesClient(apiKey);
+      const settings = getAzureOpenAISettings();
+      if (settings) {
+        const azureClient = createAzureOpenAIClient(settings);
+        this.openAIClient = new OpenAIResponsesClient(azureClient);
       }
       this.openAIInitialized = true;
     }
@@ -51,7 +53,7 @@ export class AIClientFactory implements IAIClientFactory {
     }
     
     if (model.isOpenAI()) {
-      return !!process.env.OPEN_AI_KEY;
+      return isAzureOpenAIConfigured();
     }
 
     return false;

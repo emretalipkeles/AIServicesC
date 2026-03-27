@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import type { AzureOpenAI } from 'openai';
 import type { 
   IAIClient, 
   ChatOptions, 
@@ -12,29 +12,29 @@ import type { ModelId } from '../../domain/value-objects/ModelId';
 const DEFAULT_MAX_TOKENS = 4096;
 
 export class OpenAIResponsesClient implements IAIClient {
-  private readonly client: OpenAI;
+  private readonly client: AzureOpenAI;
 
-  constructor(apiKey: string) {
-    this.client = new OpenAI({ apiKey });
+  constructor(client: AzureOpenAI) {
+    this.client = client;
   }
 
   async chat(options: ChatOptions): Promise<ChatResponse> {
-    const input = this.buildInput(options);
-    const reasoningEffort = options.model.getReasoningEffort();
+    const messages = this.buildMessages(options);
 
-    const response = await this.client.responses.create({
+    const response = await this.client.chat.completions.create({
       model: options.model.getValue(),
-      input,
-      reasoning: { effort: reasoningEffort },
-      max_output_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
+      messages,
+      max_completion_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
     });
 
+    const choice = response.choices[0];
+
     return {
-      content: response.output_text ?? '',
+      content: choice?.message?.content ?? '',
       model: options.model.getValue(),
-      inputTokens: response.usage?.input_tokens ?? 0,
-      outputTokens: response.usage?.output_tokens ?? 0,
-      stopReason: response.status ?? null,
+      inputTokens: response.usage?.prompt_tokens ?? 0,
+      outputTokens: response.usage?.completion_tokens ?? 0,
+      stopReason: choice?.finish_reason ?? null,
     };
   }
 
@@ -43,38 +43,40 @@ export class OpenAIResponsesClient implements IAIClient {
     onChunk: (chunk: StreamChunk) => void,
     streamOptions?: StreamOptions
   ): Promise<void> {
-    const input = this.buildInput(options);
-    const reasoningEffort = options.model.getReasoningEffort();
+    const messages = this.buildMessages(options);
 
     try {
-      const stream = await this.client.responses.create({
+      const stream = await this.client.chat.completions.create({
         model: options.model.getValue(),
-        input,
-        reasoning: { effort: reasoningEffort },
-        max_output_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
+        messages,
+        max_completion_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
         stream: true,
+        stream_options: { include_usage: true },
       });
 
-      for await (const event of stream) {
+      for await (const chunk of stream) {
         if (streamOptions?.abortSignal?.aborted) {
           break;
         }
 
-        if (event.type === 'response.output_text.delta') {
+        const delta = chunk.choices[0]?.delta;
+        if (delta?.content) {
           onChunk({
             type: 'content',
-            content: event.delta ?? '',
+            content: delta.content,
           });
-        } else if (event.type === 'response.completed') {
+        }
+
+        if (chunk.usage) {
           onChunk({
             type: 'done',
-            inputTokens: event.response?.usage?.input_tokens ?? 0,
-            outputTokens: event.response?.usage?.output_tokens ?? 0,
+            inputTokens: chunk.usage.prompt_tokens ?? 0,
+            outputTokens: chunk.usage.completion_tokens ?? 0,
           });
         }
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown OpenAI error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown Azure OpenAI error';
       onChunk({
         type: 'error',
         error: errorMessage,
@@ -86,10 +88,10 @@ export class OpenAIResponsesClient implements IAIClient {
     const startTime = Date.now();
 
     try {
-      const response = await this.client.responses.create({
+      await this.client.chat.completions.create({
         model: model.getValue(),
-        input: 'Hello',
-        max_output_tokens: 10,
+        messages: [{ role: 'user', content: 'Hello' }],
+        max_completion_tokens: 10,
       });
 
       return {
@@ -113,18 +115,20 @@ export class OpenAIResponsesClient implements IAIClient {
     return 'api-key';
   }
 
-  private buildInput(options: ChatOptions): string {
-    let input = '';
+  private buildMessages(options: ChatOptions): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
 
     if (options.systemPrompt) {
-      input += `System: ${options.systemPrompt}\n\n`;
+      messages.push({ role: 'system', content: options.systemPrompt });
     }
 
     for (const message of options.messages) {
-      const role = message.role === 'user' ? 'User' : 'Assistant';
-      input += `${role}: ${message.content}\n\n`;
+      messages.push({
+        role: message.role as 'user' | 'assistant',
+        content: message.content,
+      });
     }
 
-    return input.trim();
+    return messages;
   }
 }

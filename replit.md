@@ -49,7 +49,7 @@ Preferred communication style: Simple, everyday language.
 - **Source Document Type Visibility**: Results tab and Excel export include a "Source Type" column showing whether each delay event was extracted from an IDR, NCR, or Field Memo, with color-coded badges (blue/red/amber).
 - **Smart No-Delay Filter**: Automatically detects and excludes AI-generated "no delay" events (descriptions starting with "No contractor-caused delay events...") from Results tab and Excel export using regex pattern matching.
 - **Document Extraction Strategy**: Utilizes a strategy pattern (`IDocumentExtractionStrategy`) for document-type-specific processing, including IDR work activity fast-match optimization.
-- **Tool-Based Extraction**: Advanced extraction mode using OpenAI function calling to query the schedule database during document processing for on-demand activity lookup, enabling single-pass extraction and matching. Uses per-document-type system prompts via the `IToolExtractionSystemPromptStrategy` interface (Strategy pattern + Factory), with dedicated IDR, Field Memo, NCR, and Default implementations in `server/src/infrastructure/delay-analysis/tool-extraction-prompts/`.
+- **Tool-Based Extraction**: Advanced extraction mode using Azure OpenAI function calling to query the schedule database during document processing for on-demand activity lookup, enabling single-pass extraction and matching. Uses per-document-type system prompts via the `IToolExtractionSystemPromptStrategy` interface (Strategy pattern + Factory), with dedicated IDR, Field Memo, NCR, and Default implementations in `server/src/infrastructure/delay-analysis/tool-extraction-prompts/`.
 - **Activity Matching Priority**: Enforces a strict IDR-first rule for activity matching. If CPM activity IDs are in the IDR document, matching is restricted to those IDs. Only if no activity IDs are found in the document does it fall back to matching against the date-filtered full schedule. Includes IDR Match Confidence levels and a domain-layer enforcement policy.
 - **Match Date Validation**: Post-match validation ensures activities have started by the report date.
 - **Activity ID Mapping and Normalization**: Maps human-readable activity codes to UUIDs for storage and handles leading zero variations during lookups.
@@ -93,4 +93,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Cloud Services
 - **AWS Bedrock**: AI client provider
-- **OpenAI**: AI client provider
+- **Azure OpenAI**: AI client provider (uses `AzureOpenAI` from the `openai` npm package)
+  - `AZURE_OPENAI_ENDPOINT`: Azure OpenAI resource endpoint URL
+  - `AZURE_OPENAI_API_KEY`: Azure OpenAI API key
+  - `AZURE_OPENAI_API_VERSION`: API version (defaults to `2025-04-01-preview`)
+  - `AZURE_OPENAI_DEPLOYMENT`: Deployment name for the model

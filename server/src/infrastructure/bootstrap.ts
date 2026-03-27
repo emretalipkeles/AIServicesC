@@ -109,6 +109,7 @@ import { DelayEventDeduplicationService } from "./delay-analysis/DelayEventDedup
 import type { IAgentLoop } from "../domain/delay-analysis/interfaces/IAgentLoop";
 import { ReactAgentLoop } from "./delay-analysis/agent/ReactAgentLoop";
 import { OpenAIToolUseClient } from "./delay-analysis/agent/OpenAIToolUseClient";
+import { getAzureOpenAISettings, createAzureOpenAIClient } from "./ai/AzureOpenAIConfig";
 import { ToolRegistryImpl } from "./delay-analysis/agent/ToolRegistryImpl";
 import { SearchDocumentsByFilenameTool as AgentSearchDocsTool } from "./delay-analysis/agent/tools/SearchDocumentsByFilenameTool";
 import { GetDocumentContentTool as AgentGetDocContentTool } from "./delay-analysis/agent/tools/GetDocumentContentTool";
@@ -217,9 +218,9 @@ function createAgentLoop(
   contractorDelayEventRepository: IContractorDelayEventRepository,
   getActivitiesByIdsHandler: GetActivitiesByIdsQueryHandler,
 ): AppContainer['agentLoop'] {
-  const openAiKey = process.env.OPEN_AI_KEY;
-  if (!openAiKey) {
-    console.warn('[Bootstrap] OPEN_AI_KEY not set - agent loop disabled');
+  const azureSettings = getAzureOpenAISettings();
+  if (!azureSettings) {
+    console.warn('[Bootstrap] Azure OpenAI not configured - agent loop disabled');
     return { loop: null, systemPrompt: '' };
   }
 
@@ -239,7 +240,8 @@ function createAgentLoop(
   toolRegistry.register(new AgentListDelayEventsTool(contractorDelayEventRepository));
 
   const agentModel = 'gpt-5.2';
-  const toolUseClient = new OpenAIToolUseClient(openAiKey, agentModel);
+  const azureClient = createAzureOpenAIClient(azureSettings);
+  const toolUseClient = new OpenAIToolUseClient(azureClient, agentModel);
   const loop = new ReactAgentLoop(toolRegistry, toolUseClient, agentModel);
 
   console.log('[Bootstrap] ReactAgentLoop initialized with 5 tools');
@@ -430,7 +432,9 @@ export function createAppContainer(): AppContainer {
     const extractionKnowledgeBase = new ContractorDelayTrainingGuide();
     const extractionPromptBuilder = new DelayKnowledgePromptBuilder(extractionKnowledgeBase);
     const systemPromptStrategyFactory = new ToolExtractionSystemPromptStrategyFactory(extractionPromptBuilder);
-    delayEventExtractor = new AIDelayEventExtractorWithTools(scheduleActivitiesTool, systemPromptStrategyFactory);
+    const extractorAzureSettings = getAzureOpenAISettings();
+    const extractorClient = extractorAzureSettings ? createAzureOpenAIClient(extractorAzureSettings) : null;
+    delayEventExtractor = new AIDelayEventExtractorWithTools(scheduleActivitiesTool, systemPromptStrategyFactory, extractorClient);
     console.log('[Bootstrap] Using AIDelayEventExtractorWithTools with per-document-type system prompt strategies');
     activityMatcher = new AIActivityMatcher(aiClient);
   }
