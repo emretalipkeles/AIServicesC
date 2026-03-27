@@ -260,7 +260,7 @@ Fields:
 
 Return ONLY the JSON array, no other text.`;
 
-    const modelId = new ModelId('gpt-5.2');
+    const modelId = new ModelId('gpt-5.4');
     
     const response = await this.aiClient.chat({
       model: modelId,

@@ -239,7 +239,7 @@ function createAgentLoop(
   toolRegistry.register(new AgentGetActivityDetailsTool(getActivitiesByIdsHandler));
   toolRegistry.register(new AgentListDelayEventsTool(contractorDelayEventRepository));
 
-  const agentModel = azureSettings.deployment || 'gpt-5.2';
+  const agentModel = azureSettings.deployment || 'gpt-5.4';
   const azureClient = createAzureOpenAIClient(azureSettings);
   const toolUseClient = new OpenAIToolUseClient(azureClient, agentModel);
   const loop = new ReactAgentLoop(toolRegistry, toolUseClient, agentModel);
@@ -364,8 +364,8 @@ export function createAppContainer(): AppContainer {
   const extractionService = new AIDocumentExtractionService(bedrockClientProvider);
   const understandingService = new DocumentUnderstandingService(bedrockClientProvider, sessionRepository);
 
-  // Try OpenAI first (gpt-5.2), then fall back to Bedrock
-  let aiClient = aiClientFactory.getClientForModel(ModelId.gpt52());
+  // Try OpenAI first (gpt-5.4), then fall back to Bedrock
+  let aiClient = aiClientFactory.getClientForModel(ModelId.gpt54());
   if (!aiClient) {
     aiClient = bedrockClientProvider.getClient();
   }

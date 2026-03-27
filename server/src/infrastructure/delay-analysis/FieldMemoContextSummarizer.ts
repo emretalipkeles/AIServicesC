@@ -78,7 +78,7 @@ ${combinedContent}`;
       console.log(`[FieldMemoContextSummarizer] Summarizing ${filteredMemos.length} field memos for project ${projectId}`);
 
       const response = await this.aiClient.chat({
-        model: ModelId.gpt52(),
+        model: ModelId.gpt54(),
         messages: [AIMessage.user(prompt)],
         maxTokens: 1500,
         temperature: 0,

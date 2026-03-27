@@ -67,7 +67,7 @@ ${agentResponsesText}
 Please provide a unified, coherent response that addresses the user's question. Consider the conversation history if provided.`;
 
     const response = await this.aiClient.chat({
-      model: ModelId.gpt52(),
+      model: ModelId.gpt54(),
       systemPrompt: SYNTHESIS_SYSTEM_PROMPT,
       messages: [AIMessage.user(userPrompt)],
       maxTokens: 2048,
@@ -113,7 +113,7 @@ Please provide a unified, coherent response that addresses the user's question. 
 
     await this.aiClient.streamChat(
       {
-        model: ModelId.gpt52(),
+        model: ModelId.gpt54(),
         systemPrompt: SYNTHESIS_SYSTEM_PROMPT,
         messages: [AIMessage.user(userPrompt)],
         maxTokens: 2048,

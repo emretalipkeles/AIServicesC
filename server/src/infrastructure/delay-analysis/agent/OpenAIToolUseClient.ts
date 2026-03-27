@@ -6,7 +6,7 @@ export class OpenAIToolUseClient implements IToolUseClient {
   private readonly openai: AzureOpenAI;
   private readonly model: string;
 
-  constructor(client: AzureOpenAI, model: string = 'gpt-5.2') {
+  constructor(client: AzureOpenAI, model: string = 'gpt-5.4') {
     this.openai = client;
     this.model = model;
   }

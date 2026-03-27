@@ -219,7 +219,7 @@ Keep your responses brief but informative. Focus on what's important for later r
     try {
       const response = await this.retryWithTimeout(
         () => aiClient.chat({
-          model: ModelId.gpt52(),
+          model: ModelId.gpt54(),
           messages: conversationHistory,
           systemPrompt,
           maxTokens: 500,
@@ -290,7 +290,7 @@ If the document is short, create fewer but complete chunks. Focus on semantic me
     try {
       const response = await this.retryWithTimeout(
         () => aiClient.chat({
-          model: ModelId.gpt52(),
+          model: ModelId.gpt54(),
           messages: [AIMessage.user(chunkingPrompt)],
           systemPrompt: 'You are a document chunking specialist. Output valid JSON only.',
           maxTokens: 8000,
@@ -364,7 +364,7 @@ Summary:`;
     try {
       const response = await this.retryWithTimeout(
         () => aiClient.chat({
-          model: ModelId.gpt52(),
+          model: ModelId.gpt54(),
           messages: [AIMessage.user(summaryPrompt)],
           systemPrompt: 'Provide a brief, informative summary.',
           maxTokens: 200,

@@ -9,8 +9,8 @@ export const BEDROCK_MODELS = {
 } as const;
 
 export const OPENAI_MODELS = {
-  'gpt-5.2': 'gpt-5.2',
-  'gpt-5.2-high': 'gpt-5.2',
+  'gpt-5.4': 'gpt-5.4',
+  'gpt-5.4-high': 'gpt-5.4',
 } as const;
 
 export const SUPPORTED_MODELS = {
@@ -47,7 +47,7 @@ export class ModelId {
   }
 
   private detectReasoningEffort(modelName: ModelName): ReasoningEffort {
-    if (modelName === 'gpt-5.2-high' || modelName === 'claude-opus-4-5') {
+    if (modelName === 'gpt-5.4-high' || modelName === 'claude-opus-4-5') {
       return 'high';
     }
     return 'medium';
@@ -72,12 +72,12 @@ export class ModelId {
     return new ModelId('claude-opus-4-5');
   }
 
-  static gpt52(): ModelId {
-    return new ModelId('gpt-5.2');
+  static gpt54(): ModelId {
+    return new ModelId('gpt-5.4');
   }
 
-  static gpt52High(): ModelId {
-    return new ModelId('gpt-5.2-high');
+  static gpt54High(): ModelId {
+    return new ModelId('gpt-5.4-high');
   }
 
   getValue(): string {

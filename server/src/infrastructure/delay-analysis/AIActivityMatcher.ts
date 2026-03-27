@@ -164,7 +164,7 @@ export class AIActivityMatcher implements IActivityMatcher {
 
     try {
       const response = await this.aiClient.chat({
-        model: ModelId.gpt52(),
+        model: ModelId.gpt54(),
         messages: [AIMessage.user(prompt)],
         maxTokens: 500,
         temperature: 0,
@@ -243,7 +243,7 @@ export class AIActivityMatcher implements IActivityMatcher {
       console.log(`[AI] MATCHING: Full schedule match for event: "${eventDescription.substring(0, 80)}..." (${filteredActivities.length} activities)`);
 
       const response = await this.aiClient.chat({
-        model: ModelId.gpt52(),
+        model: ModelId.gpt54(),
         messages: [AIMessage.user(prompt)],
         maxTokens: 1000,
         temperature: 0,

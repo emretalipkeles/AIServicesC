@@ -9,7 +9,7 @@ export class ReactAgentLoop implements IAgentLoop {
   constructor(
     private readonly toolRegistry: IToolRegistry,
     private readonly toolUseClient: IToolUseClient,
-    private readonly modelName: string = 'gpt-5.2'
+    private readonly modelName: string = 'gpt-5.4'
   ) {}
 
   async run(

@@ -47,7 +47,7 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
       console.log(`[AI] EXTRACTION: Starting delay event extraction for "${documentFilename}" (type: ${documentType}, strategy: ${strategy.strategyName})`);
       
       const response = await this.aiClient.chat({
-        model: ModelId.gpt52(),
+        model: ModelId.gpt54(),
         messages: [AIMessage.user(strategyResult.prompt)],
         maxTokens: 4000,
         temperature: 0,
