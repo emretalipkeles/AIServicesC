@@ -7,7 +7,6 @@ import { registerChatRoutes } from "./chat.routes";
 import { registerStatsRoutes } from "./stats.routes";
 import { registerAgentRoutes } from "./agent.routes";
 import { registerStructuredOutputRoutes } from "./structured-output.routes";
-import { registerPretPackageRoutes } from "./pretPackage.routes";
 import { registerDelayAnalysisProjectRoutes } from "./delay-analysis-project.routes";
 import { registerProjectDocumentRoutes } from "./project-document.routes";
 import { registerScheduleActivityRoutes } from "./schedule-activity.routes";
@@ -26,7 +25,6 @@ export async function registerRoutes(
   registerStatsRoutes(app);
   registerAgentRoutes(app, container);
   registerStructuredOutputRoutes(app, container);
-  registerPretPackageRoutes(app, container);
   registerDelayAnalysisProjectRoutes(app, container);
   registerProjectDocumentRoutes(app, container);
   registerScheduleActivityRoutes(app, container);

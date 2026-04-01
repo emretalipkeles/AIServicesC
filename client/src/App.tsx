@@ -7,7 +7,6 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { useAuth } from "@/hooks/useAuth";
 import Home from "@/pages/home";
 import LoginPage from "@/pages/login";
-import PackageVisualization from "@/pages/package-visualization";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
@@ -29,11 +28,6 @@ function AppRouter() {
       </Route>
       <Route path="/">
         {isAuthenticated ? <Home /> : <Redirect to="/login" />}
-      </Route>
-      <Route path="/pret/:packageId">
-        {(params: Record<string, string>) =>
-          isAuthenticated ? <PackageVisualization {...params} /> : <Redirect to="/login" />
-        }
       </Route>
       <Route>
         {isAuthenticated ? <NotFound /> : <Redirect to="/login" />}

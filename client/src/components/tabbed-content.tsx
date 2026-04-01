@@ -10,8 +10,6 @@ import { SettingsMenu } from "./settings-menu";
 import { AddMenu } from "./add-menu";
 import { UserMenu } from "./user-menu";
 import { useTabContext, type Tab } from "@/contexts/tab-context";
-import PackageVisualization from "@/pages/package-visualization";
-
 interface StaticTab {
   id: string;
   label: string;
@@ -81,9 +79,6 @@ export function TabbedContent() {
     }
     if (tab.id === "user-management") {
       return <UserManagement />;
-    }
-    if ("type" in tab && tab.type === "package" && tab.packageId) {
-      return <PackageVisualization packageId={tab.packageId} embedded />;
     }
     return null;
   };

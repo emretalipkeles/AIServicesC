@@ -1,12 +1,11 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import { Package, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export interface Tab {
   id: string;
   label: string;
   icon: LucideIcon;
-  type: "static" | "package" | "delay-analysis";
-  packageId?: string;
+  type: "static" | "delay-analysis";
   delayAnalysisProjectId?: string;
 }
 
@@ -17,7 +16,6 @@ interface TabContextType {
   addTab: (tab: Tab) => void;
   setActiveTab: (tabId: string) => void;
   closeTab: (tabId: string) => void;
-  openPackageTab: (packageId: string, packageName: string) => void;
   setActiveDelayAnalysisProject: (projectId: string | null) => void;
 }
 
@@ -73,18 +71,6 @@ export function TabProvider({ children }: TabProviderProps) {
     });
   }, []);
 
-  const openPackageTab = useCallback((packageId: string, packageName: string) => {
-    const tabId = `package-${packageId}`;
-    const tab: Tab = {
-      id: tabId,
-      label: packageName,
-      icon: Package,
-      type: "package",
-      packageId,
-    };
-    addTab(tab);
-  }, [addTab]);
-
   return (
     <TabContext.Provider
       value={{
@@ -94,7 +80,6 @@ export function TabProvider({ children }: TabProviderProps) {
         addTab,
         setActiveTab,
         closeTab,
-        openPackageTab,
         setActiveDelayAnalysisProject,
       }}
     >

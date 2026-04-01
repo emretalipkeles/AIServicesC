@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Sparkles, Bot, User, Paperclip, MoreHorizontal, Loader2, Package, ExternalLink, Upload, PanelLeftClose, Download, Brain, Search, FileText, CheckCircle } from "lucide-react";
+import { Send, Sparkles, Bot, User, MoreHorizontal, Loader2, PanelLeftClose, Download, Brain, Search, FileText, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AgentSelector } from "./agent-selector";
 import { StructuredOutputCard } from "./structured-output-card";
@@ -71,12 +71,6 @@ function TableWithDownload({ children }: { children: React.ReactNode }) {
   );
 }
 
-interface PackageInfo {
-  packageId: string;
-  packageName: string;
-  redirectUrl: string;
-}
-
 interface ThinkingStep {
   stage: string;
   message: string;
@@ -99,7 +93,6 @@ interface Message {
   agentId?: string;
   isStreaming?: boolean;
   statusMessage?: string;
-  packageInfo?: PackageInfo;
   thinkingSteps?: ThinkingStep[];
   costInfo?: CostInfo;
 }
@@ -110,10 +103,8 @@ interface AIChatPanelProps {
 
 export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
   const tabContext = useOptionalTabContext();
-  const openPackageTab = tabContext?.openPackageTab;
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -125,11 +116,8 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const dragCounterRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const adjustTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -403,358 +391,11 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
     }
   };
 
-  const processFileUpload = useCallback(async (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.zip')) {
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: "I can only accept ZIP files containing PRET packages. Please select a valid .zip file.",
-        timestamp: new Date(),
-        agentName: "AI Assistant",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      return;
-    }
-
-    if (file.size > 100 * 1024 * 1024) {
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: "The file is too large. Maximum file size is 100MB.",
-        timestamp: new Date(),
-        agentName: "AI Assistant",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      return;
-    }
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: `Uploading package: ${file.name}`,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMessage]);
-
-    const uploadingMessageId = (Date.now() + 1).toString();
-    const uploadingMessage: Message = {
-      id: uploadingMessageId,
-      role: "assistant",
-      content: "",
-      timestamp: new Date(),
-      agentName: "AI Assistant",
-      isStreaming: true,
-      statusMessage: "Uploading and validating package...",
-    };
-    setMessages((prev) => [...prev, uploadingMessage]);
-
-    setIsUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/pret/packages/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Upload failed');
-      }
-
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === uploadingMessageId
-            ? { ...msg, statusMessage: "Generating response..." }
-            : msg
-        )
-      );
-
-      const streamResponse = await fetch(`/api/pret/packages/${result.packageId}/narrate/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: true,
-          packageName: result.packageName,
-          conversationId,
-        }),
-      });
-
-      if (!streamResponse.ok) {
-        throw new Error('Failed to start narrator stream');
-      }
-
-      const reader = streamResponse.body?.getReader();
-      if (!reader) throw new Error('No stream reader available');
-
-      const decoder = new TextDecoder();
-      let accumulatedContent = '';
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || '';
-
-        for (const event of events) {
-          const lines = event.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                
-                if (data.type === 'content' && data.content) {
-                  accumulatedContent += data.content;
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === uploadingMessageId
-                        ? { ...msg, content: accumulatedContent, statusMessage: undefined }
-                        : msg
-                    )
-                  );
-                } else if (data.type === 'done') {
-                  console.log('[AIChatPanel] Received done event with conversationId:', data.conversationId);
-                  if (data.conversationId) {
-                    console.log('[AIChatPanel] Setting conversationId:', data.conversationId);
-                    setConversationId(data.conversationId);
-                  }
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === uploadingMessageId
-                        ? {
-                            ...msg,
-                            content: accumulatedContent || `I've successfully imported your PRET package "${result.packageName}".`,
-                            isStreaming: false,
-                            statusMessage: undefined,
-                            packageInfo: {
-                              packageId: result.packageId,
-                              packageName: result.packageName,
-                              redirectUrl: `/pret/${result.packageId}`,
-                            },
-                          }
-                        : msg
-                    )
-                  );
-                } else if (data.type === 'error') {
-                  throw new Error(data.error || 'Stream error');
-                }
-              } catch (parseError) {
-                // Skip invalid JSON lines (like heartbeat comments)
-              }
-            }
-          }
-        }
-      }
-
-      if (buffer.trim()) {
-        const lines = buffer.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              console.log('[AIChatPanel] Processing remaining buffer event:', data.type, 'conversationId:', data.conversationId);
-              if (data.type === 'done' && data.conversationId) {
-                console.log('[AIChatPanel] Setting conversationId from remaining buffer:', data.conversationId);
-                setConversationId(data.conversationId);
-              }
-            } catch {
-            }
-          }
-        }
-      }
-
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === uploadingMessageId
-            ? {
-                ...msg,
-                isStreaming: false,
-                packageInfo: msg.packageInfo || {
-                  packageId: result.packageId,
-                  packageName: result.packageName,
-                  redirectUrl: `/pret/${result.packageId}`,
-                },
-              }
-            : msg
-        )
-      );
-    } catch (error) {
-      const errorContent = error instanceof Error ? error.message : 'Unknown error occurred';
-      const packageName = file.name.replace('.zip', '');
-      
-      try {
-        const streamResponse = await fetch(`/api/pret/packages/failed_${Date.now()}/narrate/stream`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            success: false,
-            packageName,
-            error: errorContent,
-            conversationId,
-          }),
-        });
-
-        if (streamResponse.ok && streamResponse.body) {
-          const reader = streamResponse.body.getReader();
-          const decoder = new TextDecoder();
-          let accumulatedContent = '';
-          let buffer = '';
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const events = buffer.split('\n\n');
-            buffer = events.pop() || '';
-
-            for (const event of events) {
-              const lines = event.split('\n');
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  try {
-                    const data = JSON.parse(line.slice(6));
-                    if (data.type === 'content' && data.content) {
-                      accumulatedContent += data.content;
-                      setMessages((prev) =>
-                        prev.map((msg) =>
-                          msg.id === uploadingMessageId
-                            ? { ...msg, content: accumulatedContent, statusMessage: undefined }
-                            : msg
-                        )
-                      );
-                    } else if (data.type === 'done') {
-                      if (data.conversationId) {
-                        setConversationId(data.conversationId);
-                      }
-                      setMessages((prev) =>
-                        prev.map((msg) =>
-                          msg.id === uploadingMessageId
-                            ? { ...msg, isStreaming: false, statusMessage: undefined }
-                            : msg
-                        )
-                      );
-                    }
-                  } catch {
-                    // Skip invalid JSON
-                  }
-                }
-              }
-            }
-          }
-
-          if (buffer.trim()) {
-            const lines = buffer.split('\n');
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  if (data.type === 'done' && data.conversationId) {
-                    setConversationId(data.conversationId);
-                  }
-                } catch {
-                }
-              }
-            }
-          }
-        } else {
-          throw new Error('Stream failed');
-        }
-      } catch {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === uploadingMessageId
-              ? {
-                  ...msg,
-                  content: `Failed to import package: ${errorContent}`,
-                  isStreaming: false,
-                  statusMessage: undefined,
-                }
-              : msg
-          )
-        );
-      }
-    } finally {
-      setIsUploading(false);
-    }
-  }, [conversationId, messages]);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (e.target) {
-      e.target.value = '';
-    }
-    processFileUpload(file);
-  };
-
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current++;
-    if (e.dataTransfer.types.includes('Files')) {
-      setIsDragging(true);
-    }
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current--;
-    if (dragCounterRef.current === 0) {
-      setIsDragging(false);
-    }
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    dragCounterRef.current = 0;
-
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      processFileUpload(files[0]);
-    }
-  }, [processFileUpload]);
-
-  const handleAttachClick = () => {
-    fileInputRef.current?.click();
-  };
-
   return (
     <div 
       className="chat-container bg-sidebar theme-transition relative"
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
       data-testid="chat-drop-zone"
     >
-      {isDragging && (
-        <div 
-          className="absolute inset-0 z-50 bg-primary/10 border-2 border-dashed border-primary rounded-lg flex flex-col items-center justify-center pointer-events-none"
-          data-testid="drop-overlay"
-          role="region"
-          aria-label="Drop zone for PRET package files"
-        >
-          <Upload className="w-12 h-12 text-primary mb-3" />
-          <p className="text-lg font-medium text-primary" data-testid="text-drop-instruction">Drop your PRET package here</p>
-          <p className="text-sm text-muted-foreground mt-1" data-testid="text-drop-format">ZIP files only</p>
-        </div>
-      )}
-      
       {/* Header region - fixed */}
       <div className="chat-header flex items-center justify-between px-3 sm:px-4 h-12 border-b border-sidebar-border">
         <div className="flex items-center gap-2 min-w-0">
@@ -953,33 +594,6 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
                             agentId={message.agentId || selectedAgent?.id || null}
                           />
                         )}
-                        {!message.isStreaming && message.packageInfo && (
-                          <Card className="mt-2 border-primary/20 bg-primary/5">
-                            <CardContent className="p-3">
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center justify-center w-10 h-10 rounded-md bg-primary/10">
-                                  <Package className="w-5 h-5 text-primary" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-foreground truncate" data-testid={`text-package-name-${message.id}`}>
-                                    {message.packageInfo.packageName}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    PRET Package imported successfully
-                                  </p>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  onClick={() => openPackageTab?.(message.packageInfo!.packageId, message.packageInfo!.packageName)}
-                                  data-testid={`button-open-package-${message.id}`}
-                                >
-                                  <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
-                                  Open
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        )}
                       </>
                     )}
                   </div>
@@ -1055,27 +669,9 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
               onAgentSelect={setSelectedAgent}
             />
             <div className="flex items-center gap-1">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                accept=".zip"
-                className="hidden"
-                data-testid="input-file-upload"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground"
-                onClick={handleAttachClick}
-                disabled={isUploading || isLoading}
-                data-testid="button-attach-file"
-              >
-                <Paperclip className="w-4 h-4" />
-              </Button>
               <Button
                 size="icon"
-                disabled={!inputValue.trim() || isLoading || isUploading}
+                disabled={!inputValue.trim() || isLoading}
                 onClick={handleSubmit}
                 data-testid="button-send-message"
               >

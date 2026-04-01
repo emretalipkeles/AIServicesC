@@ -26,34 +26,6 @@ import { DocumentProcessor } from "./documents/DocumentProcessor";
 import { AIDocumentExtractionService } from "./documents/AIDocumentExtractionService";
 import { DocumentUnderstandingService } from "./documents/DocumentUnderstandingService";
 import { DelayEventsAgentContextProvider } from "./delay-analysis/DelayEventsAgentContextProvider";
-import { PretToolRegistry } from "./pret/PretToolRegistry";
-import { PretOrchestrator } from "../application/pret/services/PretOrchestrator";
-import { InMemoryBuildContextRepository } from "./pret/repositories/InMemoryBuildContextRepository";
-import { InMemoryFileContextRepository } from "./pret/repositories/InMemoryFileContextRepository";
-import { PackageAnalysisPretFileLocator } from "./pret/locators/PackageAnalysisPretFileLocator";
-import { ChunkedS3PretFileReader } from "./pret/readers/ChunkedS3PretFileReader";
-import { S3PretPackageStorage } from "./pret/storage/S3PretPackageStorage";
-import { PretContextService } from "../application/pret/services/PretContextService";
-import { InMemoryPretPackageSessionRepository } from "./pret/repositories/InMemoryPretPackageSessionRepository";
-import { InMemoryConversationContextRepository } from "./orchestration/repositories/InMemoryConversationContextRepository";
-import { ImportPretPackageHandler } from "../application/pret/handlers/ImportPretPackageHandler";
-import { GetPretPackageHandler } from "../application/pret/handlers/GetPretPackageHandler";
-import { AnalyzePackageHandler } from "../application/pret/handlers/AnalyzePackageHandler";
-import { GetDimensionMembersHandler } from "../application/pret/handlers/GetDimensionMembersHandler";
-import { YauzlPackageAnalyzer } from "./pret/analyzers/YauzlPackageAnalyzer";
-import { YamlDimensionMemberReader } from "./pret/readers/YamlDimensionMemberReader";
-import type { IPackageAnalyzer } from "../domain/pret/interfaces/IPackageAnalyzer";
-import type { IDimensionMemberReader } from "../domain/pret/interfaces/IDimensionMemberReader";
-import type { IPretToolRegistry } from "../domain/pret/interfaces/IPretToolRegistry";
-import type { IBuildContextRepository } from "../domain/pret/interfaces/IBuildContextRepository";
-import type { IFileContextRepository } from "../domain/pret/interfaces/IFileContextRepository";
-import type { IPackageAnalysisCache } from "../domain/pret";
-import { InMemoryPackageAnalysisCache } from "./pret/cache/InMemoryPackageAnalysisCache";
-import type { IPretFileLocator } from "../domain/pret/interfaces/IPretFileLocator";
-import type { IPretFileReader } from "../domain/pret/interfaces/IPretFileReader";
-import type { IPretPackageStorage } from "../domain/pret/interfaces/IPretPackageStorage";
-import type { IPretPackageSessionRepository } from "../domain/pret/interfaces/IPretPackageSessionRepository";
-import type { IConversationContextRepository } from "../domain/orchestration/interfaces/IConversationContextRepository";
 import { CreateAgentCommandHandler } from "../application/commands/handlers/CreateAgentCommandHandler";
 import { UpdateAgentCommandHandler } from "../application/commands/handlers/UpdateAgentCommandHandler";
 import { DeleteAgentCommandHandler } from "../application/commands/handlers/DeleteAgentCommandHandler";
@@ -77,19 +49,6 @@ import type { ISessionMemoryRepository } from "../domain/interfaces/ISessionMemo
 import type { ICommandBus } from "../application/interfaces/ICommandBus";
 import type { IQueryBus } from "../application/interfaces/IQueryBus";
 import { InMemorySessionMemoryRepository } from "./repositories/InMemorySessionMemoryRepository";
-import type { IPretCommandRegistry } from "../domain/pret";
-import { PretCommandRegistry } from "./pret/commands/PretCommandRegistry";
-import { PretCommandExecutor } from "../application/pret/services/PretCommandExecutor";
-import { ListModelsCommandHandler } from "../application/pret/handlers/pret-command-handlers/ListModelsCommandHandler";
-import { GetCubeDetailsCommandHandler } from "../application/pret/handlers/pret-command-handlers/GetCubeDetailsCommandHandler";
-import { ListDimensionsCommandHandler } from "../application/pret/handlers/pret-command-handlers/ListDimensionsCommandHandler";
-import { GetDimensionDetailsCommandHandler } from "../application/pret/handlers/pret-command-handlers/GetDimensionDetailsCommandHandler";
-import { CreateOtherDimensionCommandHandler } from "../application/pret/handlers/pret-command-handlers/CreateOtherDimensionCommandHandler";
-import { SchemaValidator } from "./pret/validators/SchemaValidator";
-import { AIIntentClassifier } from "./pret/classifiers/AIIntentClassifier";
-import { PRET_COMMAND_DESCRIPTORS } from "./pret/classifiers/PretCommandDescriptors";
-import { AIPretResponseNarrator } from "./pret/narrators/AIPretResponseNarrator";
-import type { IIntentClassifier, IResponseNarrator } from "../domain/pret";
 import { DocumentParserFactory } from "./document-parsing/DocumentParserFactory";
 import type { IDocumentParserFactory } from "../domain/delay-analysis/interfaces/IDocumentParserFactory";
 import { ExcelScheduleParserV2 } from "./document-parsing/ExcelScheduleParserV2";
@@ -162,10 +121,6 @@ export interface AppContainer {
     structuredOutput: IStructuredOutputRepository;
     processingSession: IProcessingSessionRepository;
     conversation: IConversationRepository;
-    conversationContext: IConversationContextRepository;
-    buildContext: IBuildContextRepository;
-    pretPackageSession: IPretPackageSessionRepository;
-    pretPackageStorage: IPretPackageStorage | null;
     sessionMemory: ISessionMemoryRepository;
     delayAnalysisProject: IDelayAnalysisProjectRepository;
     projectDocument: IProjectDocumentRepository;
@@ -174,21 +129,8 @@ export interface AppContainer {
     aiTokenUsage: IAITokenUsageRepository;
   };
   
-  handlers: {
-    importPretPackageHandler: ImportPretPackageHandler | null;
-    getPretPackageHandler: GetPretPackageHandler | null;
-    analyzePackageHandler: AnalyzePackageHandler | null;
-    getDimensionMembersHandler: GetDimensionMembersHandler | null;
-  };
-  
   services: {
     isAIConfigured: boolean;
-    pretToolRegistry: IPretToolRegistry | null;
-    pretOrchestrator: PretOrchestrator | null;
-    pretContextService: PretContextService | null;
-    packageAnalysisCache: IPackageAnalysisCache;
-    pretCommandRegistry: IPretCommandRegistry;
-    pretCommandExecutor: PretCommandExecutor | null;
     documentParserFactory: IDocumentParserFactory;
     scheduleParserFactory: IScheduleParserFactory;
     delayEventExtractor: IDelayEventExtractor | null;
@@ -329,11 +271,6 @@ export function createAppContainer(): AppContainer {
   const structuredOutputRepository = new DrizzleStructuredOutputRepository();
   const sessionRepository = new PostgresProcessingSessionRepository();
   const conversationRepository = new DrizzleConversationRepository();
-  const buildContextRepository = new InMemoryBuildContextRepository();
-  const fileContextRepository: IFileContextRepository = new InMemoryFileContextRepository();
-  const pretPackageSessionRepository = new InMemoryPretPackageSessionRepository();
-  const conversationContextRepository = new InMemoryConversationContextRepository();
-  const packageAnalysisCache: IPackageAnalysisCache = new InMemoryPackageAnalysisCache();
   const sessionMemoryRepository = new InMemorySessionMemoryRepository();
 
   const delayAnalysisProjectRepository = new DrizzleDelayAnalysisProjectRepository();
@@ -351,15 +288,6 @@ export function createAppContainer(): AppContainer {
   let activityMatcher: IActivityMatcher | null = null;
   let scheduleParserFactory: IScheduleParserFactory;
 
-  let pretPackageStorage: IPretPackageStorage | null = null;
-  try {
-    if (process.env.S3_AUTH_KEY && process.env.S3_AUTH_SECRET && process.env.S3_BUCKET_NAME) {
-      pretPackageStorage = new S3PretPackageStorage(process.env.S3_BUCKET_NAME);
-    }
-  } catch (error) {
-    console.warn("S3 storage not configured:", error);
-  }
-
   const documentProcessor = new DocumentProcessor();
   const extractionService = new AIDocumentExtractionService(bedrockClientProvider);
   const understandingService = new DocumentUnderstandingService(bedrockClientProvider, sessionRepository);
@@ -370,65 +298,11 @@ export function createAppContainer(): AppContainer {
     aiClient = bedrockClientProvider.getClient();
   }
   
-  let pretToolRegistry: IPretToolRegistry | null = null;
-  let pretOrchestrator: PretOrchestrator | null = null;
-  let pretContextService: PretContextService | null = null;
-  
-  if (aiClient && pretPackageStorage) {
-    const fileLocator: IPretFileLocator = new PackageAnalysisPretFileLocator();
-    const fileReader: IPretFileReader = new ChunkedS3PretFileReader(pretPackageStorage);
-    
-    pretContextService = new PretContextService(
-      fileLocator,
-      fileReader,
-      fileContextRepository
-    );
-    
-    pretToolRegistry = new PretToolRegistry(aiClient);
-    pretOrchestrator = new PretOrchestrator(
-      pretToolRegistry, 
-      buildContextRepository,
-      pretContextService,
-      aiClient
-    );
-  } else if (aiClient) {
-    pretToolRegistry = new PretToolRegistry(aiClient);
-    pretOrchestrator = new PretOrchestrator(
-      pretToolRegistry, 
-      buildContextRepository,
-      undefined,
-      aiClient
-    );
-  }
-
-  const pretCommandRegistry: IPretCommandRegistry = new PretCommandRegistry();
-  pretCommandRegistry.register(new ListModelsCommandHandler(packageAnalysisCache));
-  pretCommandRegistry.register(new GetCubeDetailsCommandHandler(packageAnalysisCache));
-  pretCommandRegistry.register(new ListDimensionsCommandHandler(packageAnalysisCache));
-  pretCommandRegistry.register(new GetDimensionDetailsCommandHandler(packageAnalysisCache));
-  
-  let createOtherDimensionHandler: CreateOtherDimensionCommandHandler | null = null;
-  if (pretPackageStorage) {
-    const schemaValidator = new SchemaValidator(
-      new URL('../pret/schemas', import.meta.url).pathname
-    );
-    createOtherDimensionHandler = new CreateOtherDimensionCommandHandler(
-      packageAnalysisCache,
-      pretPackageStorage,
-      schemaValidator
-    );
-    pretCommandRegistry.register(createOtherDimensionHandler);
-  }
-  
-  let intentClassifier: IIntentClassifier | null = null;
-  let responseNarrator: IResponseNarrator | null = null;
   const excelParser = new ExcelScheduleParserV2();
   const regexPdfParser = new RegexScheduleParser();
   scheduleParserFactory = new ScheduleParserFactory([excelParser, regexPdfParser]);
 
   if (aiClient) {
-    intentClassifier = new AIIntentClassifier(aiClient);
-    responseNarrator = new AIPretResponseNarrator(aiClient);
     const extractionKnowledgeBase = new ContractorDelayTrainingGuide();
     const extractionPromptBuilder = new DelayKnowledgePromptBuilder(extractionKnowledgeBase);
     const systemPromptStrategyFactory = new ToolExtractionSystemPromptStrategyFactory(extractionPromptBuilder);
@@ -445,15 +319,6 @@ export function createAppContainer(): AppContainer {
     console.log('[Bootstrap] FieldMemoContextSummarizer initialized for IDR context injection');
   }
   
-  const pretCommandExecutor = intentClassifier 
-    ? new PretCommandExecutor(
-        pretCommandRegistry, 
-        intentClassifier, 
-        PRET_COMMAND_DESCRIPTORS,
-        responseNarrator ?? undefined
-      )
-    : null;
-
   const testConnectionHandler = new TestConnectionQueryHandler(bedrockClientProvider);
 
   const createAgentHandler = new CreateAgentCommandHandler(agentRepository);
@@ -489,38 +354,6 @@ export function createAppContainer(): AppContainer {
   const listDelayAnalysisProjectsHandler = new ListDelayAnalysisProjectsQueryHandler(delayAnalysisProjectRepository);
   const getTokenUsageByRunIdHandler = new GetTokenUsageByRunIdQueryHandler(aiTokenUsageRepository);
 
-  let importPretPackageHandler: ImportPretPackageHandler | null = null;
-  let getPretPackageHandler: GetPretPackageHandler | null = null;
-  let analyzePackageHandler: AnalyzePackageHandler | null = null;
-  let getDimensionMembersHandler: GetDimensionMembersHandler | null = null;
-  
-  if (pretPackageStorage) {
-    const packageAnalyzer: IPackageAnalyzer = new YauzlPackageAnalyzer();
-    const dimensionMemberReader: IDimensionMemberReader = new YamlDimensionMemberReader(packageAnalyzer);
-    
-    importPretPackageHandler = new ImportPretPackageHandler(
-      pretPackageStorage,
-      pretPackageSessionRepository
-    );
-    getPretPackageHandler = new GetPretPackageHandler(
-      pretPackageSessionRepository,
-      pretPackageStorage
-    );
-    analyzePackageHandler = new AnalyzePackageHandler(
-      pretPackageStorage,
-      packageAnalyzer
-    );
-    getDimensionMembersHandler = new GetDimensionMembersHandler(
-      pretPackageStorage,
-      dimensionMemberReader
-    );
-
-    // Wire the analyze handler to the create dimension handler for cache rehydration
-    if (createOtherDimensionHandler && analyzePackageHandler) {
-      createOtherDimensionHandler.setAnalyzeHandler(analyzePackageHandler);
-    }
-  }
-
   commandBus.register('CreateAgentCommand', createAgentHandler);
   commandBus.register('UpdateAgentCommand', updateAgentHandler);
   commandBus.register('DeleteAgentCommand', deleteAgentHandler);
@@ -553,10 +386,6 @@ export function createAppContainer(): AppContainer {
       structuredOutput: structuredOutputRepository,
       processingSession: sessionRepository,
       conversation: conversationRepository,
-      conversationContext: conversationContextRepository,
-      buildContext: buildContextRepository,
-      pretPackageSession: pretPackageSessionRepository,
-      pretPackageStorage,
       sessionMemory: sessionMemoryRepository,
       delayAnalysisProject: delayAnalysisProjectRepository,
       projectDocument: projectDocumentRepository,
@@ -564,20 +393,8 @@ export function createAppContainer(): AppContainer {
       contractorDelayEvent: contractorDelayEventRepository,
       aiTokenUsage: aiTokenUsageRepository,
     },
-    handlers: {
-      importPretPackageHandler,
-      getPretPackageHandler,
-      analyzePackageHandler,
-      getDimensionMembersHandler,
-    },
     services: {
       isAIConfigured: bedrockClientProvider.isConfigured(),
-      pretToolRegistry,
-      pretOrchestrator,
-      pretContextService,
-      packageAnalysisCache,
-      pretCommandRegistry,
-      pretCommandExecutor,
       documentParserFactory,
       scheduleParserFactory,
       delayEventExtractor,
