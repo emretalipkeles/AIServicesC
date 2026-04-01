@@ -1,0 +1,78 @@
+2026-04-01T05:20:10.4254467Z PRET Package handlers not available - skipping route registration
+2026-04-01T05:20:10.7594689Z [Auth] Admin user already exists, skipping seed
+2026-04-01T05:20:11.3178944Z 5:20:10 AM [express] serving on port 8080
+2026-04-01T05:20:16.4074708Z 5:20:16 AM [express] POST /api/users 201 in 1323ms :: {"user":{"id":"8db2be3b-4bab-48bd-88ee-b17e353f4a79","email":"marlen.shakimov@axiompmp.com","name":"Marlen","role":"user","createdAt":"2026-04-01T05:20:16.216Z","updatedAt":"2026-04-01T05:20:16.216Z"}}
+2026-04-01T05:20:16.976915Z 5:20:16 AM [express] GET /api/users 200 in 374ms :: {"users":[{"id":"ecb01e51-8e48-4614-b06c-c54cc3eebe62","email":"emre.keles@axiompmp.com","name":"Emre Keles","role":"admin","createdAt":"2026-03-26T01:45:59.267Z","updatedAt":"2026-03-26T01:45:59.267Z"},{"id":"8db2be3b-4bab-48bd-88ee-b17e353f4a79","email":"marlen.shakimov@axiompmp.com","name":"Marlen","role":"user","createdAt":"2026-04-01T05:20:16.216Z","updatedAt":"2026-04-01T05:20:16.216Z"}]}
+2026-04-01T05:20:26.5982593Z Error listing delay analysis projects: Error: No handler registered for query: yg
+2026-04-01T05:20:26.598301Z     at yu.execute (file:///home/site/wwwroot/index.mjs:79:112140)
+2026-04-01T05:20:26.5983036Z     at gg.listProjects (file:///home/site/wwwroot/index.mjs:1461:3948)
+2026-04-01T05:20:26.5983057Z     at file:///home/site/wwwroot/index.mjs:1461:5546
+2026-04-01T05:20:26.5983078Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:26.5983097Z     at c (file:///home/site/wwwroot/index.mjs:39:5238)
+2026-04-01T05:20:26.5983117Z     at Ta.dispatch (file:///home/site/wwwroot/index.mjs:39:5037)
+2026-04-01T05:20:26.5983137Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:26.5983156Z     at file:///home/site/wwwroot/index.mjs:39:7911
+2026-04-01T05:20:26.5983177Z     at Ji.process_params (file:///home/site/wwwroot/index.mjs:39:8455)
+2026-04-01T05:20:26.5983197Z     at y (file:///home/site/wwwroot/index.mjs:39:7862)
+2026-04-01T05:20:26.5983251Z     at Mi (file:///home/site/wwwroot/index.mjs:1481:6752)
+2026-04-01T05:20:26.5983272Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:26.5983291Z     at g (file:///home/site/wwwroot/index.mjs:39:8339)
+2026-04-01T05:20:26.5983311Z     at file:///home/site/wwwroot/index.mjs:39:7933
+2026-04-01T05:20:26.5983331Z     at Ji.process_params (file:///home/site/wwwroot/index.mjs:39:8455)
+2026-04-01T05:20:26.598335Z     at y (file:///home/site/wwwroot/index.mjs:39:7862)
+2026-04-01T05:20:26.598337Z     at file:///home/site/wwwroot/index.mjs:1481:8544
+2026-04-01T05:20:26.5983389Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:26.5983408Z     at g (file:///home/site/wwwroot/index.mjs:39:8339)
+2026-04-01T05:20:26.5983428Z     at file:///home/site/wwwroot/index.mjs:39:7933
+2026-04-01T05:20:26.5983473Z     at Ji.process_params (file:///home/site/wwwroot/index.mjs:39:8455)
+2026-04-01T05:20:26.5983492Z     at y (file:///home/site/wwwroot/index.mjs:39:7862)
+2026-04-01T05:20:26.7342671Z 5:20:26 AM [express] GET /api/delay-analysis/projects 500 in 144ms :: {"error":"Failed to list projects"}
+2026-04-01T05:20:34.2369732Z 5:20:34 AM [express] GET /api/auth/me 200 in 247ms :: {"user":{"id":"ecb01e51-8e48-4614-b06c-c54cc3eebe62","email":"emre.keles@axiompmp.com","name":"Emre Keles","role":"admin","createdAt":"2026-03-26T01:45:59.267Z","updatedAt":"2026-03-26T01:45:59.267Z"}}
+2026-04-01T05:20:34.4026009Z Agent Controller error: Error: No handler registered for query: rg
+2026-04-01T05:20:34.4026438Z     at yu.execute (file:///home/site/wwwroot/index.mjs:79:112140)
+2026-04-01T05:20:34.4026474Z     at ig.listAgents (file:///home/site/wwwroot/index.mjs:1443:10622)
+2026-04-01T05:20:34.4026499Z     at file:///home/site/wwwroot/index.mjs:1449:1332
+2026-04-01T05:20:34.4026523Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:34.4026554Z     at c (file:///home/site/wwwroot/index.mjs:39:5238)
+2026-04-01T05:20:34.4026577Z     at Ta.dispatch (file:///home/site/wwwroot/index.mjs:39:5037)
+2026-04-01T05:20:34.40266Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:34.4026623Z     at file:///home/site/wwwroot/index.mjs:39:7911
+2026-04-01T05:20:34.4026895Z     at Ji.process_params (file:///home/site/wwwroot/index.mjs:39:8455)
+2026-04-01T05:20:34.4026918Z     at y (file:///home/site/wwwroot/index.mjs:39:7862)
+2026-04-01T05:20:34.4026941Z     at Mi (file:///home/site/wwwroot/index.mjs:1481:6752)
+2026-04-01T05:20:34.4026963Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:34.4026985Z     at g (file:///home/site/wwwroot/index.mjs:39:8339)
+2026-04-01T05:20:34.4027006Z     at file:///home/site/wwwroot/index.mjs:39:7933
+2026-04-01T05:20:34.4027028Z     at Ji.process_params (file:///home/site/wwwroot/index.mjs:39:8455)
+2026-04-01T05:20:34.402705Z     at y (file:///home/site/wwwroot/index.mjs:39:7862)
+2026-04-01T05:20:34.4027072Z     at file:///home/site/wwwroot/index.mjs:1481:8544
+2026-04-01T05:20:34.4027094Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:34.4027142Z     at g (file:///home/site/wwwroot/index.mjs:39:8339)
+2026-04-01T05:20:34.402732Z     at file:///home/site/wwwroot/index.mjs:39:7933
+2026-04-01T05:20:34.4027343Z     at Ji.process_params (file:///home/site/wwwroot/index.mjs:39:8455)
+2026-04-01T05:20:34.4027364Z     at y (file:///home/site/wwwroot/index.mjs:39:7862)
+2026-04-01T05:20:34.5337574Z 5:20:34 AM [express] GET /api/agents 500 in 132ms :: {"error":"No handler registered for query: rg"}
+2026-04-01T05:20:36.9168975Z Error listing delay analysis projects: Error: No handler registered for query: yg
+2026-04-01T05:20:36.9169742Z     at yu.execute (file:///home/site/wwwroot/index.mjs:79:112140)
+2026-04-01T05:20:36.9169775Z     at gg.listProjects (file:///home/site/wwwroot/index.mjs:1461:3948)
+2026-04-01T05:20:36.9169801Z     at file:///home/site/wwwroot/index.mjs:1461:5546
+2026-04-01T05:20:36.9169818Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:36.9169835Z     at c (file:///home/site/wwwroot/index.mjs:39:5238)
+2026-04-01T05:20:36.9169935Z     at Ta.dispatch (file:///home/site/wwwroot/index.mjs:39:5037)
+2026-04-01T05:20:36.9169955Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:36.9169973Z     at file:///home/site/wwwroot/index.mjs:39:7911
+2026-04-01T05:20:36.916999Z     at Ji.process_params (file:///home/site/wwwroot/index.mjs:39:8455)
+2026-04-01T05:20:36.9170007Z     at y (file:///home/site/wwwroot/index.mjs:39:7862)
+2026-04-01T05:20:36.9170026Z     at Mi (file:///home/site/wwwroot/index.mjs:1481:6752)
+2026-04-01T05:20:36.9170043Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:36.9170113Z     at g (file:///home/site/wwwroot/index.mjs:39:8339)
+2026-04-01T05:20:36.9170132Z     at file:///home/site/wwwroot/index.mjs:39:7933
+2026-04-01T05:20:36.9170149Z     at Ji.process_params (file:///home/site/wwwroot/index.mjs:39:8455)
+2026-04-01T05:20:36.9170168Z     at y (file:///home/site/wwwroot/index.mjs:39:7862)
+2026-04-01T05:20:36.9170206Z     at file:///home/site/wwwroot/index.mjs:1481:8544
+2026-04-01T05:20:36.9170224Z     at Da.handle_request (file:///home/site/wwwroot/index.mjs:39:3162)
+2026-04-01T05:20:36.9170242Z     at g (file:///home/site/wwwroot/index.mjs:39:8339)
+2026-04-01T05:20:36.9170258Z     at file:///home/site/wwwroot/index.mjs:39:7933
+2026-04-01T05:20:36.9170276Z     at Ji.process_params (file:///home/site/wwwroot/index.mjs:39:8455)
+2026-04-01T05:20:36.9170292Z     at y (file:///home/site/wwwroot/index.mjs:39:7862)
+2026-04-01T05:20:37.0418485Z 5:20:37 AM [express] GET /api/delay-analysis/projects 500 in 128ms :: {"error":"Failed to list projects"}
