@@ -1,6 +1,7 @@
 import { BaseCommand } from '../interfaces/ICommandBus';
 
 export class UpdateAgentCommand extends BaseCommand {
+  readonly type = 'UpdateAgentCommand' as const;
   constructor(
     public readonly id: string,
     tenantId: string,

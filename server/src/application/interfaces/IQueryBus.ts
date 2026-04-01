@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
 export interface Query {
+  readonly type: string;
   readonly queryId: string;
   readonly tenantId?: string;
 }
 
 export abstract class BaseQuery implements Query {
+  abstract readonly type: string;
   readonly queryId: string;
 
   constructor(public readonly tenantId?: string) {

@@ -6,6 +6,7 @@ export interface ChatMessage {
 }
 
 export class ChatWithAgentCommand extends BaseCommand {
+  readonly type = 'ChatWithAgentCommand' as const;
   constructor(
     public readonly agentId: string,
     tenantId: string,

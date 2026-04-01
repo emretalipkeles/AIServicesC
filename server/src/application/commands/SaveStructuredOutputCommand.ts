@@ -6,6 +6,7 @@ export interface StructuredOutputBlock {
 }
 
 export class SaveStructuredOutputCommand extends BaseCommand {
+  readonly type = 'SaveStructuredOutputCommand' as const;
   constructor(
     tenantId: string,
     public readonly agentId: string,

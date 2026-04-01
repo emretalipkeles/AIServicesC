@@ -4,7 +4,7 @@ export class InMemoryCommandBus implements ICommandBus {
   private handlers: Map<string, ICommandHandler<any, any>> = new Map();
 
   async execute<TCommand extends Command, TResult = void>(command: TCommand): Promise<TResult> {
-    const commandType = command.constructor.name;
+    const commandType = command.type;
     const handler = this.handlers.get(commandType);
     
     if (!handler) {

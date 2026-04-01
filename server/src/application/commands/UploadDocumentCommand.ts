@@ -1,6 +1,7 @@
 import { BaseCommand } from '../interfaces/ICommandBus';
 
 export class UploadDocumentCommand extends BaseCommand {
+  readonly type = 'UploadDocumentCommand' as const;
   constructor(
     public readonly agentId: string,
     tenantId: string,

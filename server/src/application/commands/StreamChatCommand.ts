@@ -8,6 +8,7 @@ export interface StreamChatMessageInput {
 }
 
 export class StreamChatCommand extends BaseCommand {
+  readonly type = 'StreamChatCommand' as const;
   constructor(
     public readonly model: ModelName,
     public readonly messages: StreamChatMessageInput[],

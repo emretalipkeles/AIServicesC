@@ -1,6 +1,7 @@
 import { BaseCommand } from '../interfaces/ICommandBus';
 
 export class CreateAgentCommand extends BaseCommand {
+  readonly type = 'CreateAgentCommand' as const;
   constructor(
     tenantId: string,
     public readonly name: string,

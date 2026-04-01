@@ -8,6 +8,7 @@ export interface ChatMessageInput {
 }
 
 export class SendChatCommand extends BaseCommand {
+  readonly type = 'SendChatCommand' as const;
   constructor(
     public readonly model: ModelName,
     public readonly messages: ChatMessageInput[],

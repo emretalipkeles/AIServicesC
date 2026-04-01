@@ -1,6 +1,7 @@
 import { BaseCommand } from '../../interfaces/ICommandBus';
 
 export class UpdateDelayAnalysisProjectCommand extends BaseCommand {
+  readonly type = 'UpdateDelayAnalysisProjectCommand' as const;
   constructor(
     tenantId: string,
     public readonly projectId: string,

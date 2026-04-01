@@ -4,7 +4,7 @@ export class InMemoryQueryBus implements IQueryBus {
   private handlers: Map<string, IQueryHandler<any, any>> = new Map();
 
   async execute<TQuery extends Query, TResult>(query: TQuery): Promise<TResult> {
-    const queryType = query.constructor.name;
+    const queryType = query.type;
     const handler = this.handlers.get(queryType);
     
     if (!handler) {
