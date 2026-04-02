@@ -46,59 +46,54 @@ export class PdfScheduleParser implements IScheduleParser {
 
       progress.report({
         stage: 'filtering_dates',
-        message: `Identifying activity lines from PDF...`,
+        message: `Preparing PDF text for AI analysis...`,
         percentage: 15,
       });
 
       const textToProcess = this.extractAllActivitiesSection(fullText);
-      const filteredLines = this.filterActivityLines(textToProcess);
-      
-      console.log(`[PdfScheduleParser] Found ${filteredLines.length} activity lines`);
+      const chunks = this.chunkText(textToProcess, 5000);
 
-      if (filteredLines.length === 0) {
+      console.log(`[PdfScheduleParser] Split ${textToProcess.length} chars into ${chunks.length} chunks for AI extraction`);
+
+      if (textToProcess.trim().length === 0) {
         progress.report({
           stage: 'complete',
-          message: 'No activity lines found in PDF',
+          message: 'No text content found in PDF',
           percentage: 100,
         });
         return {
           rows: [],
           scheduleUpdateMonth: null,
-          errors: [`No activity lines found in PDF. The document may not contain recognizable CPM schedule activity data.`],
+          errors: [`No text content found in PDF. The document may not contain recognizable CPM schedule activity data.`],
           totalRowsProcessed: 0,
           successfulRows: 0,
         };
       }
-      
-      console.log(`[PdfScheduleParser] Sending ${filteredLines.length} activity lines to AI for extraction`);
 
       progress.report({
         stage: 'ai_processing',
-        message: `Found ${filteredLines.length} potential activities. Starting AI analysis...`,
+        message: `Sending ${chunks.length} text chunks to AI for activity extraction...`,
         percentage: 20,
-        details: { total: filteredLines.length },
+        details: { total: chunks.length },
       });
 
-      const batchSize = 30;
-      const batches = this.chunkArray(filteredLines, batchSize);
-
-      for (let i = 0; i < batches.length; i++) {
-        const batchProgress = 20 + ((i + 1) / batches.length) * 60;
+      let chunkErrors = 0;
+      for (let i = 0; i < chunks.length; i++) {
+        const batchProgress = 20 + ((i + 1) / chunks.length) * 60;
         progress.report({
           stage: 'processing_batch',
-          message: `Processing batch ${i + 1} of ${batches.length}...`,
+          message: `AI analyzing chunk ${i + 1} of ${chunks.length}...`,
           percentage: Math.round(batchProgress),
           details: {
             batchNumber: i + 1,
-            totalBatches: batches.length,
+            totalBatches: chunks.length,
             current: rows.length,
-            total: filteredLines.length,
           },
         });
 
         try {
-          const batchRows = await this.parseWithAI(
-            batches[i], 
+          const batchRows = await this.parseChunkWithAI(
+            chunks[i],
             options,
             options.tokenUsageCallback,
             options.runId,
@@ -106,16 +101,38 @@ export class PdfScheduleParser implements IScheduleParser {
           );
           rows.push(...batchRows);
         } catch (batchError) {
-          errors.push(`Batch ${i + 1}: ${batchError instanceof Error ? batchError.message : 'Parse error'}`);
+          chunkErrors++;
+          errors.push(`Chunk ${i + 1}: ${batchError instanceof Error ? batchError.message : 'Parse error'}`);
         }
       }
 
+      const errorRate = chunks.length > 0 ? chunkErrors / chunks.length : 0;
+      if (errorRate > 0.5) {
+        errors.push(`High chunk error rate (${chunkErrors}/${chunks.length} failed). Extraction may be incomplete.`);
+        console.warn(`[PdfScheduleParser] WARNING: ${chunkErrors}/${chunks.length} chunks failed (${Math.round(errorRate * 100)}% error rate)`);
+      }
+
+      const seenActivityIds = new Set<string>();
+      const deduplicatedRows: ParsedScheduleRow[] = [];
+      for (const row of rows) {
+        if (!seenActivityIds.has(row.activityId)) {
+          seenActivityIds.add(row.activityId);
+          deduplicatedRows.push(row);
+        }
+      }
+
+      const filteredRows = options.filterActualOnly !== false
+        ? deduplicatedRows.filter(r => r.actualStartDate !== null || r.actualFinishDate !== null)
+        : deduplicatedRows;
+
+      console.log(`[PdfScheduleParser] AI extracted ${rows.length} total activities, ${deduplicatedRows.length} after dedup, ${filteredRows.length} with actual dates`);
+
       return {
-        rows,
+        rows: filteredRows,
         scheduleUpdateMonth: null,
         errors,
-        totalRowsProcessed: filteredLines.length,
-        successfulRows: rows.length,
+        totalRowsProcessed: rows.length,
+        successfulRows: filteredRows.length,
       };
     } catch (error) {
       return {
@@ -128,123 +145,80 @@ export class PdfScheduleParser implements IScheduleParser {
     }
   }
 
-  private filterActivityLines(text: string): string[] {
+  private chunkText(text: string, maxChunkSize: number, overlapLines: number = 15): string[] {
     const lines = text.split('\n');
-    const totalLines = lines.length;
-    const filteredLines: string[] = [];
-    let linesWithActivityId = 0;
+    const chunks: string[] = [];
+    let startIdx = 0;
 
-    const activityIdPatterns = [
-      /\d+-[A-Za-z]+-\d+/,
-      /\d+-[A-Za-z]{1,4}-\d+/,
-      /[A-Za-z]+-\d+/,
-      /[A-Za-z]{1,6}\d{3,}/,
-      /\d+-[A-Za-z]+-\d+[A-Za-z]/,
-      /[A-Za-z]{2,6}-\d{2,6}-\d+/,
-    ];
+    while (startIdx < lines.length) {
+      let currentChunk = '';
+      let endIdx = startIdx;
 
-    const actualDatePatterns = [
-      /\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{2,4}\s+A\b/,
-      /\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}\s+A\b/,
-      /\d{4}[-\/]\d{1,2}[-\/]\d{1,2}\s+A\b/,
-      /[A-Za-z]{3}[-\/\s]\d{1,2}[-\/\s]\d{2,4}\s+A\b/,
-    ];
-
-    const dateOnlyPattern = /^\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{2,4}$/;
-    const monthAbbreviations = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$/i;
-    const monthYearPattern = /^[A-Za-z]{3,9}[-\/\s]\d{2,4}$/;
-
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (trimmedLine.length < 10) continue;
-
-      let hasActivityId = false;
-      for (const pattern of activityIdPatterns) {
-        const match = trimmedLine.match(pattern);
-        if (match) {
-          if (dateOnlyPattern.test(match[0])) continue;
-          if (monthYearPattern.test(match[0])) continue;
-          const parts = match[0].split(/[-_]/);
-          const allMonth = parts.every(p => monthAbbreviations.test(p) || /^\d{1,4}$/.test(p));
-          if (allMonth && parts.length <= 3) continue;
-          hasActivityId = true;
+      while (endIdx < lines.length) {
+        const nextLine = lines[endIdx];
+        if (currentChunk.length + nextLine.length + 1 > maxChunkSize && currentChunk.length > 0) {
           break;
         }
+        currentChunk += (currentChunk.length > 0 ? '\n' : '') + nextLine;
+        endIdx++;
       }
 
-      if (!hasActivityId) continue;
-
-      linesWithActivityId++;
-
-      let hasActualDate = false;
-      for (const pattern of actualDatePatterns) {
-        if (pattern.test(trimmedLine)) {
-          hasActualDate = true;
-          break;
-        }
+      if (currentChunk.trim().length > 0) {
+        chunks.push(currentChunk);
       }
 
-      if (hasActualDate) {
-        filteredLines.push(trimmedLine);
-      }
+      if (endIdx >= lines.length) break;
+
+      startIdx = Math.max(startIdx + 1, endIdx - overlapLines);
     }
 
-    console.log(`[PdfScheduleParser] Pre-filter: ${totalLines} total lines, ${linesWithActivityId} with activity IDs, ${filteredLines.length} with actual date markers`);
-
-    return filteredLines;
+    return chunks;
   }
 
-  private async parseWithAI(
-    lines: string[], 
+  private async parseChunkWithAI(
+    textChunk: string,
     options: ScheduleParseOptions,
     tokenUsageCallback?: TokenUsageCallback,
     runId?: string,
-    batchNumber?: number
+    chunkNumber?: number
   ): Promise<ParsedScheduleRow[]> {
-    const prompt = `You are parsing CPM (Critical Path Method) schedule data extracted from a PDF. Extract structured activity data from the lines below.
+    const prompt = `You are parsing raw text extracted from a CPM (Critical Path Method) construction schedule PDF. Your job is to find and extract ALL schedule activities that have actual dates.
 
-## ACTIVITY ID RECOGNITION
-Activity IDs can appear in many formats. Do NOT restrict to any single pattern. Common formats include but are not limited to:
-- Numeric-alpha-numeric: "1-W-0036", "4-PF-1526", "3-WE-1111"
-- Alpha-numeric: "PROC-0005", "DSC-023", "DSC-024"
-- Alpha with number suffix: "FM0009", "FM0012"
-- With letter suffixes: "4-PH-1460A"
-- Any other alphanumeric code that serves as a unique activity identifier
+## HOW TO IDENTIFY ACTIVITIES
+- Each activity row typically has: an Activity ID, a description, duration values, and date columns
+- Activity IDs can be in any alphanumeric format: "1-W-0036", "PROC-0005", "DSC-023", "FM0009", "4-PH-1460A", "M-9000", etc.
+- Ignore headers, footers, legends, page numbers, column labels, and any non-activity text
 
-The Activity ID is typically the FIRST column in the schedule data. Use column headers (if visible in the text) to identify which values are Activity IDs, descriptions, dates, etc. Note that column headers may appear duplicated in the PDF text.
+## HOW TO IDENTIFY ACTUAL DATES
+- In CPM schedules, dates followed by "A" indicate ACTUAL dates (e.g., "07-Nov-24 A" means actual date November 7, 2024)
+- The "A" marker may appear immediately after the date or separated by whitespace
+- Dates WITHOUT an "A" marker are planned/baseline dates
+- Dates may appear in formats: DD-Mon-YY, DD/MM/YY, Mon-DD-YY, MM/DD/YY, YYYY-MM-DD, or with spaces/dashes
+- Dates from any year are valid — there is no date range restriction
 
-## DATE EXTRACTION
-- Dates followed by "A" are ACTUAL dates (e.g., "29-Jul-25 A" means actual date July 29, 2025)
-- Dates may be in formats: DD-Mon-YY, DD/MM/YY, Mon-DD-YY, MM/DD/YY, YYYY-MM-DD, or with spaces instead of dashes
-- Every line below has been pre-filtered to contain at least one actual date marker. Extract ALL of them — do not skip any line.
-- Dates from any year are valid (2023, 2024, 2025, etc.) — there is no date range restriction
+## WHAT TO EXTRACT
+Only extract activities that have AT LEAST ONE actual date (a date marked with "A"). Skip activities that only have planned dates and no actual dates.
 
-## OTHER FIELDS TO EXTRACT
-- Activity Name/Description: descriptive text about the work (usually the second column)
-- WBS: hierarchical numbers or zone indicators (may be null)
-- TF (Total Float): numeric value in days, can be negative (may be null)
-- LP/CP (Critical Path): look for checkbox markers, asterisks, TF=0, or explicit critical path indicators
-
-## LINES TO PARSE
-${lines.join('\n')}
+## RAW TEXT TO ANALYZE
+${textChunk}
 
 ## OUTPUT FORMAT
-Return a JSON array of objects. Every line has at least one actual date — extract ALL activities.
+Return a JSON array of objects. If no activities with actual dates are found in this chunk, return an empty array [].
 Fields:
-- activityId: string (required) — the exact activity ID as it appears in the schedule
-- activityDescription: string (required)
+- activityId: string (required) — the exact activity ID as it appears
+- activityDescription: string (required) — the activity description/name
 - wbs: string or null
 - actualStartDate: ISO date string or null (only dates marked with "A")
 - actualFinishDate: ISO date string or null (only dates marked with "A")
-- plannedStartDate: ISO date string or null
-- plannedFinishDate: ISO date string or null
+- plannedStartDate: ISO date string or null (dates without "A" marker)
+- plannedFinishDate: ISO date string or null (dates without "A" marker)
 - isCriticalPath: "yes", "no", or "unknown"
-- totalFloat: number or null
+- totalFloat: number or null (in days, can be negative)
 
 Return ONLY the JSON array, no other text.`;
 
     const modelId = new ModelId('gpt-5.4');
-    
+
     const response = await this.aiClient.chat({
       model: modelId,
       messages: [AIMessage.user(prompt)],
@@ -252,8 +226,8 @@ Return ONLY the JSON array, no other text.`;
 
     if (tokenUsageCallback && runId) {
       await tokenUsageCallback({
-        operation: batchNumber !== undefined 
-          ? `schedule_parsing_batch_${batchNumber}` 
+        operation: chunkNumber !== undefined
+          ? `schedule_parsing_chunk_${chunkNumber}`
           : 'schedule_parsing',
         model: modelId.getValue(),
         inputTokens: response.inputTokens,
@@ -263,14 +237,17 @@ Return ONLY the JSON array, no other text.`;
     }
 
     const responseText = response.content;
-    
-    console.log(`[PdfScheduleParser] Batch ${batchNumber}: Sent ${lines.length} lines to AI`);
-    console.log(`[PdfScheduleParser] Batch ${batchNumber}: First 3 lines sample:`, lines.slice(0, 3));
-    
+
+    console.log(`[PdfScheduleParser] Chunk ${chunkNumber}: Sent ${textChunk.length} chars to AI`);
+
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      console.error(`[PdfScheduleParser] Batch ${batchNumber}: AI response did not contain valid JSON array`);
-      console.error(`[PdfScheduleParser] Batch ${batchNumber}: AI response was:`, responseText.substring(0, 500));
+      if (responseText.trim() === '[]' || responseText.includes('no activities') || responseText.includes('No activities')) {
+        console.log(`[PdfScheduleParser] Chunk ${chunkNumber}: No activities found in this chunk`);
+        return [];
+      }
+      console.error(`[PdfScheduleParser] Chunk ${chunkNumber}: AI response did not contain valid JSON array`);
+      console.error(`[PdfScheduleParser] Chunk ${chunkNumber}: AI response was:`, responseText.substring(0, 500));
       throw new Error('AI response did not contain valid JSON array');
     }
 
@@ -286,9 +263,9 @@ Return ONLY the JSON array, no other text.`;
       totalFloat?: number | null;
     }>;
 
-    console.log(`[PdfScheduleParser] Batch ${batchNumber}: AI returned ${parsed.length} activities`);
+    console.log(`[PdfScheduleParser] Chunk ${chunkNumber}: AI returned ${parsed.length} activities`);
     if (parsed.length > 0) {
-      console.log(`[PdfScheduleParser] Batch ${batchNumber}: First activity:`, parsed[0]);
+      console.log(`[PdfScheduleParser] Chunk ${chunkNumber}: First activity:`, parsed[0]);
     }
 
     return parsed.map(item => ({
@@ -316,14 +293,6 @@ Return ONLY the JSON array, no other text.`;
       return isNaN(parsed) ? null : parsed;
     }
     return null;
-  }
-
-  private chunkArray<T>(array: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
   }
 
   private extractAllActivitiesSection(fullText: string): string {
