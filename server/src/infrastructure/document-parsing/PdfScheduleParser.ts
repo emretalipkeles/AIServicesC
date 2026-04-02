@@ -131,6 +131,7 @@ export class PdfScheduleParser implements IScheduleParser {
   private filterActivityLines(text: string): string[] {
     const lines = text.split('\n');
     const filteredLines: string[] = [];
+    let linesWithActivityId = 0;
 
     const activityIdPatterns = [
       /\d+-[A-Za-z]+-\d+/,
@@ -139,6 +140,13 @@ export class PdfScheduleParser implements IScheduleParser {
       /[A-Za-z]{1,6}\d{3,}/,
       /\d+-[A-Za-z]+-\d+[A-Za-z]/,
       /[A-Za-z]{2,6}-\d{2,6}-\d+/,
+    ];
+
+    const actualDatePatterns = [
+      /\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{2,4}\s+A\b/,
+      /\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}\s+A\b/,
+      /\d{4}[-\/]\d{1,2}[-\/]\d{1,2}\s+A\b/,
+      /[A-Za-z]{3}[-\/\s]\d{1,2}[-\/\s]\d{2,4}\s+A\b/,
     ];
 
     const dateOnlyPattern = /^\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{2,4}$/;
@@ -163,10 +171,24 @@ export class PdfScheduleParser implements IScheduleParser {
         }
       }
 
-      if (hasActivityId) {
+      if (!hasActivityId) continue;
+
+      linesWithActivityId++;
+
+      let hasActualDate = false;
+      for (const pattern of actualDatePatterns) {
+        if (pattern.test(trimmedLine)) {
+          hasActualDate = true;
+          break;
+        }
+      }
+
+      if (hasActualDate) {
         filteredLines.push(trimmedLine);
       }
     }
+
+    console.log(`[PdfScheduleParser] Pre-filter: ${linesWithActivityId} lines with activity IDs, ${filteredLines.length} with actual date markers`);
 
     return filteredLines;
   }
@@ -193,8 +215,8 @@ The Activity ID is typically the FIRST column in the schedule data. Use column h
 ## DATE EXTRACTION
 - Dates followed by "A" are ACTUAL dates (e.g., "29-Jul-25 A" means actual date July 29, 2025)
 - Dates may be in formats: DD-Mon-YY, DD/MM/YY, Mon-DD-YY, MM/DD/YY, YYYY-MM-DD, or with spaces instead of dashes
-- Extract ALL activities that have at least one actual date (Actual Start or Actual Finish)
-- If an activity has no actual dates at all, skip it
+- Every line below has been pre-filtered to contain at least one actual date marker. Extract ALL of them — do not skip any line.
+- Dates from any year are valid (2023, 2024, 2025, etc.) — there is no date range restriction
 
 ## OTHER FIELDS TO EXTRACT
 - Activity Name/Description: descriptive text about the work (usually the second column)
@@ -206,7 +228,7 @@ The Activity ID is typically the FIRST column in the schedule data. Use column h
 ${lines.join('\n')}
 
 ## OUTPUT FORMAT
-Return a JSON array of objects. Only include activities with at least one actual date.
+Return a JSON array of objects. Every line has at least one actual date — extract ALL activities.
 Fields:
 - activityId: string (required) — the exact activity ID as it appears in the schedule
 - activityDescription: string (required)
