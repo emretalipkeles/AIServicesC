@@ -69,7 +69,7 @@ export class PdfScheduleParser implements IScheduleParser {
         return {
           rows: [],
           scheduleUpdateMonth: `${options.targetYear}-${String(options.targetMonth).padStart(2, '0')}`,
-          errors: [`No activity lines found in PDF. Expected activity IDs like "1-W-0036" or "3-PF-1526".`],
+          errors: [`No activity lines found in PDF. The document may not contain recognizable CPM schedule activity data.`],
           totalRowsProcessed: 0,
           successfulRows: 0,
           filteredByMonth: 0,
@@ -202,14 +202,39 @@ export class PdfScheduleParser implements IScheduleParser {
   private filterActivityLines(text: string): string[] {
     const lines = text.split('\n');
     const filteredLines: string[] = [];
-    
-    const activityIdPattern = /\d+-[A-Za-z]+-\d+|\d+-[A-Za-z]{1,3}-\d+/;
+
+    const activityIdPatterns = [
+      /\d+-[A-Za-z]+-\d+/,
+      /\d+-[A-Za-z]{1,4}-\d+/,
+      /[A-Za-z]+-\d+/,
+      /[A-Za-z]{1,6}\d{3,}/,
+      /\d+-[A-Za-z]+-\d+[A-Za-z]/,
+      /[A-Za-z]{2,6}-\d{2,6}-\d+/,
+    ];
+
+    const dateOnlyPattern = /^\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{2,4}$/;
+    const monthAbbreviations = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$/i;
+    const monthYearPattern = /^[A-Za-z]{3,9}[-\/\s]\d{2,4}$/;
 
     for (const line of lines) {
       const trimmedLine = line.trim();
-      if (trimmedLine.length < 15) continue;
-      
-      if (activityIdPattern.test(trimmedLine)) {
+      if (trimmedLine.length < 10) continue;
+
+      let hasActivityId = false;
+      for (const pattern of activityIdPatterns) {
+        const match = trimmedLine.match(pattern);
+        if (match) {
+          if (dateOnlyPattern.test(match[0])) continue;
+          if (monthYearPattern.test(match[0])) continue;
+          const parts = match[0].split(/[-_]/);
+          const allMonth = parts.every(p => monthAbbreviations.test(p) || /^\d{1,4}$/.test(p));
+          if (allMonth && parts.length <= 3) continue;
+          hasActivityId = true;
+          break;
+        }
+      }
+
+      if (hasActivityId) {
         filteredLines.push(trimmedLine);
       }
     }
@@ -227,28 +252,37 @@ export class PdfScheduleParser implements IScheduleParser {
     const monthName = ['', 'January', 'February', 'March', 'April', 'May', 'June', 
                        'July', 'August', 'September', 'October', 'November', 'December'][options.targetMonth];
     
-    const prompt = `You are parsing CPM schedule data from a PDF. Extract structured activity data from these lines.
+    const prompt = `You are parsing CPM (Critical Path Method) schedule data extracted from a PDF. Extract structured activity data from the lines below.
 
-CRITICAL FILTERING RULE:
+## ACTIVITY ID RECOGNITION
+Activity IDs can appear in many formats. Do NOT restrict to any single pattern. Common formats include but are not limited to:
+- Numeric-alpha-numeric: "1-W-0036", "4-PF-1526", "3-WE-1111"
+- Alpha-numeric: "PROC-0005", "DSC-023", "DSC-024"
+- Alpha with number suffix: "FM0009", "FM0012"
+- With letter suffixes: "4-PH-1460A"
+- Any other alphanumeric code that serves as a unique activity identifier
+
+The Activity ID is typically the FIRST column in the schedule data. Use column headers (if visible in the text) to identify which values are Activity IDs, descriptions, dates, etc. Note that column headers may appear duplicated in the PDF text.
+
+## CRITICAL FILTERING RULE
 Only include activities where EITHER the Actual Start Date OR the Actual Finish Date falls in ${monthName} ${options.targetYear}.
 - Dates followed by "A" are ACTUAL dates (e.g., "29-Jul-25 A" means actual date July 29, 2025)
-- Dates may be in formats: DD-Mon-YY, DD/MM/YY, Mon-DD-YY, or with spaces instead of dashes
+- Dates may be in formats: DD-Mon-YY, DD/MM/YY, Mon-DD-YY, MM/DD/YY, YYYY-MM-DD, or with spaces instead of dashes
 - If an activity has no actual dates in ${monthName} ${options.targetYear}, do NOT include it
 
-Activity ID formats: "1-W-0036", "4-PF-1526", "3-WE-1111", "3-W-1100"
-
-Other fields to extract:
-- Activity Name/Description: descriptive text about the work
+## OTHER FIELDS TO EXTRACT
+- Activity Name/Description: descriptive text about the work (usually the second column)
 - WBS: hierarchical numbers or zone indicators (may be null)
 - TF (Total Float): numeric value in days, can be negative (may be null)
-- LP (Critical Path): look for checkbox markers, asterisks, or TF=0
+- LP/CP (Critical Path): look for checkbox markers, asterisks, TF=0, or explicit critical path indicators
 
-Lines to parse:
+## LINES TO PARSE
 ${lines.join('\n')}
 
+## OUTPUT FORMAT
 Return a JSON array of objects. Only include activities with actual dates in ${monthName} ${options.targetYear}.
 Fields:
-- activityId: string (required)
+- activityId: string (required) — the exact activity ID as it appears in the schedule
 - activityDescription: string (required)
 - wbs: string or null
 - actualStartDate: ISO date string or null (only dates marked with "A")

@@ -25,7 +25,7 @@ NCRs are formal documentation of quality failures where work does not meet contr
 
 1. **Read the entire NCR** — Identify the non-conformance, what failed, and the corrective action
 2. **Extract the delay event** — The NCR itself is the delay event
-3. **Scan the NCR for any activity IDs or WBS codes** — Look for patterns like "X-XX-XXXX", "Activity XXXX", or "WBS XX.XX.XX". If found, use the get_schedule_activities tool to look them up.
+3. **Scan the NCR for any activity IDs or WBS codes** — Activity IDs can be in any alphanumeric format (e.g., "2-W-0471", "PROC-0005", "DSC-023", "FM0009", "4-PH-1460A", "Activity XXXX", "WBS XX.XX.XX"). If found, use the get_schedule_activities tool to look them up.
 4. **If no activity IDs found** — Leave matchedActivityId as null. Do NOT fabricate activity IDs or pass descriptive text to the tool.
 5. **Output the final JSON**
 

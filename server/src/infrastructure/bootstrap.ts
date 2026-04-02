@@ -299,8 +299,10 @@ export function createAppContainer(): AppContainer {
   }
   
   const excelParser = new ExcelScheduleParserV2();
-  const regexPdfParser = new RegexScheduleParser();
-  scheduleParserFactory = new ScheduleParserFactory([excelParser, regexPdfParser]);
+  const pdfParser = aiClient
+    ? new PdfScheduleParser(aiClient)
+    : new RegexScheduleParser();
+  scheduleParserFactory = new ScheduleParserFactory([excelParser, pdfParser]);
 
   if (aiClient) {
     const extractionKnowledgeBase = new ContractorDelayTrainingGuide();

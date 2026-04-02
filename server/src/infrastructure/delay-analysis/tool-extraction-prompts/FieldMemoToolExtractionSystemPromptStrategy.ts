@@ -30,7 +30,7 @@ Field Memos are formal written directives from the owner/engineer to the contrac
 
 1. **Read the entire memo** — Identify each distinct Issue/Corrective Action pair
 2. **Extract delay events** — Each issue + corrective action = one delay event
-3. **Scan the memo for any activity IDs** — Look for patterns like "X-XX-XXXX", "Activity XXXX", or "WBS XX.XX.XX". If found, use the get_schedule_activities tool to look them up.
+3. **Scan the memo for any activity IDs** — Activity IDs can be in any alphanumeric format (e.g., "2-W-0471", "PROC-0005", "DSC-023", "FM0009", "4-PH-1460A", "Activity XXXX", "WBS XX.XX.XX"). If found, use the get_schedule_activities tool to look them up.
 4. **If no activity IDs found** — Leave matchedActivityId as null. Do NOT fabricate activity IDs or pass descriptive text to the tool.
 5. **Output the final JSON**
 

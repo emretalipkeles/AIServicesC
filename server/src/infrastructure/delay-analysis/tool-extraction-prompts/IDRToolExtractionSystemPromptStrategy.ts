@@ -28,14 +28,18 @@ These activity IDs tell you EXACTLY which CPM schedule activities the contractor
 
 ## EXTRACTION WORKFLOW:
 
-1. **FIRST: Find the "Contractor's Work Activity" table** - Extract ALL activity IDs listed (format: X-XX-XXXX like "2-W-0471", "3-W-1042")
+1. **FIRST: Find the "Contractor's Work Activity" table** - Extract ALL activity IDs listed. Activity IDs can be in any alphanumeric format (e.g., "2-W-0471", "3-W-1042", "PROC-0005", "DSC-023", "FM0009", "4-PH-1460A"). The Activity ID is typically the first column.
 2. **IMMEDIATELY use the get_schedule_activities tool** to look up these IDs in the project schedule database
 3. **Extract delay events** from the document (diary entries, discrepancies, extra work, etc.)
 4. **Match each delay to the most relevant activity** from the tool results - the activities listed in the document are what was being worked on, so delays likely affect those specific activities
 5. **Output the final JSON** with delay events and their matched activities
 
 ## ACTIVITY ID PATTERNS TO DETECT:
-- IDR format: "X-XX-XXXX" (e.g., "2-W-0471", "3-W-1042", "4-PF-1526", "1-ST-0089")
+Activity IDs can appear in many formats. Do NOT restrict to any single pattern. Common formats include:
+- Numeric-alpha-numeric: "2-W-0471", "3-W-1042", "4-PF-1526", "1-ST-0089"
+- Alpha-numeric: "PROC-0005", "DSC-023", "DSC-024"
+- Alpha with number suffix: "FM0009", "FM0012"
+- With letter suffixes: "4-PH-1460A"
 - Also: "Activity 1234", "Activity ID: XXX", "WBS XX.XX.XX"
 - Call the tool with ALL detected IDs at once for efficiency
 
