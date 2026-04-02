@@ -131,7 +131,7 @@ export class PdfScheduleParser implements IScheduleParser {
         rows: filteredRows,
         scheduleUpdateMonth: null,
         errors,
-        totalRowsProcessed: rows.length,
+        totalRowsProcessed: deduplicatedRows.length,
         successfulRows: filteredRows.length,
       };
     } catch (error) {
