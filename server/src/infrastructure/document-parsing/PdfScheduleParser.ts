@@ -130,6 +130,7 @@ export class PdfScheduleParser implements IScheduleParser {
 
   private filterActivityLines(text: string): string[] {
     const lines = text.split('\n');
+    const totalLines = lines.length;
     const filteredLines: string[] = [];
     let linesWithActivityId = 0;
 
@@ -188,7 +189,7 @@ export class PdfScheduleParser implements IScheduleParser {
       }
     }
 
-    console.log(`[PdfScheduleParser] Pre-filter: ${linesWithActivityId} lines with activity IDs, ${filteredLines.length} with actual date markers`);
+    console.log(`[PdfScheduleParser] Pre-filter: ${totalLines} total lines, ${linesWithActivityId} with activity IDs, ${filteredLines.length} with actual date markers`);
 
     return filteredLines;
   }
