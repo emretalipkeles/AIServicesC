@@ -11,11 +11,6 @@ import { ModelId } from '../../domain/value-objects/ModelId';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 import { NoOpProgressReporter } from '../../domain/delay-analysis/interfaces/IProgressReporter';
 
-const MONTH_NAMES: Record<string, number> = {
-  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
-  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
-};
-
 export class PdfScheduleParser implements IScheduleParser {
   private readonly supportedContentTypes = ['application/pdf'];
   private readonly supportedExtensions = ['.pdf'];
@@ -68,35 +63,14 @@ export class PdfScheduleParser implements IScheduleParser {
         });
         return {
           rows: [],
-          scheduleUpdateMonth: `${options.targetYear}-${String(options.targetMonth).padStart(2, '0')}`,
+          scheduleUpdateMonth: null,
           errors: [`No activity lines found in PDF. The document may not contain recognizable CPM schedule activity data.`],
           totalRowsProcessed: 0,
           successfulRows: 0,
-          filteredByMonth: 0,
         };
       }
       
-      const hasTargetMonthDates = this.quickCheckForTargetMonthDates(filteredLines, options);
-      if (!hasTargetMonthDates) {
-        const monthName = ['', 'January', 'February', 'March', 'April', 'May', 'June', 
-                           'July', 'August', 'September', 'October', 'November', 'December'][options.targetMonth];
-        progress.report({
-          stage: 'complete',
-          message: `No actual dates found for ${monthName} ${options.targetYear}`,
-          percentage: 100,
-        });
-        console.log(`[PdfScheduleParser] Quick check: No dates found for ${options.targetMonth}/${options.targetYear} in ${filteredLines.length} activity lines - skipping AI`);
-        return {
-          rows: [],
-          scheduleUpdateMonth: `${options.targetYear}-${String(options.targetMonth).padStart(2, '0')}`,
-          errors: [`No activities with actual dates found for ${monthName} ${options.targetYear}`],
-          totalRowsProcessed: 0,
-          successfulRows: 0,
-          filteredByMonth: 0,
-        };
-      }
-      
-      console.log(`[PdfScheduleParser] Found ${filteredLines.length} activity lines to send to AI for ${options.targetMonth}/${options.targetYear} filtering`);
+      console.log(`[PdfScheduleParser] Sending ${filteredLines.length} activity lines to AI for extraction`);
 
       progress.report({
         stage: 'ai_processing',
@@ -138,11 +112,10 @@ export class PdfScheduleParser implements IScheduleParser {
 
       return {
         rows,
-        scheduleUpdateMonth: `${options.targetYear}-${String(options.targetMonth).padStart(2, '0')}`,
+        scheduleUpdateMonth: null,
         errors,
         totalRowsProcessed: filteredLines.length,
         successfulRows: rows.length,
-        filteredByMonth: filteredLines.length,
       };
     } catch (error) {
       return {
@@ -151,52 +124,8 @@ export class PdfScheduleParser implements IScheduleParser {
         errors: [`Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}`],
         totalRowsProcessed: 0,
         successfulRows: 0,
-        filteredByMonth: 0,
       };
     }
-  }
-
-  private quickCheckForTargetMonthDates(activityLines: string[], options: ScheduleParseOptions): boolean {
-    const monthAbbrevs = ['', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-    const monthAbbrev = monthAbbrevs[options.targetMonth];
-    const yearStr2 = String(options.targetYear).slice(-2);
-    const yearStr4 = String(options.targetYear);
-    const monthNum = String(options.targetMonth).padStart(2, '0');
-    
-    const patterns = [
-      new RegExp(`\\d{1,2}[-/\\s]${monthAbbrev}[-/\\s](${yearStr2}|${yearStr4})`, 'gi'),
-      new RegExp(`${monthAbbrev}[-/\\s]\\d{1,2}[-/\\s](${yearStr2}|${yearStr4})`, 'gi'),
-      new RegExp(`\\d{1,2}[-/]${monthNum}[-/](${yearStr2}|${yearStr4})`, 'gi'),
-      new RegExp(`${monthNum}[-/]\\d{1,2}[-/](${yearStr2}|${yearStr4})`, 'gi'),
-    ];
-    
-    let matchCount = 0;
-    const matchExamples: string[] = [];
-    
-    for (const line of activityLines) {
-      const hasActualMarker = /\bA\b/.test(line);
-      if (!hasActualMarker) continue;
-      
-      for (const pattern of patterns) {
-        pattern.lastIndex = 0;
-        if (pattern.test(line)) {
-          matchCount++;
-          if (matchExamples.length < 3) {
-            matchExamples.push(line.substring(0, 120));
-          }
-          break;
-        }
-      }
-      if (matchCount >= 3) break;
-    }
-    
-    if (matchCount > 0) {
-      console.log(`[PdfScheduleParser] Quick check found ${matchCount}+ lines with ${monthAbbrev}/${yearStr2} dates and 'A' marker`);
-      console.log(`[PdfScheduleParser] Examples:`, matchExamples);
-      return true;
-    }
-    
-    return false;
   }
 
   private filterActivityLines(text: string): string[] {
@@ -249,9 +178,6 @@ export class PdfScheduleParser implements IScheduleParser {
     runId?: string,
     batchNumber?: number
   ): Promise<ParsedScheduleRow[]> {
-    const monthName = ['', 'January', 'February', 'March', 'April', 'May', 'June', 
-                       'July', 'August', 'September', 'October', 'November', 'December'][options.targetMonth];
-    
     const prompt = `You are parsing CPM (Critical Path Method) schedule data extracted from a PDF. Extract structured activity data from the lines below.
 
 ## ACTIVITY ID RECOGNITION
@@ -264,11 +190,11 @@ Activity IDs can appear in many formats. Do NOT restrict to any single pattern. 
 
 The Activity ID is typically the FIRST column in the schedule data. Use column headers (if visible in the text) to identify which values are Activity IDs, descriptions, dates, etc. Note that column headers may appear duplicated in the PDF text.
 
-## CRITICAL FILTERING RULE
-Only include activities where EITHER the Actual Start Date OR the Actual Finish Date falls in ${monthName} ${options.targetYear}.
+## DATE EXTRACTION
 - Dates followed by "A" are ACTUAL dates (e.g., "29-Jul-25 A" means actual date July 29, 2025)
 - Dates may be in formats: DD-Mon-YY, DD/MM/YY, Mon-DD-YY, MM/DD/YY, YYYY-MM-DD, or with spaces instead of dashes
-- If an activity has no actual dates in ${monthName} ${options.targetYear}, do NOT include it
+- Extract ALL activities that have at least one actual date (Actual Start or Actual Finish)
+- If an activity has no actual dates at all, skip it
 
 ## OTHER FIELDS TO EXTRACT
 - Activity Name/Description: descriptive text about the work (usually the second column)
@@ -280,7 +206,7 @@ Only include activities where EITHER the Actual Start Date OR the Actual Finish 
 ${lines.join('\n')}
 
 ## OUTPUT FORMAT
-Return a JSON array of objects. Only include activities with actual dates in ${monthName} ${options.targetYear}.
+Return a JSON array of objects. Only include activities with at least one actual date.
 Fields:
 - activityId: string (required) — the exact activity ID as it appears in the schedule
 - activityDescription: string (required)
@@ -337,7 +263,7 @@ Return ONLY the JSON array, no other text.`;
       totalFloat?: number | null;
     }>;
 
-    console.log(`[PdfScheduleParser] Batch ${batchNumber}: AI returned ${parsed.length} activities for ${monthName} ${options.targetYear}`);
+    console.log(`[PdfScheduleParser] Batch ${batchNumber}: AI returned ${parsed.length} activities`);
     if (parsed.length > 0) {
       console.log(`[PdfScheduleParser] Batch ${batchNumber}: First activity:`, parsed[0]);
     }

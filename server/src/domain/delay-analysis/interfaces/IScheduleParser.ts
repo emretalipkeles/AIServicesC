@@ -4,8 +4,6 @@ import type { IProgressReporter } from './IProgressReporter';
 import type { TokenUsageCallback } from './ITokenUsageRecorder';
 
 export interface ScheduleParseOptions {
-  targetMonth: number;
-  targetYear: number;
   filterActualOnly: boolean;
   progressReporter?: IProgressReporter;
   tokenUsageCallback?: TokenUsageCallback;
@@ -18,7 +16,6 @@ export interface ScheduleParseResult {
   errors: string[];
   totalRowsProcessed: number;
   successfulRows: number;
-  filteredByMonth: number;
 }
 
 export interface IScheduleParser {

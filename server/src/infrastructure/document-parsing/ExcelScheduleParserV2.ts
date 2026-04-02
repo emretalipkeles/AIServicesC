@@ -52,7 +52,6 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
     const errors: string[] = [];
     const rows: ParsedScheduleRow[] = [];
     let totalRowsProcessed = 0;
-    let filteredByMonth = 0;
 
     try {
       const workbook = new ExcelJS.Workbook();
@@ -65,7 +64,6 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
           errors: ['No sheets found in Excel file'],
           totalRowsProcessed: 0,
           successfulRows: 0,
-          filteredByMonth: 0,
         };
       }
 
@@ -79,7 +77,6 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
           errors: ['No data rows found in Excel file'],
           totalRowsProcessed: 0,
           successfulRows: 0,
-          filteredByMonth: 0,
         };
       }
 
@@ -99,7 +96,6 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
           errors,
           totalRowsProcessed: 0,
           successfulRows: 0,
-          filteredByMonth: 0,
         };
       }
 
@@ -122,12 +118,6 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
             continue;
           }
 
-          if (!this.isInTargetMonth(actualStartDate, actualFinishDate, options)) {
-            continue;
-          }
-
-          filteredByMonth++;
-
           const parsedRow: ParsedScheduleRow = {
             activityId,
             wbs: columnMap.wbs ? this.getString(row[columnMap.wbs]) : null,
@@ -146,15 +136,12 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
         }
       }
 
-      const scheduleUpdateMonth = `${options.targetYear}-${String(options.targetMonth).padStart(2, '0')}`;
-
       return {
         rows,
-        scheduleUpdateMonth,
+        scheduleUpdateMonth: null,
         errors,
         totalRowsProcessed,
         successfulRows: rows.length,
-        filteredByMonth,
       };
     } catch (error) {
       return {
@@ -163,23 +150,8 @@ export class ExcelScheduleParserV2 implements IScheduleParser {
         errors: [`Failed to parse Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`],
         totalRowsProcessed: 0,
         successfulRows: 0,
-        filteredByMonth: 0,
       };
     }
-  }
-
-  private isInTargetMonth(
-    actualStart: Date | null, 
-    actualFinish: Date | null, 
-    options: ScheduleParseOptions
-  ): boolean {
-    const checkDate = (date: Date | null): boolean => {
-      if (!date) return false;
-      return date.getFullYear() === options.targetYear && 
-             (date.getMonth() + 1) === options.targetMonth;
-    };
-
-    return checkDate(actualStart) || checkDate(actualFinish);
   }
 
   private worksheetToJson(worksheet: ExcelJS.Worksheet): Record<string, unknown>[] {

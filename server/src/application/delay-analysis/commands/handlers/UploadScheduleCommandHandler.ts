@@ -88,8 +88,6 @@ export class UploadScheduleCommandHandler {
         command.file.buffer,
         command.file.filename,
         {
-          targetMonth: command.targetMonth,
-          targetYear: command.targetYear,
           filterActualOnly: true,
           progressReporter: progress,
           tokenUsageCallback: options?.tokenUsageCallback,
@@ -97,14 +95,14 @@ export class UploadScheduleCommandHandler {
         }
       );
 
-      console.log(`[UploadScheduleHandler] Parse result: ${parseResult.rows.length} rows, ${parseResult.totalRowsProcessed} total processed, ${parseResult.filteredByMonth} filtered by month`);
+      console.log(`[UploadScheduleHandler] Parse result: ${parseResult.rows.length} rows, ${parseResult.totalRowsProcessed} total processed`);
       console.log(`[UploadScheduleHandler] Parse errors: ${parseResult.errors.join('; ') || 'none'}`);
 
       if (parseResult.rows.length === 0) {
         console.log(`[UploadScheduleHandler] No rows returned from parser, returning early`);
         const updatedDoc = document.withProcessingStatus(
           'completed',
-          `No activities with actual dates found for ${command.targetMonth}/${command.targetYear}. ${parseResult.errors.join('; ')}`
+          `No activities with actual dates found. ${parseResult.errors.join('; ')}`
         );
         await this.documentRepository.update(updatedDoc);
 
@@ -119,8 +117,7 @@ export class UploadScheduleCommandHandler {
         };
       }
 
-      const scheduleMonth = parseResult.scheduleUpdateMonth || 
-        `${command.targetYear}-${String(command.targetMonth).padStart(2, '0')}`;
+      const scheduleMonth = parseResult.scheduleUpdateMonth || null;
 
       const deduplicatedRows = this.deduplicateByActivityId(parseResult.rows);
       

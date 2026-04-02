@@ -39,8 +39,6 @@ export class ScheduleActivityController {
           contentType: req.file.mimetype,
           buffer: req.file.buffer,
         },
-        targetMonth: body.targetMonth,
-        targetYear: body.targetYear,
       });
 
       res.status(201).json({

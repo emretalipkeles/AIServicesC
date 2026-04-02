@@ -87,9 +87,6 @@ export function registerScheduleActivityRoutes(app: Express, container: AppConta
           return;
         }
 
-        const targetMonth = req.body.targetMonth ? Number(req.body.targetMonth) : undefined;
-        const targetYear = req.body.targetYear ? Number(req.body.targetYear) : undefined;
-
         const file = req.file;
         if (!file) {
           res.status(400).json({ error: 'No file uploaded' });
@@ -121,8 +118,6 @@ export function registerScheduleActivityRoutes(app: Express, container: AppConta
             filename: file.originalname,
             contentType: file.mimetype,
           },
-          targetMonth,
-          targetYear,
         };
 
         try {

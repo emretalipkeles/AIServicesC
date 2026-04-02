@@ -78,7 +78,6 @@ export class RegexScheduleParser implements IScheduleParser {
           errors: [`No activity lines found in PDF. Expected activity IDs like "1-W-0036" or "3-PF-1526".`],
           totalRowsProcessed: 0,
           successfulRows: 0,
-          filteredByMonth: 0,
         };
       }
 
@@ -137,7 +136,6 @@ export class RegexScheduleParser implements IScheduleParser {
         errors,
         totalRowsProcessed: activityLines.length,
         successfulRows: rows.length,
-        filteredByMonth: 0,
       };
     } catch (error) {
       console.error('[RegexScheduleParser] Error parsing PDF:', error);
@@ -147,7 +145,6 @@ export class RegexScheduleParser implements IScheduleParser {
         errors: [`Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}`],
         totalRowsProcessed: 0,
         successfulRows: 0,
-        filteredByMonth: 0,
       };
     }
   }
