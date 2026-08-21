@@ -142,12 +142,33 @@ function nonEmptyString(value: unknown): string | null {
 }
 
 /** Loosely parses a report date string; returns null (never throws) when it cannot be determined. */
+/**
+ * Accepts only a strict "YYYY-MM-DD" calendar date, as the extraction prompt requires.
+ * Free-form parsing via `new Date(...)` is deliberately avoided: it silently accepts junk
+ * strings and rolls invalid days over into the next month (e.g. "2025-02-31" -> March 3).
+ */
 function coerceReportDate(value: unknown): Date | null {
-  if (typeof value !== 'string' || value.trim().length === 0) {
+  if (typeof value !== 'string') {
     return null;
   }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return parsed;
 }
 
 /**

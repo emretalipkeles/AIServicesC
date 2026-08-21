@@ -2,7 +2,6 @@ import type { IPostParseDocumentHandler } from '../../../../domain/delay-analysi
 import type { ProjectDocument } from '../../../../domain/delay-analysis/entities/ProjectDocument';
 import { ProcessPodDocumentCommand } from '../ProcessPodDocumentCommand';
 import type { ProcessPodDocumentCommandHandler } from './ProcessPodDocumentCommandHandler';
-import { extractDateFromFilename } from '../../../../infrastructure/delay-analysis/pod/extractDateFromFilename';
 
 /**
  * Thin adapter registering POD's structured-extraction handler on the post-parse seam
@@ -21,15 +20,16 @@ export class PodPostParseHandler implements IPostParseDocumentHandler {
       return;
     }
 
-    const fallbackReportDate = document.reportDate ?? extractDateFromFilename(document.filename);
-
     const command = new ProcessPodDocumentCommand(
       document.id,
       document.projectId,
       document.tenantId,
       document.rawContent,
       document.filename,
-      fallbackReportDate
+      // POD report dates are resolved by the model itself, which is given both the document
+      // body (priority) and the filename (fallback). Passing the generic upload-time
+      // heuristic date here would silently override that decision, so no fallback is used.
+      null
     );
 
     await this.processPodDocumentHandler.execute(command);
