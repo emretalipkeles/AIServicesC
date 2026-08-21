@@ -1,4 +1,4 @@
-import { eq, and, count, ilike } from 'drizzle-orm';
+import { eq, and, count, ilike, inArray } from 'drizzle-orm';
 import type { IProjectDocumentRepository } from '../../../../domain/delay-analysis/repositories/IProjectDocumentRepository';
 import { ProjectDocument, type ProjectDocumentType, type DocumentProcessingStatus } from '../../../../domain/delay-analysis/entities/ProjectDocument';
 import { projectDocuments } from '@shared/schema';
@@ -80,6 +80,32 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
 
     if (result.length === 0) return null;
     return this.mapRowToEntity(result[0]);
+  }
+
+  async findExistingContentHashes(
+    projectId: string,
+    tenantId: string,
+    contentHashes: string[]
+  ): Promise<Array<{ contentHash: string; documentId: string; filename: string }>> {
+    if (contentHashes.length === 0) return [];
+
+    const rows = await db
+      .select({
+        contentHash: projectDocuments.contentHash,
+        documentId: projectDocuments.id,
+        filename: projectDocuments.filename,
+      })
+      .from(projectDocuments)
+      .where(and(
+        eq(projectDocuments.projectId, projectId),
+        eq(projectDocuments.tenantId, tenantId),
+        inArray(projectDocuments.contentHash, contentHashes)
+      ));
+
+    return rows
+      .filter((row): row is { contentHash: string; documentId: string; filename: string } =>
+        row.contentHash !== null
+      );
   }
 
   async save(document: ProjectDocument): Promise<void> {

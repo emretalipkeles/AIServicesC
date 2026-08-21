@@ -8,6 +8,9 @@ import { ListProjectDocumentsQueryHandler } from '../../application/delay-analys
 import type { ProjectDocumentType } from '../../domain/delay-analysis/entities/ProjectDocument';
 import type { IProjectDocumentRepository } from '../../domain/delay-analysis/repositories/IProjectDocumentRepository';
 
+const SHA256_HEX = /^[a-f0-9]{64}$/i;
+const MAX_HASHES_PER_CHECK = 1000;
+
 export class ProjectDocumentController {
   constructor(
     private readonly uploadHandler: UploadDocumentsCommandHandler,
@@ -43,6 +46,51 @@ export class ProjectDocumentController {
       console.error('Error uploading documents:', error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : 'Failed to upload documents' 
+      });
+    }
+  }
+
+  /**
+   * Lets the client find out which files it already uploaded BEFORE sending any bytes.
+   * The client hashes each file locally (SHA-256, same algorithm the upload path uses)
+   * and posts the hashes here; anything already stored is reported back so the client
+   * can skip it. Without this, re-uploading a large folder re-transfers every duplicate.
+   */
+  async checkDuplicates(req: Request, res: Response): Promise<void> {
+    try {
+      const { projectId } = req.params;
+      const tenantId = (req as any).tenantId || 'default';
+
+      const rawHashes = (req.body as { hashes?: unknown }).hashes;
+      if (!Array.isArray(rawHashes)) {
+        res.status(400).json({ error: 'hashes must be an array of SHA-256 hex strings' });
+        return;
+      }
+      if (rawHashes.length > MAX_HASHES_PER_CHECK) {
+        res.status(400).json({ error: `At most ${MAX_HASHES_PER_CHECK} hashes may be checked per request` });
+        return;
+      }
+
+      const hashes: string[] = [];
+      for (const value of rawHashes) {
+        if (typeof value !== 'string' || !SHA256_HEX.test(value)) {
+          res.status(400).json({ error: 'Each hash must be a 64-character hex SHA-256 string' });
+          return;
+        }
+        hashes.push(value.toLowerCase());
+      }
+
+      const existing = await this.documentRepository.findExistingContentHashes(
+        projectId,
+        tenantId,
+        Array.from(new Set(hashes))
+      );
+
+      res.json({ existing });
+    } catch (error) {
+      console.error('Error checking duplicate documents:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'Failed to check duplicates',
       });
     }
   }

@@ -58,6 +58,11 @@ export function registerProjectDocumentRoutes(app: Express, container: AppContai
     (req, res) => controller.upload(req, res)
   );
 
+  app.post(
+    '/api/delay-analysis/projects/:projectId/documents/check-duplicates',
+    (req, res) => controller.checkDuplicates(req, res)
+  );
+
   app.get(
     '/api/delay-analysis/projects/:projectId/documents',
     (req, res) => controller.list(req, res)

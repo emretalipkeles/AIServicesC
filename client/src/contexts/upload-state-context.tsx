@@ -179,6 +179,10 @@ function uploadReducer(state: UploadStateMap, action: UploadAction): UploadState
           ...projectState,
           documents: {
             ...projectState.documents,
+            // The batch uploader may drop files before sending them (duplicates detected by
+            // the pre-check), so the authoritative total comes from the progress event, not
+            // from the count of files the user originally selected.
+            uploadingCount: action.progress.totalFiles,
             currentBatch: action.progress.currentBatch,
             totalBatches: action.progress.totalBatches,
             uploadedCount: action.progress.uploadedCount,
