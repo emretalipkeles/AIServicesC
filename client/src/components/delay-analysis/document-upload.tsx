@@ -191,6 +191,13 @@ export function DocumentUpload({ projectId }: DocumentUploadProps) {
         setLastFailedFiles([]);
         setShowFailedFiles(false);
       }
+
+      if (result.skipped.length > 0) {
+        toast({
+          title: "Some files were skipped",
+          description: `${result.skipped.length} file(s) were skipped because identical content was already uploaded previously.`,
+        });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to upload documents";
       failDocumentUpload(errorMessage);

@@ -24,6 +24,11 @@ export interface UploadResult {
     filename: string;
     error: string;
   }>;
+  skipped: Array<{
+    filename: string;
+    reason: string;
+    existingDocumentId: string;
+  }>;
 }
 
 export interface BatchUploadProgress {
@@ -43,6 +48,11 @@ export interface BatchUploadResult {
   failed: Array<{
     filename: string;
     error: string;
+  }>;
+  skipped: Array<{
+    filename: string;
+    reason: string;
+    existingDocumentId: string;
   }>;
   totalBatches: number;
 }
@@ -92,6 +102,7 @@ export async function uploadDocumentsInBatches(
 
   const allUploaded: BatchUploadResult['uploaded'] = [];
   const allFailed: BatchUploadResult['failed'] = [];
+  const allSkipped: BatchUploadResult['skipped'] = [];
 
   onProgress?.({
     currentBatch: 0,
@@ -116,6 +127,7 @@ export async function uploadDocumentsInBatches(
       const result = await uploadDocumentsBatch(projectId, batch, documentType);
       allUploaded.push(...result.uploaded);
       allFailed.push(...result.failed);
+      allSkipped.push(...(result.skipped ?? []));
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Upload failed';
       batch.forEach(file => {
@@ -135,6 +147,7 @@ export async function uploadDocumentsInBatches(
   return {
     uploaded: allUploaded,
     failed: allFailed,
+    skipped: allSkipped,
     totalBatches: batches.length,
   };
 }
