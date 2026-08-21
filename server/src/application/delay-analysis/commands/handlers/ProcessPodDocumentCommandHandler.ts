@@ -3,11 +3,13 @@ import type { ProcessPodDocumentCommand } from '../ProcessPodDocumentCommand';
 import type { IPodReportRepository } from '../../../../domain/delay-analysis/repositories/IPodReportRepository';
 import type { IPodExtractionStrategy } from '../../../../domain/delay-analysis/interfaces/IPodExtractionStrategy';
 import type { IAIClient } from '../../../../domain/interfaces/IAIClient';
+import type { IProjectDocumentRepository } from '../../../../domain/delay-analysis/repositories/IProjectDocumentRepository';
 import { AIMessage } from '../../../../domain/value-objects/AIMessage';
 import { ModelId } from '../../../../domain/value-objects/ModelId';
 import { PodReport } from '../../../../domain/delay-analysis/entities/PodReport';
 import { extractJsonObjectFromResponse } from '../../../../infrastructure/delay-analysis/AIJsonResponseParser';
 import { coercePodExtractionResponse } from '../../../../infrastructure/delay-analysis/pod/PodExtractionResponseValidator';
+import { retryWithBackoff } from '../../../../infrastructure/delay-analysis/retryWithBackoff';
 
 /**
  * Orchestrates POD structured extraction: strategy -> AI call -> validation -> persistence.
@@ -16,6 +18,11 @@ import { coercePodExtractionResponse } from '../../../../infrastructure/delay-an
  * response, transaction error, unparseable output) is caught and logged, and the caller's
  * document upload/completion flow is never affected. A POD upload always keeps its raw
  * project_documents row even when this handler fails outright.
+ *
+ * Failures are no longer *silent*, though: every outcome is persisted onto the source
+ * project_documents row (structuredExtractionStatus/Error) so a document whose raw parse
+ * succeeded but whose structured extraction failed is discoverable (e.g. for a backfill),
+ * instead of looking identical to a fully-processed one.
  */
 export class ProcessPodDocumentCommandHandler {
   static readonly type = 'ProcessPodDocumentCommand';
@@ -23,7 +30,8 @@ export class ProcessPodDocumentCommandHandler {
   constructor(
     private readonly podReportRepository: IPodReportRepository,
     private readonly strategy: IPodExtractionStrategy,
-    private readonly aiClient: IAIClient
+    private readonly aiClient: IAIClient,
+    private readonly projectDocumentRepository?: IProjectDocumentRepository
   ) {}
 
   async execute(command: ProcessPodDocumentCommand): Promise<void> {
@@ -38,22 +46,30 @@ export class ProcessPodDocumentCommandHandler {
         documentId: command.documentId,
       });
 
-      const response = await this.aiClient.chat({
-        model: ModelId.gpt54(),
-        messages: [AIMessage.user(prompt)],
-        maxTokens: 4000,
-        temperature: 0,
-      });
+      // Retried because unbounded-concurrency uploads can trip the AI provider's rate
+      // limits; a transient 429/5xx should not permanently drop the extraction.
+      const response = await retryWithBackoff(() =>
+        this.aiClient.chat({
+          model: ModelId.gpt54(),
+          messages: [AIMessage.user(prompt)],
+          maxTokens: 4000,
+          temperature: 0,
+        })
+      );
 
       const parsedJson = extractJsonObjectFromResponse(response.content);
       if (!parsedJson) {
-        console.error(`[ProcessPodDocument] AI response was not valid JSON (${logContext})`);
+        const message = 'AI response was not valid JSON';
+        console.error(`[ProcessPodDocument] ${message} (${logContext})`);
+        await this.markFailed(command, message);
         return;
       }
 
       const coerced = coercePodExtractionResponse(parsedJson);
       if (!coerced) {
-        console.error(`[ProcessPodDocument] AI response failed schema validation (${logContext})`);
+        const message = 'AI response failed schema validation';
+        console.error(`[ProcessPodDocument] ${message} (${logContext})`);
+        await this.markFailed(command, message);
         return;
       }
 
@@ -70,6 +86,7 @@ export class ProcessPodDocumentCommandHandler {
       });
 
       await this.podReportRepository.saveReport(report);
+      await this.markCompleted(command);
 
       const childCount = report.sections.reduce(
         (sum, section) => sum + section.crewMembers.length + section.equipment.length + section.taskLines.length,
@@ -80,7 +97,37 @@ export class ProcessPodDocumentCommandHandler {
         `[ProcessPodDocument] Completed POD extraction (${logContext}): ${report.sections.length} sections, ${childCount} child rows, ${durationMs}ms`
       );
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown extraction error';
       console.error(`[ProcessPodDocument] Failed POD extraction (${logContext})`, error);
+      await this.markFailed(command, message);
+    }
+  }
+
+  private async markCompleted(command: ProcessPodDocumentCommand): Promise<void> {
+    await this.persistStatus(command, 'completed');
+  }
+
+  private async markFailed(command: ProcessPodDocumentCommand, message: string): Promise<void> {
+    await this.persistStatus(command, 'failed', message);
+  }
+
+  private async persistStatus(
+    command: ProcessPodDocumentCommand,
+    status: 'completed' | 'failed',
+    error?: string
+  ): Promise<void> {
+    if (!this.projectDocumentRepository) return;
+    try {
+      const document = await this.projectDocumentRepository.findById(command.documentId, command.tenantId);
+      if (!document) return;
+      await this.projectDocumentRepository.update(
+        document.withStructuredExtractionStatus(status, error)
+      );
+    } catch (persistError) {
+      console.error(
+        `[ProcessPodDocument] Failed to persist structured extraction status for document=${command.documentId}`,
+        persistError
+      );
     }
   }
 }

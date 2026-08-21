@@ -13,6 +13,8 @@ export interface ProjectDocumentProps {
   reportDate?: Date | null;
   status: DocumentProcessingStatus;
   errorMessage?: string | null;
+  structuredExtractionStatus?: 'completed' | 'failed' | null;
+  structuredExtractionError?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,6 +31,8 @@ export class ProjectDocument {
   readonly reportDate: Date | null;
   readonly status: DocumentProcessingStatus;
   readonly errorMessage: string | null;
+  readonly structuredExtractionStatus: 'completed' | 'failed' | null;
+  readonly structuredExtractionError: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 
@@ -44,6 +48,8 @@ export class ProjectDocument {
     this.reportDate = props.reportDate ?? null;
     this.status = props.status;
     this.errorMessage = props.errorMessage ?? null;
+    this.structuredExtractionStatus = props.structuredExtractionStatus ?? null;
+    this.structuredExtractionError = props.structuredExtractionError ?? null;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
     this.validate();
@@ -95,6 +101,18 @@ export class ProjectDocument {
     return new ProjectDocument({
       ...this,
       reportDate,
+      updatedAt: new Date(),
+    });
+  }
+
+  withStructuredExtractionStatus(
+    structuredExtractionStatus: 'completed' | 'failed',
+    structuredExtractionError?: string
+  ): ProjectDocument {
+    return new ProjectDocument({
+      ...this,
+      structuredExtractionStatus,
+      structuredExtractionError: structuredExtractionError ?? null,
       updatedAt: new Date(),
     });
   }

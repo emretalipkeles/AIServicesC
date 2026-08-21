@@ -275,6 +275,12 @@ export const projectDocuments = pgTable("project_documents", {
   reportDate: timestamp("report_date"),
   status: text("status").notNull().default("pending"),
   errorMessage: text("error_message"),
+  // Tracks the *separate* document-type-specific structured extraction step (e.g. POD ->
+  // pod_reports) that runs after raw parsing completes. Null means no structured extraction
+  // applies to this document type or it has not run yet; 'completed'/'failed' let failures
+  // surface instead of being silently swallowed while `status` stays 'completed' for the raw parse.
+  structuredExtractionStatus: text("structured_extraction_status"),
+  structuredExtractionError: text("structured_extraction_error"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -340,7 +340,7 @@ export function createAppContainer(): AppContainer {
   if (aiClient) {
     const podExtractionStrategy: IPodExtractionStrategy = new PODExtractionStrategy();
     const processPodDocumentHandler = new ProcessPodDocumentCommandHandler(
-      podReportRepository, podExtractionStrategy, aiClient
+      podReportRepository, podExtractionStrategy, aiClient, projectDocumentRepository
     );
     postParseHandlers.push(new PodPostParseHandler(processPodDocumentHandler));
     console.log('[Bootstrap] POD structured extraction handler registered');

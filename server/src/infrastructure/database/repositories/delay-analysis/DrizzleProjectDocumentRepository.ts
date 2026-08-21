@@ -95,6 +95,8 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
       reportDate: document.reportDate,
       status: document.status,
       errorMessage: document.errorMessage,
+      structuredExtractionStatus: document.structuredExtractionStatus,
+      structuredExtractionError: document.structuredExtractionError,
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
     });
@@ -116,6 +118,8 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
         reportDate: doc.reportDate,
         status: doc.status,
         errorMessage: doc.errorMessage,
+        structuredExtractionStatus: doc.structuredExtractionStatus,
+        structuredExtractionError: doc.structuredExtractionError,
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt,
       }))
@@ -131,6 +135,8 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
         reportDate: document.reportDate,
         status: document.status,
         errorMessage: document.errorMessage,
+        structuredExtractionStatus: document.structuredExtractionStatus,
+        structuredExtractionError: document.structuredExtractionError,
         updatedAt: document.updatedAt,
       })
       .where(and(
@@ -208,6 +214,8 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
       reportDate: row.reportDate,
       status: row.status as DocumentProcessingStatus,
       errorMessage: row.errorMessage,
+      structuredExtractionStatus: row.structuredExtractionStatus as 'completed' | 'failed' | null,
+      structuredExtractionError: row.structuredExtractionError,
       createdAt: row.createdAt ?? new Date(),
       updatedAt: row.updatedAt ?? new Date(),
     });

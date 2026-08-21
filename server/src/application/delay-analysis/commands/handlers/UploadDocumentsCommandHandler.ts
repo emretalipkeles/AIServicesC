@@ -7,6 +7,12 @@ import type { IDocumentHashService } from '../../../../domain/delay-analysis/int
 import type { IPostParseDocumentHandlerFactory } from '../../../../domain/delay-analysis/interfaces/IPostParseDocumentHandlerFactory';
 import { ProjectDocument } from '../../../../domain/delay-analysis/entities/ProjectDocument';
 import { extractDocumentDate } from '../../../../infrastructure/delay-analysis/DocumentDateExtractor';
+import { ConcurrencyLimiter } from '../../../../infrastructure/concurrency/ConcurrencyLimiter';
+
+// Bounds how many documents parse/extract concurrently per batch. Uploading hundreds of
+// files at once previously fired an AI call per document with no limit, tripping provider
+// rate limits and silently failing most extractions (see PodPostParseHandler).
+const DOCUMENT_PROCESSING_CONCURRENCY = 5;
 
 export interface UploadDocumentsResult {
   uploaded: Array<{
@@ -26,6 +32,8 @@ export interface UploadDocumentsResult {
 }
 
 export class UploadDocumentsCommandHandler {
+  private readonly processingLimiter = new ConcurrencyLimiter(DOCUMENT_PROCESSING_CONCURRENCY);
+
   constructor(
     private readonly projectRepository: IDelayAnalysisProjectRepository,
     private readonly documentRepository: IProjectDocumentRepository,
@@ -112,7 +120,7 @@ export class UploadDocumentsCommandHandler {
       await this.documentRepository.saveBatch(documentsToSave);
       
       for (const { document, buffer } of documentsWithBuffers) {
-        this.parseDocumentAsync(document, buffer);
+        this.processingLimiter.run(() => this.parseDocumentAsync(document, buffer));
       }
     }
 
