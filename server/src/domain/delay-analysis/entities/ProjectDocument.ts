@@ -1,4 +1,4 @@
-export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'other';
+export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'pod' | 'other';
 export type DocumentProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export interface ProjectDocumentProps {

@@ -506,6 +506,9 @@ const DOCUMENT_TYPE_SECTIONS: Record<ProjectDocumentType, ReadonlyArray<Knowledg
     'exclusions',
     'cheat_sheet',
   ],
+  // POD documents are never sent through delay-event extraction, so no knowledge base
+  // sections are needed for them.
+  pod: [],
 };
 
 export class ContractorDelayTrainingGuide implements IDelayKnowledgeBase {

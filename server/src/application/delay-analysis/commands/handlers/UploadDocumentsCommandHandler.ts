@@ -4,6 +4,7 @@ import type { IProjectDocumentRepository } from '../../../../domain/delay-analys
 import type { IDelayAnalysisProjectRepository } from '../../../../domain/delay-analysis/repositories/IDelayAnalysisProjectRepository';
 import type { IDocumentParserFactory } from '../../../../domain/delay-analysis/interfaces/IDocumentParserFactory';
 import type { IDocumentHashService } from '../../../../domain/delay-analysis/interfaces/IDocumentHashService';
+import type { IPostParseDocumentHandlerFactory } from '../../../../domain/delay-analysis/interfaces/IPostParseDocumentHandlerFactory';
 import { ProjectDocument } from '../../../../domain/delay-analysis/entities/ProjectDocument';
 import { extractDocumentDate } from '../../../../infrastructure/delay-analysis/DocumentDateExtractor';
 
@@ -29,7 +30,8 @@ export class UploadDocumentsCommandHandler {
     private readonly projectRepository: IDelayAnalysisProjectRepository,
     private readonly documentRepository: IProjectDocumentRepository,
     private readonly parserFactory: IDocumentParserFactory,
-    private readonly hashService: IDocumentHashService
+    private readonly hashService: IDocumentHashService,
+    private readonly postParseHandlerFactory?: IPostParseDocumentHandlerFactory
   ) {}
 
   async execute(command: UploadDocumentsCommand): Promise<UploadDocumentsResult> {
@@ -119,7 +121,7 @@ export class UploadDocumentsCommandHandler {
 
   private async parseDocumentAsync(document: ProjectDocument, buffer: Buffer): Promise<void> {
     try {
-      const parser = this.parserFactory.getParser(document.contentType);
+      const parser = this.parserFactory.getParser(document.contentType, document.documentType);
       if (!parser) {
         await this.documentRepository.update(
           document.withProcessingStatus('failed', 'No parser available for content type')
@@ -148,6 +150,18 @@ export class UploadDocumentsCommandHandler {
         .withProcessingStatus('completed');
       
       await this.documentRepository.update(completedDoc);
+
+      // Document-type-specific structured extraction (e.g. POD), resolved through the same
+      // factory-style seam as the parser rather than an inline type check. A failure here must
+      // never disturb the raw-content save above or the document's completed status.
+      const postParseHandler = this.postParseHandlerFactory?.getHandler(completedDoc.documentType);
+      if (postParseHandler) {
+        try {
+          await postParseHandler.handle(completedDoc);
+        } catch (postParseError) {
+          console.error(`[DocumentUpload] Structured extraction failed for ${completedDoc.filename}:`, postParseError);
+        }
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown parsing error';
       await this.documentRepository.update(

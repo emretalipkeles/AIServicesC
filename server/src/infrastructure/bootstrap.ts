@@ -110,6 +110,15 @@ import { RecordTokenUsageCommandHandler } from "../application/delay-analysis/co
 import { SearchDocumentsByFilenameQueryHandler } from "../application/delay-analysis/queries/handlers/SearchDocumentsByFilenameQueryHandler";
 import { GetDelayEventsByDocumentQueryHandler } from "../application/delay-analysis/queries/handlers/GetDelayEventsByDocumentQueryHandler";
 
+import { DrizzlePodReportRepository } from "./database/repositories/delay-analysis/DrizzlePodReportRepository";
+import type { IPodReportRepository } from "../domain/delay-analysis/repositories/IPodReportRepository";
+import { PODExtractionStrategy } from "./delay-analysis/extraction-strategies/PODExtractionStrategy";
+import type { IPodExtractionStrategy } from "../domain/delay-analysis/interfaces/IPodExtractionStrategy";
+import { ProcessPodDocumentCommandHandler } from "../application/delay-analysis/commands/handlers/ProcessPodDocumentCommandHandler";
+import { PodPostParseHandler } from "../application/delay-analysis/commands/handlers/PodPostParseHandler";
+import { PostParseDocumentHandlerFactory } from "./delay-analysis/PostParseDocumentHandlerFactory";
+import type { IPostParseDocumentHandlerFactory } from "../domain/delay-analysis/interfaces/IPostParseDocumentHandlerFactory";
+
 export interface AppContainer {
   commandBus: ICommandBus;
   queryBus: IQueryBus;
@@ -127,6 +136,7 @@ export interface AppContainer {
     scheduleActivity: IScheduleActivityRepository;
     contractorDelayEvent: IContractorDelayEventRepository;
     aiTokenUsage: IAITokenUsageRepository;
+    podReport: IPodReportRepository;
   };
   
   services: {
@@ -141,6 +151,7 @@ export interface AppContainer {
     documentHashService: IDocumentHashService;
     delayEventDeduplicationService: IDelayEventDeduplicationService;
     fieldMemoContextProvider: IFieldMemoContextProvider | null;
+    postParseDocumentHandlerFactory: IPostParseDocumentHandlerFactory;
   };
 
   agentLoop: {
@@ -279,6 +290,7 @@ export function createAppContainer(): AppContainer {
   const contractorDelayEventRepository = new DrizzleContractorDelayEventRepository();
   const aiTokenUsageRepository = new DrizzleAITokenUsageRepository();
   const documentParserFactory = new DocumentParserFactory();
+  const podReportRepository = new DrizzlePodReportRepository();
 
   const getActivitiesByIdsHandler = new GetActivitiesByIdsQueryHandler(scheduleActivityRepository);
   const scheduleActivitiesTool = new GetScheduleActivitiesTool(getActivitiesByIdsHandler);
@@ -320,6 +332,23 @@ export function createAppContainer(): AppContainer {
     fieldMemoContextProvider = new FieldMemoContextSummarizer(projectDocumentRepository, aiClient);
     console.log('[Bootstrap] FieldMemoContextSummarizer initialized for IDR context injection');
   }
+
+  // POD structured extraction is wired through the same post-parse handler seam that the
+  // upload flow resolves by document type. Without an AI client, POD uploads still save
+  // their raw project_documents row; they simply get no structured rows (graceful degradation).
+  const postParseHandlers: import("../domain/delay-analysis/interfaces/IPostParseDocumentHandler").IPostParseDocumentHandler[] = [];
+  if (aiClient) {
+    const podExtractionStrategy: IPodExtractionStrategy = new PODExtractionStrategy();
+    const processPodDocumentHandler = new ProcessPodDocumentCommandHandler(
+      podReportRepository, podExtractionStrategy, aiClient
+    );
+    postParseHandlers.push(new PodPostParseHandler(processPodDocumentHandler));
+    console.log('[Bootstrap] POD structured extraction handler registered');
+  } else {
+    console.warn('[Bootstrap] No AI client configured - POD uploads will save raw content only');
+  }
+  const postParseDocumentHandlerFactory: IPostParseDocumentHandlerFactory =
+    new PostParseDocumentHandlerFactory(postParseHandlers);
   
   const testConnectionHandler = new TestConnectionQueryHandler(bedrockClientProvider);
 
@@ -394,6 +423,7 @@ export function createAppContainer(): AppContainer {
       scheduleActivity: scheduleActivityRepository,
       contractorDelayEvent: contractorDelayEventRepository,
       aiTokenUsage: aiTokenUsageRepository,
+      podReport: podReportRepository,
     },
     services: {
       isAIConfigured: bedrockClientProvider.isConfigured(),
@@ -407,6 +437,7 @@ export function createAppContainer(): AppContainer {
       documentHashService: new SHA256DocumentHashService(),
       delayEventDeduplicationService: new DelayEventDeduplicationService(),
       fieldMemoContextProvider,
+      postParseDocumentHandlerFactory,
     },
     agentLoop: createAgentLoop(projectDocumentRepository, contractorDelayEventRepository, getActivitiesByIdsHandler),
     auth: createAuthSection(),

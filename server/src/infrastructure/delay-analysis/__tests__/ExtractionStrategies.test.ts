@@ -4,6 +4,7 @@ import { NCRExtractionStrategy } from '../extraction-strategies/NCRExtractionStr
 import { FieldMemoExtractionStrategy } from '../extraction-strategies/FieldMemoExtractionStrategy';
 import { DefaultExtractionStrategy } from '../extraction-strategies/DefaultExtractionStrategy';
 import { DocumentExtractionStrategyFactory } from '../extraction-strategies/DocumentExtractionStrategyFactory';
+import { PODExtractionStrategy } from '../extraction-strategies/PODExtractionStrategy';
 import { ContractorDelayTrainingGuide } from '../../../domain/delay-analysis/config/ContractorDelayTrainingGuide';
 import { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
 import type { DocumentExtractionContext } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
@@ -59,7 +60,12 @@ describe('Extraction Strategies', () => {
     it('should truncate document content to 30000 characters', () => {
       const longContent = 'x'.repeat(50000);
       const result = strategy.buildExtractionPrompt(createContext('idr', longContent));
-      expect(result.prompt.length).toBeLessThan(longContent.length);
+      // The prompt also embeds a large training-guide knowledge base, so its total length
+      // can exceed the raw content length; assert on the truncation directly instead of on
+      // overall prompt length, which is not a reliable proxy once that content is injected.
+      expect(result.prompt).not.toContain(longContent);
+      expect(result.prompt).toContain('x'.repeat(30000));
+      expect(result.prompt).not.toContain('x'.repeat(30001));
     });
 
     it('should include training guide knowledge base content', () => {
@@ -247,6 +253,52 @@ describe('Extraction Strategies', () => {
 
       expect(ncrResult.delayIsCertain).toBe(true);
       expect(idrResult.delayIsCertain).toBe(false);
+    });
+  });
+
+  describe('PODExtractionStrategy', () => {
+    const strategy = new PODExtractionStrategy();
+
+    it('builds a prompt describing structural chunking, not semantic interpretation', () => {
+      const result = strategy.buildExtractionPrompt({
+        documentContent: 'CIVIL #1\nJ. BRICKMAN\nR. CABUENA',
+        documentFilename: 'pod-test.pdf',
+        documentId: 'pod-doc-123',
+      });
+      expect(result.prompt).toContain('STRUCTURAL CHUNKING');
+      expect(result.prompt).toContain('CIVIL #1\nJ. BRICKMAN\nR. CABUENA');
+      expect(result.prompt).toContain('sections');
+    });
+
+    it('instructs the model to leave category empty rather than guess', () => {
+      const result = strategy.buildExtractionPrompt({
+        documentContent: 'content',
+        documentFilename: 'pod-test.pdf',
+        documentId: 'pod-doc-123',
+      });
+      expect(result.prompt.toLowerCase()).toContain('leave');
+      expect(result.prompt.toLowerCase()).toContain('rather than guessing');
+    });
+
+    it('instructs the model to preserve cost codes verbatim, including placeholders', () => {
+      const result = strategy.buildExtractionPrompt({
+        documentContent: 'content',
+        documentFilename: 'pod-test.pdf',
+        documentId: 'pod-doc-123',
+      });
+      expect(result.prompt).toContain('TBD');
+      expect(result.prompt.toLowerCase()).toContain('exactly as written');
+    });
+
+    it('does not expose delay-event-specific confidence metadata', () => {
+      const result = strategy.buildExtractionPrompt({
+        documentContent: 'content',
+        documentFilename: 'pod-test.pdf',
+        documentId: 'pod-doc-123',
+      });
+      expect(result).not.toHaveProperty('baseConfidence');
+      expect(result).not.toHaveProperty('delayIsCertain');
+      expect(result).not.toHaveProperty('requiresNarrativeVerification');
     });
   });
 });

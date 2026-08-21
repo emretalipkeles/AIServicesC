@@ -36,6 +36,7 @@ const documentTypeLabels: Partial<Record<ProjectDocumentType, string>> = {
   field_memo: "Field Memo",
   contract_plan: "Contract Plan",
   dsc_claim: "DSC Claim",
+  pod: "Play of the Day (POD)",
   other: "Other",
 };
 

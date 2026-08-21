@@ -47,7 +47,7 @@ export interface BatchUploadResult {
   totalBatches: number;
 }
 
-export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'other';
+export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'pod' | 'other';
 
 const BATCH_SIZE = 25;
 

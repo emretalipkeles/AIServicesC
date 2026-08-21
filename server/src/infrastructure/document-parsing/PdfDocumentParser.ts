@@ -6,7 +6,11 @@ export class PdfDocumentParser implements IDocumentParser {
     'application/pdf',
   ];
 
-  canParse(contentType: string): boolean {
+  canParse(contentType: string, documentType?: string): boolean {
+    if (documentType === 'pod') {
+      // POD PDFs are handled by PdfPodDocumentParser, which reads text in visual order.
+      return false;
+    }
     return this.supportedTypes.includes(contentType.toLowerCase());
   }
 

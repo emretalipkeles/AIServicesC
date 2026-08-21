@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -288,7 +288,90 @@ export const insertProjectDocumentSchema = createInsertSchema(projectDocuments).
 export type InsertProjectDocument = z.infer<typeof insertProjectDocumentSchema>;
 export type ProjectDocument = typeof projectDocuments.$inferSelect;
 
-export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'other';
+export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'pod' | 'other';
+
+// Play of the Day (POD) — daily construction assignment sheets made of repeating,
+// loosely-structured blocks (e.g. "CIVIL #1", "SUBCONTRACTORS", "UPO"). The tables below
+// normalize the repeating container structure (report -> sections -> crew/equipment/task
+// lines) while keeping genuinely variable leaf content as plain text.
+//
+// Deliberate modeling decisions (do not "fix"):
+// - trucking/traffic/notes are single-valued columns on pod_sections, not child tables.
+// - podSections.category has no enum/check constraint so unseen block labels never fail an insert.
+// - There are no hours or status columns anywhere; real PODs carry no such data.
+export const podReports = pgTable("pod_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sourceDocumentId: varchar("source_document_id").notNull().references(() => projectDocuments.id, { onDelete: "cascade" }),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  reportDate: timestamp("report_date"),
+  title: text("title"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  sourceDocumentIdx: index("pod_reports_source_document_idx").on(table.sourceDocumentId),
+  reportDateIdx: index("pod_reports_report_date_idx").on(table.reportDate),
+}));
+
+export type PodReportRow = typeof podReports.$inferSelect;
+export type InsertPodReportRow = typeof podReports.$inferInsert;
+
+export const podSections = pgTable("pod_sections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull().references(() => podReports.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(),
+  crewNumber: text("crew_number"),
+  label: text("label").notNull(),
+  category: text("category"),
+  trucking: text("trucking"),
+  traffic: text("traffic"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  reportIdx: index("pod_sections_report_idx").on(table.reportId),
+}));
+
+export type PodSectionRow = typeof podSections.$inferSelect;
+export type InsertPodSectionRow = typeof podSections.$inferInsert;
+
+export const podCrewMembers = pgTable("pod_crew_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sectionId: varchar("section_id").notNull().references(() => podSections.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(),
+  name: text("name").notNull(),
+  workerId: varchar("worker_id"),
+}, (table) => ({
+  sectionIdx: index("pod_crew_members_section_idx").on(table.sectionId),
+}));
+
+export type PodCrewMemberRow = typeof podCrewMembers.$inferSelect;
+export type InsertPodCrewMemberRow = typeof podCrewMembers.$inferInsert;
+
+export const podEquipment = pgTable("pod_equipment", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sectionId: varchar("section_id").notNull().references(() => podSections.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(),
+  name: text("name").notNull(),
+  isRental: boolean("is_rental").notNull().default(false),
+}, (table) => ({
+  sectionIdx: index("pod_equipment_section_idx").on(table.sectionId),
+}));
+
+export type PodEquipmentRow = typeof podEquipment.$inferSelect;
+export type InsertPodEquipmentRow = typeof podEquipment.$inferInsert;
+
+export const podTaskLines = pgTable("pod_task_lines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sectionId: varchar("section_id").notNull().references(() => podSections.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(),
+  description: text("description").notNull(),
+  costCode: text("cost_code"),
+}, (table) => ({
+  sectionIdx: index("pod_task_lines_section_idx").on(table.sectionId),
+}));
+
+export type PodTaskLineRow = typeof podTaskLines.$inferSelect;
+export type InsertPodTaskLineRow = typeof podTaskLines.$inferInsert;
 
 export const scheduleActivities = pgTable("schedule_activities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

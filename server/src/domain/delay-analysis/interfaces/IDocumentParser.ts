@@ -9,6 +9,11 @@ export interface ParsedDocumentResult {
 }
 
 export interface IDocumentParser {
-  canParse(contentType: string): boolean;
+  /**
+   * @param contentType MIME type of the uploaded file.
+   * @param documentType Optional project-document type (e.g. 'pod'), used by factories to select
+   *   a specialised parser for the same content type without branching in the caller.
+   */
+  canParse(contentType: string, documentType?: string): boolean;
   parse(buffer: Buffer, filename: string): Promise<ParsedDocumentResult>;
 }

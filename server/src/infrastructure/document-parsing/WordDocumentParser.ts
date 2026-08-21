@@ -7,7 +7,7 @@ export class WordDocumentParser implements IDocumentParser {
     'application/msword',
   ];
 
-  canParse(contentType: string): boolean {
+  canParse(contentType: string, documentType?: string): boolean {
     return this.supportedTypes.includes(contentType.toLowerCase());
   }
 
