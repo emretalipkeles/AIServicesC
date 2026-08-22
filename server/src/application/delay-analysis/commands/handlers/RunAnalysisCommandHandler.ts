@@ -16,10 +16,15 @@ import type {
 import type { IIDRMatchEnforcementPolicy } from '../../../../domain/delay-analysis/interfaces/IIDRMatchEnforcementPolicy';
 import type { IAnalysisRunTracker } from '../../../../domain/delay-analysis/interfaces/IAnalysisRunTracker';
 import type { IFieldMemoContextProvider } from '../../../../domain/delay-analysis/interfaces/IFieldMemoContextProvider';
+import type { IPodEvidenceProvider } from '../../../../domain/delay-analysis/interfaces/IPodEvidenceProvider';
+import { toPodEvidenceDateKey } from '../../../../domain/delay-analysis/interfaces/IPodEvidenceProvider';
+import type { PodReport } from '../../../../domain/delay-analysis/entities/PodReport';
+import type { PodMatchEvidence } from '../../../../domain/delay-analysis/interfaces/IActivityMatcher';
 import type { ProgressEvent } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 import { extractReportDateFromIDR } from '../../../../infrastructure/delay-analysis/ReportDateExtractor';
+import { renderPodDayContext } from '../../../../infrastructure/delay-analysis/PodContextRenderer';
 
 class TrackingProgressReporter implements IProgressReporter {
   constructor(
@@ -45,6 +50,7 @@ class TrackingProgressReporter implements IProgressReporter {
 interface DocumentExtractionContext {
   workActivities: IDRWorkActivity[];
   reportDate: Date | null;
+  podEvidence?: PodMatchEvidence;
 }
 
 const MIN_MATCH_CONFIDENCE_FOR_SKIP = 85;
@@ -112,8 +118,48 @@ export class RunAnalysisCommandHandler {
     private readonly deduplicationService: IDelayEventDeduplicationService,
     private readonly idrMatchPolicy?: IIDRMatchEnforcementPolicy,
     private readonly runTracker?: IAnalysisRunTracker,
-    private readonly fieldMemoContextProvider?: IFieldMemoContextProvider
+    private readonly fieldMemoContextProvider?: IFieldMemoContextProvider,
+    private readonly podEvidenceProvider?: IPodEvidenceProvider
   ) {}
+
+  /**
+   * Resolves POD evidence for the whole analysis run's date range in one call, so per-document
+   * and per-event lookups below are in-memory map reads rather than one query per delay event
+   * (database-efficiency rule). Any failure is logged and treated as "no POD evidence" — POD is
+   * an enhancement, never a dependency of analysis completing.
+   */
+  private async loadPodEvidenceByDate(
+    projectId: string,
+    tenantId: string,
+    documents: Array<{ reportDate: Date | null }>
+  ): Promise<Map<string, PodReport[]>> {
+    if (!this.podEvidenceProvider) {
+      return new Map();
+    }
+    const dates = documents.map(d => d.reportDate).filter((d): d is Date => d != null);
+    if (dates.length === 0) {
+      return new Map();
+    }
+    const startDate = new Date(Math.min(...dates.map(d => d.getTime())));
+    const endDate = new Date(Math.max(...dates.map(d => d.getTime())));
+    try {
+      const evidenceByDate = await this.podEvidenceProvider.getEvidenceForDateRange(projectId, tenantId, startDate, endDate);
+      const totalSections = Array.from(evidenceByDate.values())
+        .reduce((sum, reports) => sum + reports.reduce((s, r) => s + r.sections.length, 0), 0);
+      console.log(`[RunAnalysisCommandHandler] POD evidence: ${evidenceByDate.size} date(s) with reports covering ${startDate.toISOString().split('T')[0]}..${endDate.toISOString().split('T')[0]} (${totalSections} sections total)`);
+      return evidenceByDate;
+    } catch (error) {
+      console.warn('[RunAnalysisCommandHandler] Failed to load POD evidence for date range (continuing without it):', error);
+      return new Map();
+    }
+  }
+
+  private buildPodMatchEvidence(evidenceByDate: Map<string, PodReport[]>, date: Date | null): PodMatchEvidence | undefined {
+    if (!date) return undefined;
+    const reports = evidenceByDate.get(toPodEvidenceDateKey(date)) ?? [];
+    if (reports.length === 0) return undefined;
+    return { contextText: renderPodDayContext(reports), reports };
+  }
 
   async execute(command: RunAnalysisCommand, options?: RunAnalysisOptions): Promise<RunAnalysisResult> {
     const baseProgress = options?.progressReporter || new NoOpProgressReporter();
@@ -171,6 +217,11 @@ export class RunAnalysisCommandHandler {
     const shouldMatch = command.matchToActivities !== false;
 
     const documentContexts = new Map<string, DocumentExtractionContext>();
+    // Resolved once for the whole run's date range and reused for every document/event below,
+    // per the "load once per run, not per event" database-efficiency rule. Populated from
+    // whichever set of documents is available first (extraction's fieldReports, or all project
+    // documents if this run only matches).
+    let podEvidenceByDate = new Map<string, PodReport[]>();
 
     if (shouldExtract) {
       progress.report({
@@ -238,6 +289,8 @@ export class RunAnalysisCommandHandler {
           }
         }
 
+        podEvidenceByDate = await this.loadPodEvidenceByDate(command.projectId, command.tenantId, fieldReports);
+
         const allExtractedEvents: ExtractedEventWithSource[] = [];
         const successfulDocIds = new Set<string>();
 
@@ -253,6 +306,7 @@ export class RunAnalysisCommandHandler {
           });
 
           try {
+            const docPodEvidence = this.buildPodMatchEvidence(podEvidenceByDate, doc.reportDate ?? null);
             const extractionResult = await this.extractor.extractDelayEvents(
               doc.rawContent!,
               doc.filename,
@@ -265,6 +319,7 @@ export class RunAnalysisCommandHandler {
                 projectId: command.projectId,
                 enableToolBasedMatching: options?.enableToolBasedMatching ?? true,
                 fieldMemoContext: doc.documentType === 'idr' && fieldMemoContext ? fieldMemoContext : undefined,
+                podContext: docPodEvidence?.contextText ?? undefined,
               }
             );
 
@@ -273,11 +328,15 @@ export class RunAnalysisCommandHandler {
             const reportDate = doc.reportDate ?? (doc.documentType === 'idr' 
               ? extractReportDateFromIDR(doc.rawContent!) 
               : null);
+            const eventPodEvidence = reportDate === (doc.reportDate ?? null)
+              ? docPodEvidence
+              : this.buildPodMatchEvidence(podEvidenceByDate, reportDate);
 
             if (extractionResult.workActivities && extractionResult.workActivities.length > 0) {
               documentContexts.set(doc.id, {
                 workActivities: extractionResult.workActivities,
                 reportDate,
+                podEvidence: eventPodEvidence,
               });
               const activityIds = extractionResult.workActivities.map(a => a.activityId).join(', ');
               const dateInfo = reportDate ? ` (${reportDate.toISOString().split('T')[0]})` : '';
@@ -291,6 +350,7 @@ export class RunAnalysisCommandHandler {
               documentContexts.set(doc.id, {
                 workActivities: [],
                 reportDate,
+                podEvidence: eventPodEvidence,
               });
             }
 
@@ -579,6 +639,12 @@ export class RunAnalysisCommandHandler {
           }
         }
 
+        // Match-only runs (extraction skipped) never populated podEvidenceByDate above —
+        // resolve it here instead, still once for the whole run rather than per event.
+        if (!shouldExtract && podEvidenceByDate.size === 0) {
+          podEvidenceByDate = await this.loadPodEvidenceByDate(command.projectId, command.tenantId, allDocs);
+        }
+
         const unmatchedEvents = await this.eventRepository.findUnmatched(
           command.projectId,
           command.tenantId
@@ -618,6 +684,13 @@ export class RunAnalysisCommandHandler {
                 ? documentContexts.get(event.sourceDocumentId)
                 : undefined;
 
+              const fallbackReportDate = docContext?.reportDate
+                ?? (event.sourceDocumentId ? allDocumentReportDates.get(event.sourceDocumentId) : undefined)
+                ?? event.eventStartDate
+                ?? undefined;
+              const podEvidence = docContext?.podEvidence
+                ?? this.buildPodMatchEvidence(podEvidenceByDate, fallbackReportDate ?? null);
+
               const matchResult = await this.matcher.matchEventToActivities(
                 event.eventDescription,
                 event.eventStartDate,
@@ -627,6 +700,7 @@ export class RunAnalysisCommandHandler {
                   onTokenUsage: options?.onTokenUsage,
                   idrWorkActivities: docContext?.workActivities,
                   reportDate: docContext?.reportDate ?? undefined,
+                  podEvidence,
                 }
               );
 
@@ -657,7 +731,8 @@ export class RunAnalysisCommandHandler {
                   matchResult.cpmActivityDescription,
                   matchResult.wbs,
                   matchResult.confidence,
-                  matchResult.reasoning
+                  matchResult.reasoning,
+                  matchResult.podCorroborated ? { podCorroborated: true } : undefined
                 );
 
                 await this.eventRepository.update(matchedEvent);

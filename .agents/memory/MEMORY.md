@@ -2,3 +2,4 @@
 - [POD report date resolution](pod-report-date-resolution.md) — POD sheets are copied day-to-day and keep stale header dates; the model resolves the date from body + filename, never a regex.
 - [Interactive drizzle-kit push prompts](drizzle-kit-push-interactive-prompts.md) — db:push can hang on rename-detection/data-loss prompts unrelated to your change; apply new tables via direct SQL instead of fighting the TTY.
 - [Upload resumability pattern](upload-resumability-pattern.md) — project_documents.file_data (bytea) + StartupReconciliationService recover uploads orphaned by a mid-process restart; exclude file_data from normal list/lookup selects.
+- [POD-aware delay activity matching](pod-aware-matching.md) — POD exclusion markers are free text with no schema column; rank/reorder POD evidence before the matcher's 100-activity truncation; metadata is a merge-only patch.

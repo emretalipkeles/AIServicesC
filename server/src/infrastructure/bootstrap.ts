@@ -112,6 +112,8 @@ import { GetDelayEventsByDocumentQueryHandler } from "../application/delay-analy
 
 import { DrizzlePodReportRepository } from "./database/repositories/delay-analysis/DrizzlePodReportRepository";
 import type { IPodReportRepository } from "../domain/delay-analysis/repositories/IPodReportRepository";
+import { DrizzlePodEvidenceRepository } from "./database/repositories/delay-analysis/DrizzlePodEvidenceRepository";
+import type { IPodEvidenceProvider } from "../domain/delay-analysis/interfaces/IPodEvidenceProvider";
 import { PODExtractionStrategy } from "./delay-analysis/extraction-strategies/PODExtractionStrategy";
 import type { IPodExtractionStrategy } from "../domain/delay-analysis/interfaces/IPodExtractionStrategy";
 import { ProcessPodDocumentCommandHandler } from "../application/delay-analysis/commands/handlers/ProcessPodDocumentCommandHandler";
@@ -155,6 +157,7 @@ export interface AppContainer {
     delayEventDeduplicationService: IDelayEventDeduplicationService;
     fieldMemoContextProvider: IFieldMemoContextProvider | null;
     postParseDocumentHandlerFactory: IPostParseDocumentHandlerFactory;
+    podEvidenceProvider: IPodEvidenceProvider | null;
   };
 
   documentUpload: {
@@ -342,6 +345,11 @@ export function createAppContainer(): AppContainer {
     console.log('[Bootstrap] FieldMemoContextSummarizer initialized for IDR context injection');
   }
 
+  // Read-side POD evidence repository, kept separate from the write-side podReportRepository
+  // per CQRS. Optional dependency: analysis degrades to today's behavior without it.
+  const podEvidenceProvider: IPodEvidenceProvider = new DrizzlePodEvidenceRepository();
+  console.log('[Bootstrap] DrizzlePodEvidenceRepository initialized for POD-aware matching');
+
   // POD structured extraction is wired through the same post-parse handler seam that the
   // upload flow resolves by document type. Without an AI client, POD uploads still save
   // their raw project_documents row; they simply get no structured rows (graceful degradation).
@@ -469,6 +477,7 @@ export function createAppContainer(): AppContainer {
       delayEventDeduplicationService: new DelayEventDeduplicationService(),
       fieldMemoContextProvider,
       postParseDocumentHandlerFactory,
+      podEvidenceProvider,
     },
     documentUpload: {
       uploadDocumentsHandler,

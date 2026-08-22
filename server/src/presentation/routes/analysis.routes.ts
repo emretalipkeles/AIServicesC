@@ -289,7 +289,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
     container.services.delayEventDeduplicationService,
     container.services.idrMatchPolicy,
     container.services.analysisRunTracker,
-    container.services.fieldMemoContextProvider ?? undefined
+    container.services.fieldMemoContextProvider ?? undefined,
+    container.services.podEvidenceProvider ?? undefined
   );
 
   const createTokenCallback = (projectId: string): TokenUsageCallback => {
@@ -416,7 +417,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
     container.services.delayEventExtractor!,
     container.services.activityMatcher!,
     container.services.idrMatchPolicy,
-    container.services.fieldMemoContextProvider ?? undefined
+    container.services.fieldMemoContextProvider ?? undefined,
+    container.services.podEvidenceProvider ?? undefined
   );
 
   app.get(

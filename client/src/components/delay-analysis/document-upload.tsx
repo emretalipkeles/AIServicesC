@@ -541,6 +541,7 @@ const DocumentRow = React.memo(function DocumentRow({ doc, onDelete, onAnalyze, 
   const StatusIcon = status.icon;
 
   const canAnalyze = doc.status === 'completed' && analyzableDocTypes.includes(doc.documentType);
+  const isPodSupportingContext = doc.status === 'completed' && doc.documentType === 'pod';
 
   return (
     <div
@@ -586,6 +587,14 @@ const DocumentRow = React.memo(function DocumentRow({ doc, onDelete, onAnalyze, 
         {doc.errorMessage && (
           <span className="text-xs text-destructive max-w-[150px] truncate" title={doc.errorMessage}>
             {doc.errorMessage}
+          </span>
+        )}
+        {isPodSupportingContext && (
+          <span
+            className="text-xs text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full whitespace-nowrap"
+            title="POD reports aren't analyzed for delay events themselves, but their crew, equipment, and cost-code data is used as supporting evidence when matching delays to schedule activities."
+          >
+            Used as supporting context
           </span>
         )}
         {canAnalyze && (

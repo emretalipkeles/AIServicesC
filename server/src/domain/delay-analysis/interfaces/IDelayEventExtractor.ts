@@ -43,6 +43,13 @@ export interface ExtractionOptions {
   projectId?: string;
   enableToolBasedMatching?: boolean;
   fieldMemoContext?: string;
+  /**
+   * Rendered, size-capped POD (Play of the Day) context text for the document's report date,
+   * if a POD report exists for that date. Purely supporting context: POD never produces delay
+   * events of its own, it only helps the extractor's own activity pre-matching (see
+   * IActivityMatcher's podEvidence for the equivalent used by the standalone matcher).
+   */
+  podContext?: string;
 }
 
 export interface IDelayEventExtractor {

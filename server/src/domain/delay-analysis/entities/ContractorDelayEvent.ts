@@ -124,7 +124,12 @@ export class ContractorDelayEvent {
     cpmActivityDescription: string,
     wbs: string | null,
     confidence: number,
-    reasoning: string
+    reasoning: string,
+    /**
+     * Merged into existing metadata (never replaces it) so callers can layer in traceability
+     * markers — e.g. `{ podCorroborated: true }` — without new columns.
+     */
+    metadataPatch?: Record<string, unknown>
   ): ContractorDelayEvent {
     return new ContractorDelayEvent({
       ...this,
@@ -134,6 +139,7 @@ export class ContractorDelayEvent {
       wbs,
       matchConfidence: confidence,
       matchReasoning: reasoning,
+      metadata: metadataPatch ? { ...(this.metadata ?? {}), ...metadataPatch } : this.metadata,
       updatedAt: new Date(),
     });
   }
