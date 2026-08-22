@@ -1,14 +1,9 @@
-import { useState } from "react";
-import { useDelayAnalysisProjects, useCreateProject, useDeleteProject, type DelayAnalysisProject } from "@/lib/delay-analysis-api";
+import { useDelayAnalysisProjects, useDeleteProject, type DelayAnalysisProject } from "@/lib/delay-analysis-api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, FolderOpen, Trash2, Calendar, FileText, Clock } from "lucide-react";
+import { FolderOpen, Trash2, Calendar, FileText, Clock } from "lucide-react";
 import { format } from "date-fns";
 
 interface DelayAnalysisProjectsProps {
@@ -17,36 +12,8 @@ interface DelayAnalysisProjectsProps {
 
 export function DelayAnalysisProjects({ onSelectProject }: DelayAnalysisProjectsProps) {
   const { data: projects, isLoading, error } = useDelayAnalysisProjects();
-  const createProject = useCreateProject();
   const deleteProject = useDeleteProject();
   const { toast } = useToast();
-  
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [newProject, setNewProject] = useState({
-    name: "",
-    description: "",
-    contractNumber: "",
-  });
-
-  const handleCreateProject = async () => {
-    if (!newProject.name.trim()) {
-      toast({ title: "Error", description: "Project name is required", variant: "destructive" });
-      return;
-    }
-
-    try {
-      await createProject.mutateAsync({
-        name: newProject.name,
-        description: newProject.description || undefined,
-        contractNumber: newProject.contractNumber || undefined,
-      });
-      toast({ title: "Success", description: "Project created successfully" });
-      setIsCreateDialogOpen(false);
-      setNewProject({ name: "", description: "", contractNumber: "" });
-    } catch (err) {
-      toast({ title: "Error", description: "Failed to create project", variant: "destructive" });
-    }
-  };
 
   const handleDeleteProject = async (e: React.MouseEvent, projectId: string) => {
     e.stopPropagation();
@@ -85,60 +52,6 @@ export function DelayAnalysisProjects({ onSelectProject }: DelayAnalysisProjects
             Interpret contractor-caused delays from construction documentation
           </p>
         </div>
-        
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              New Project
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Project</DialogTitle>
-              <DialogDescription>
-                Create a new delay analysis project for a construction contract
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Project Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g., J-Line BRT Project"
-                  value={newProject.name}
-                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="contractNumber">Contract Number</Label>
-                <Input
-                  id="contractNumber"
-                  placeholder="e.g., J-LINE-2024-001"
-                  value={newProject.contractNumber}
-                  onChange={(e) => setNewProject({ ...newProject, contractNumber: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Brief description of the project..."
-                  value={newProject.description}
-                  onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateProject} disabled={createProject.isPending}>
-                {createProject.isPending ? "Creating..." : "Create Project"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {projects && projects.length === 0 ? (
@@ -146,13 +59,9 @@ export function DelayAnalysisProjects({ onSelectProject }: DelayAnalysisProjects
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FolderOpen className="w-12 h-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No projects yet</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Create your first delay analysis project to get started
+            <p className="text-muted-foreground text-center">
+              No delay analysis projects have been created yet
             </p>
-            <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Create First Project
-            </Button>
           </CardContent>
         </Card>
       ) : (
