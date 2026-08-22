@@ -2,7 +2,6 @@ import type { Express } from 'express';
 import multer from 'multer';
 import type { AppContainer } from '../../infrastructure/bootstrap';
 import { ProjectDocumentController } from '../controllers/ProjectDocumentController';
-import { UploadDocumentsCommandHandler } from '../../application/delay-analysis/commands/handlers/UploadDocumentsCommandHandler';
 import { ListProjectDocumentsQueryHandler } from '../../application/delay-analysis/queries/handlers/ListProjectDocumentsQueryHandler';
 import { DeleteAllProjectDocumentsCommandHandler } from '../../application/delay-analysis/commands/handlers/DeleteAllProjectDocumentsCommandHandler';
 
@@ -28,13 +27,9 @@ const upload = multer({
 });
 
 export function registerProjectDocumentRoutes(app: Express, container: AppContainer): void {
-  const uploadHandler = new UploadDocumentsCommandHandler(
-    container.repositories.delayAnalysisProject,
-    container.repositories.projectDocument,
-    container.services.documentParserFactory,
-    container.services.documentHashService,
-    container.services.postParseDocumentHandlerFactory
-  );
+  // Shared with StartupReconciliationService so retried documents go through the exact same
+  // handler instance (concurrency limiter included) as normal uploads.
+  const uploadHandler = container.documentUpload.uploadDocumentsHandler;
 
   const listHandler = new ListProjectDocumentsQueryHandler(
     container.repositories.projectDocument

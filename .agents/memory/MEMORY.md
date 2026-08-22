@@ -1,3 +1,4 @@
 - [PDF visual-order text extraction](pdf-visual-order-extraction.md) — pdf-parse/unpdf don't sort by position; use pdfjs-dist getTextContent + manual x/y sort for layout-sensitive PDFs.
 - [POD report date resolution](pod-report-date-resolution.md) — POD sheets are copied day-to-day and keep stale header dates; the model resolves the date from body + filename, never a regex.
 - [Interactive drizzle-kit push prompts](drizzle-kit-push-interactive-prompts.md) — db:push can hang on rename-detection/data-loss prompts unrelated to your change; apply new tables via direct SQL instead of fighting the TTY.
+- [Upload resumability pattern](upload-resumability-pattern.md) — project_documents.file_data (bytea) + StartupReconciliationService recover uploads orphaned by a mid-process restart; exclude file_data from normal list/lookup selects.

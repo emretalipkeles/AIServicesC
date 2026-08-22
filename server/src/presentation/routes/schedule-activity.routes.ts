@@ -3,7 +3,6 @@ import type { Express } from 'express';
 import multer from 'multer';
 import type { AppContainer } from '../../infrastructure/bootstrap';
 import { ScheduleActivityController } from '../controllers/ScheduleActivityController';
-import { UploadScheduleCommandHandler } from '../../application/delay-analysis/commands/handlers/UploadScheduleCommandHandler';
 import { ListScheduleActivitiesQueryHandler } from '../../application/delay-analysis/queries/handlers/ListScheduleActivitiesQueryHandler';
 import { RecordTokenUsageCommandHandler } from '../../application/delay-analysis/commands/handlers/RecordTokenUsageCommandHandler';
 import { SSEProgressReporter } from '../../infrastructure/document-parsing/SSEProgressReporter';
@@ -34,12 +33,9 @@ const upload = multer({
 });
 
 export function registerScheduleActivityRoutes(app: Express, container: AppContainer): void {
-  const uploadScheduleHandler = new UploadScheduleCommandHandler(
-    container.repositories.delayAnalysisProject,
-    container.repositories.projectDocument,
-    container.repositories.scheduleActivity,
-    container.services.scheduleParserFactory
-  );
+  // Shared with StartupReconciliationService so retried schedules go through the exact same
+  // handler instance as normal uploads.
+  const uploadScheduleHandler = container.documentUpload.uploadScheduleHandler;
 
   const listActivitiesHandler = new ListScheduleActivitiesQueryHandler(
     container.repositories.scheduleActivity

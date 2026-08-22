@@ -118,6 +118,9 @@ import { ProcessPodDocumentCommandHandler } from "../application/delay-analysis/
 import { PodPostParseHandler } from "../application/delay-analysis/commands/handlers/PodPostParseHandler";
 import { PostParseDocumentHandlerFactory } from "./delay-analysis/PostParseDocumentHandlerFactory";
 import type { IPostParseDocumentHandlerFactory } from "../domain/delay-analysis/interfaces/IPostParseDocumentHandlerFactory";
+import { UploadDocumentsCommandHandler } from "../application/delay-analysis/commands/handlers/UploadDocumentsCommandHandler";
+import { UploadScheduleCommandHandler } from "../application/delay-analysis/commands/handlers/UploadScheduleCommandHandler";
+import { StartupReconciliationService } from "./delay-analysis/StartupReconciliationService";
 
 export interface AppContainer {
   commandBus: ICommandBus;
@@ -152,6 +155,12 @@ export interface AppContainer {
     delayEventDeduplicationService: IDelayEventDeduplicationService;
     fieldMemoContextProvider: IFieldMemoContextProvider | null;
     postParseDocumentHandlerFactory: IPostParseDocumentHandlerFactory;
+  };
+
+  documentUpload: {
+    uploadDocumentsHandler: UploadDocumentsCommandHandler;
+    uploadScheduleHandler: UploadScheduleCommandHandler;
+    startupReconciliationService: StartupReconciliationService;
   };
 
   agentLoop: {
@@ -349,7 +358,29 @@ export function createAppContainer(): AppContainer {
   }
   const postParseDocumentHandlerFactory: IPostParseDocumentHandlerFactory =
     new PostParseDocumentHandlerFactory(postParseHandlers);
-  
+  const documentHashService = new SHA256DocumentHashService();
+
+  // Single shared instances so route handlers and StartupReconciliationService retry through
+  // the exact same processing path (concurrency limiter, parser factories, etc).
+  const uploadDocumentsHandler = new UploadDocumentsCommandHandler(
+    delayAnalysisProjectRepository,
+    projectDocumentRepository,
+    documentParserFactory,
+    documentHashService,
+    postParseDocumentHandlerFactory
+  );
+  const uploadScheduleHandler = new UploadScheduleCommandHandler(
+    delayAnalysisProjectRepository,
+    projectDocumentRepository,
+    scheduleActivityRepository,
+    scheduleParserFactory
+  );
+  const startupReconciliationService = new StartupReconciliationService(
+    projectDocumentRepository,
+    uploadDocumentsHandler,
+    uploadScheduleHandler
+  );
+
   const testConnectionHandler = new TestConnectionQueryHandler(bedrockClientProvider);
 
   const createAgentHandler = new CreateAgentCommandHandler(agentRepository);
@@ -434,10 +465,15 @@ export function createAppContainer(): AppContainer {
       idrMatchPolicy: new IDRMatchEnforcementPolicy(),
       analysisRunTracker: new InMemoryAnalysisRunTracker(),
       documentContentProvider: new DocumentContentProvider(),
-      documentHashService: new SHA256DocumentHashService(),
+      documentHashService,
       delayEventDeduplicationService: new DelayEventDeduplicationService(),
       fieldMemoContextProvider,
       postParseDocumentHandlerFactory,
+    },
+    documentUpload: {
+      uploadDocumentsHandler,
+      uploadScheduleHandler,
+      startupReconciliationService,
     },
     agentLoop: createAgentLoop(projectDocumentRepository, contractorDelayEventRepository, getActivitiesByIdsHandler),
     auth: createAuthSection(),
@@ -479,4 +515,13 @@ export function resetAppContainer(): void {
 
 export async function initializeInfrastructure(): Promise<void> {
   await warmDatabaseConnection();
+
+  // Detect and recover documents/schedules orphaned by a previous process dying mid-upload
+  // before any request traffic is served. See StartupReconciliationService for why "at
+  // startup" is the only reliable place to run this.
+  try {
+    await getAppContainer().documentUpload.startupReconciliationService.reconcile();
+  } catch (error) {
+    console.error('[Bootstrap] Startup reconciliation failed:', error);
+  }
 }

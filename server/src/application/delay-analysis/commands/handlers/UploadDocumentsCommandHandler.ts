@@ -118,7 +118,14 @@ export class UploadDocumentsCommandHandler {
 
     if (documentsToSave.length > 0) {
       await this.documentRepository.saveBatch(documentsToSave);
-      
+
+      // Persist the raw bytes before kicking off async processing so a mid-flight server
+      // restart leaves enough state behind for StartupReconciliationService to retry the
+      // document itself instead of just marking it failed.
+      for (const { document, buffer } of documentsWithBuffers) {
+        await this.documentRepository.setFileData(document.id, document.tenantId, buffer);
+      }
+
       for (const { document, buffer } of documentsWithBuffers) {
         this.processingLimiter.run(() => this.parseDocumentAsync(document, buffer));
       }
@@ -127,10 +134,24 @@ export class UploadDocumentsCommandHandler {
     return { uploaded, failed, skipped };
   }
 
+  /**
+   * Re-runs processing for a document left in 'pending'/'processing' by an interrupted server
+   * process, using the raw bytes persisted at upload time. Used by StartupReconciliationService;
+   * not part of the normal upload path. Routed through the same processingLimiter as a normal
+   * upload batch - without this, reconciling a large stuck batch (e.g. 916 documents) would
+   * fire every retry's parse/AI-extraction call at once, recreating the exact rate-limit
+   * overload this limiter exists to prevent.
+   */
+  reprocessDocument(document: ProjectDocument, buffer: Buffer): Promise<void> {
+    return this.processingLimiter.run(() => this.parseDocumentAsync(document, buffer));
+  }
+
   private async parseDocumentAsync(document: ProjectDocument, buffer: Buffer): Promise<void> {
     try {
       const parser = this.parserFactory.getParser(document.contentType, document.documentType);
       if (!parser) {
+        // update() clears retained file bytes atomically with the terminal status write - see
+        // DrizzleProjectDocumentRepository.update.
         await this.documentRepository.update(
           document.withProcessingStatus('failed', 'No parser available for content type')
         );
@@ -157,6 +178,9 @@ export class UploadDocumentsCommandHandler {
         .withReportDate(dateExtraction.date)
         .withProcessingStatus('completed');
       
+      // update() clears retained file bytes atomically with the terminal status write - see
+      // DrizzleProjectDocumentRepository.update. Raw bytes are only needed to survive a restart
+      // while processing is in flight; once parsing succeeds, `rawContent` is the durable artifact.
       await this.documentRepository.update(completedDoc);
 
       // Document-type-specific structured extraction (e.g. POD), resolved through the same
@@ -172,6 +196,8 @@ export class UploadDocumentsCommandHandler {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown parsing error';
+      // update() clears retained file bytes atomically with the terminal status write - see
+      // DrizzleProjectDocumentRepository.update.
       await this.documentRepository.update(
         document.withProcessingStatus('failed', errorMessage)
       );

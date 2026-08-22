@@ -76,6 +76,48 @@ export class UploadScheduleCommandHandler {
     });
 
     await this.documentRepository.save(document);
+    // Persisted before parsing starts so a mid-flight server restart leaves enough state for
+    // StartupReconciliationService to retry the schedule instead of leaving it stuck forever.
+    await this.documentRepository.setFileData(docId, command.tenantId, command.file.buffer);
+
+    return this.processSchedule(document, command.file.buffer, command.projectId, command.tenantId, options, progress);
+  }
+
+  /**
+   * Re-runs schedule processing for a document left in 'pending'/'processing' by an interrupted
+   * server process, using the raw bytes persisted at upload time. Used by
+   * StartupReconciliationService; not part of the normal upload path.
+   */
+  async reprocessDocument(
+    document: ProjectDocument,
+    buffer: Buffer,
+    options?: UploadScheduleOptions
+  ): Promise<UploadScheduleResult> {
+    const progress = options?.progressReporter || new NoOpProgressReporter();
+    return this.processSchedule(document, buffer, document.projectId, document.tenantId, options, progress);
+  }
+
+  private async processSchedule(
+    document: ProjectDocument,
+    buffer: Buffer,
+    projectId: string,
+    tenantId: string,
+    options: UploadScheduleOptions | undefined,
+    progress: IProgressReporter
+  ): Promise<UploadScheduleResult> {
+    const docId = document.id;
+    const now = new Date();
+    const parser = this.parserFactory.getParser(document.contentType, document.filename);
+    if (!parser) {
+      const updatedDoc = document.withProcessingStatus(
+        'failed',
+        `Unsupported file type: ${document.contentType}. Please upload an Excel (.xlsx, .xls) or PDF file.`
+      );
+      // update() clears retained file bytes atomically with the terminal status write - see
+      // DrizzleProjectDocumentRepository.update.
+      await this.documentRepository.update(updatedDoc);
+      throw new Error(updatedDoc.errorMessage ?? 'Unsupported file type');
+    }
 
     progress.report({
       stage: 'parsing_pdf',
@@ -85,8 +127,8 @@ export class UploadScheduleCommandHandler {
 
     try {
       const parseResult = await parser.parseSchedule(
-        command.file.buffer,
-        command.file.filename,
+        buffer,
+        document.filename,
         {
           filterActualOnly: true,
           progressReporter: progress,
@@ -104,6 +146,8 @@ export class UploadScheduleCommandHandler {
           'completed',
           `No activities with actual dates found. ${parseResult.errors.join('; ')}`
         );
+        // update() clears retained file bytes atomically with the terminal status write - see
+        // DrizzleProjectDocumentRepository.update.
         await this.documentRepository.update(updatedDoc);
 
         return {
@@ -136,8 +180,8 @@ export class UploadScheduleCommandHandler {
       for (let i = 0; i < deduplicatedRows.length; i++) {
         const row = deduplicatedRows[i];
         const existing = await this.scheduleRepository.findByActivityId(
-          command.projectId,
-          command.tenantId,
+          projectId,
+          tenantId,
           row.activityId
         );
 
@@ -147,8 +191,8 @@ export class UploadScheduleCommandHandler {
           if (hasChanges) {
             const updatedActivity = new ScheduleActivity({
               id: existing.id,
-              projectId: command.projectId,
-              tenantId: command.tenantId,
+              projectId,
+              tenantId,
               sourceDocumentId: docId,
               activityId: row.activityId,
               wbs: row.wbs,
@@ -171,8 +215,8 @@ export class UploadScheduleCommandHandler {
         } else {
           const newActivity = new ScheduleActivity({
             id: randomUUID(),
-            projectId: command.projectId,
-            tenantId: command.tenantId,
+            projectId,
+            tenantId,
             sourceDocumentId: docId,
             activityId: row.activityId,
             wbs: row.wbs,
@@ -206,6 +250,8 @@ export class UploadScheduleCommandHandler {
       }
 
       const updatedDoc = document.withProcessingStatus('completed');
+      // update() clears retained file bytes atomically with the terminal status write - see
+      // DrizzleProjectDocumentRepository.update.
       await this.documentRepository.update(updatedDoc);
 
       progress.report({
@@ -230,6 +276,8 @@ export class UploadScheduleCommandHandler {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error during parsing';
       const updatedDoc = document.withProcessingStatus('failed', errorMessage);
+      // update() clears retained file bytes atomically with the terminal status write - see
+      // DrizzleProjectDocumentRepository.update.
       await this.documentRepository.update(updatedDoc);
 
       throw error;

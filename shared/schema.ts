@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, customType } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -281,6 +281,19 @@ export const projectDocuments = pgTable("project_documents", {
   // surface instead of being silently swallowed while `status` stays 'completed' for the raw parse.
   structuredExtractionStatus: text("structured_extraction_status"),
   structuredExtractionError: text("structured_extraction_error"),
+  // Original uploaded bytes, kept only while status is 'pending'/'processing' so a server
+  // restart mid-upload can resume/retry without asking the user to re-upload. Cleared once
+  // processing reaches a terminal state (completed, or failed after exhausting retries) to
+  // avoid unbounded row bloat - see StartupReconciliationService.
+  fileData: customType<{ data: Buffer; driverData: Buffer }>({
+    dataType() {
+      return "bytea";
+    },
+  })("file_data"),
+  // Counts reconciliation retry attempts after an interrupted (pending/processing) restart is
+  // detected. Bounds retries so a document whose processing itself crashes the server can't
+  // wedge the app in a permanent restart loop - see StartupReconciliationService.
+  processingAttempts: integer("processing_attempts").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
