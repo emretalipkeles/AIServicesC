@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useCallback, useRef, useMemo } from "react";
+import { motion } from "framer-motion";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, FileSpreadsheet, Trash2, FileText, Loader2, DollarSign, CheckCircle, Clock, Search } from "lucide-react";
@@ -16,10 +17,14 @@ interface ScheduleUploadProps {
   projectId: string;
 }
 
+const SCHEDULE_TABLE_GRID_COLS = "140px minmax(200px,1fr) 130px 130px 120px 110px";
+const SCHEDULE_ROW_HEIGHT = 45;
+
 export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [filterText, setFilterText] = useState("");
   const uploadSectionRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -41,6 +46,23 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
 
   const { data: activities = [], isLoading } = useScheduleActivities(projectId);
   const deleteMutation = useDeleteAllActivities();
+
+  const filteredActivities = useMemo(() => {
+    if (!filterText) return activities;
+    const search = filterText.toLowerCase();
+    return activities.filter(activity =>
+      activity.activityId.toLowerCase().includes(search) ||
+      (activity.wbs || "").toLowerCase().includes(search) ||
+      activity.activityDescription.toLowerCase().includes(search)
+    );
+  }, [activities, filterText]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: filteredActivities.length,
+    getScrollElement: () => tableScrollRef.current,
+    estimateSize: () => SCHEDULE_ROW_HEIGHT,
+    overscan: 15,
+  });
 
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -229,52 +251,59 @@ export function ScheduleUpload({ projectId }: ScheduleUploadProps) {
                 placeholder="Filter by Activity ID or Description..."
                 className="max-w-md"
               />
-              <div className="rounded-xl border border-border/50 overflow-auto max-h-[500px]">
-                <table className="w-full">
-                  <thead className={tableHeaderStyles}>
-                    <tr>
-                      <th className={tableHeaderCellStyles}>Activity ID</th>
-                      <th className={cn(tableHeaderCellStyles, "min-w-[200px]")}>Description</th>
-                      <th className={tableHeaderCellStyles}>Actual Start</th>
-                      <th className={tableHeaderCellStyles}>Actual Finish</th>
-                      <th className={cn(tableHeaderCellStyles, "text-center")}>Critical Path</th>
-                      <th className={cn(tableHeaderCellStyles, "text-center")}>Total Float</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <AnimatePresence>
-                      {activities
-                        .filter(activity => {
-                          if (!filterText) return true;
-                          const search = filterText.toLowerCase();
-                          return (
-                            activity.activityId.toLowerCase().includes(search) ||
-                            (activity.wbs || "").toLowerCase().includes(search) ||
-                            activity.activityDescription.toLowerCase().includes(search)
-                          );
-                        })
-                        .map((activity, index) => (
-                          <motion.tr
-                            key={activity.id}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: index * 0.02 }}
-                            className="border-b border-border/30 hover:bg-muted/20 transition-colors"
-                          >
-                            <td className="p-3 font-mono text-sm">{activity.activityId}</td>
-                            <td className="p-3 max-w-[300px] truncate" title={activity.activityDescription}>
-                              {activity.activityDescription}
-                            </td>
-                            <td className="p-3 text-sm">{formatDate(activity.actualStartDate)}</td>
-                            <td className="p-3 text-sm">{formatDate(activity.actualFinishDate)}</td>
-                            <td className="p-3 text-sm text-center">{activity.isCriticalPath === 'yes' ? 'Yes' : activity.isCriticalPath === 'no' ? 'No' : '-'}</td>
-                            <td className="p-3 text-sm text-center">{activity.totalFloat !== null && activity.totalFloat !== undefined ? activity.totalFloat : '-'}</td>
-                          </motion.tr>
-                        ))}
-                    </AnimatePresence>
-                  </tbody>
-                </table>
-              </div>
+              {filteredActivities.length === 0 ? (
+                <div className="rounded-xl border border-border/50 py-12 text-center text-sm text-muted-foreground">
+                  No activities match your filter
+                </div>
+              ) : (
+                <div
+                  ref={tableScrollRef}
+                  className="rounded-xl border border-border/50 overflow-auto max-h-[500px]"
+                >
+                  <div
+                    className={cn(tableHeaderStyles, "grid sticky top-0")}
+                    style={{ gridTemplateColumns: SCHEDULE_TABLE_GRID_COLS }}
+                  >
+                    <div className={tableHeaderCellStyles}>Activity ID</div>
+                    <div className={tableHeaderCellStyles}>Description</div>
+                    <div className={tableHeaderCellStyles}>Actual Start</div>
+                    <div className={tableHeaderCellStyles}>Actual Finish</div>
+                    <div className={cn(tableHeaderCellStyles, "text-center")}>Critical Path</div>
+                    <div className={cn(tableHeaderCellStyles, "text-center")}>Total Float</div>
+                  </div>
+                  <div
+                    style={{
+                      height: `${rowVirtualizer.getTotalSize()}px`,
+                      position: "relative",
+                      width: "100%",
+                    }}
+                  >
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const activity = filteredActivities[virtualRow.index];
+                      return (
+                        <div
+                          key={activity.id}
+                          className="grid items-center border-b border-border/30 hover:bg-muted/20 transition-colors absolute top-0 left-0 w-full"
+                          style={{
+                            gridTemplateColumns: SCHEDULE_TABLE_GRID_COLS,
+                            height: `${virtualRow.size}px`,
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          <div className="p-3 font-mono text-sm">{activity.activityId}</div>
+                          <div className="p-3 truncate min-w-0" title={activity.activityDescription}>
+                            {activity.activityDescription}
+                          </div>
+                          <div className="p-3 text-sm">{formatDate(activity.actualStartDate)}</div>
+                          <div className="p-3 text-sm">{formatDate(activity.actualFinishDate)}</div>
+                          <div className="p-3 text-sm text-center">{activity.isCriticalPath === 'yes' ? 'Yes' : activity.isCriticalPath === 'no' ? 'No' : '-'}</div>
+                          <div className="p-3 text-sm text-center">{activity.totalFloat !== null && activity.totalFloat !== undefined ? activity.totalFloat : '-'}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
