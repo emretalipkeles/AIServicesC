@@ -17,6 +17,20 @@ export interface MatchResult {
    * the delay event's metadata without re-deriving the evidence.
    */
   podCorroborated?: boolean;
+  /**
+   * Short, plain-language note on how POD evidence was actually used for this match:
+   * corroboration (cost code/keyword), candidate reordering, off-project exclusion, or
+   * context-only with no corroboration. Undefined when no POD evidence was available at all.
+   */
+  podUsageNote?: string;
+  /**
+   * The exact POD source document id that corroborated this match, when `podCorroborated` is
+   * true. Only ever set from the specific report whose task line/cost code corroborated the
+   * activity — never an arbitrary "first" report when multiple POD reports exist for the date.
+   * Undefined when there was no corroboration (context-only or reordering-only usage), since in
+   * those cases no single report can be honestly singled out as "the" source.
+   */
+  podSourceDocumentId?: string;
 }
 
 /**

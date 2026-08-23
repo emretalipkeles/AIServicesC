@@ -110,6 +110,45 @@ describe('findPodCorroboration', () => {
     expect(findPodCorroboration(activity, [report])).toBeNull();
   });
 
+  it('attributes corroboration to the exact report that supplied the matching task line, not just the first report for the date', () => {
+    const nonCorroboratingReport = makePodReport([
+      {
+        sequence: 1,
+        crewNumber: '100',
+        label: 'ELECTRICAL',
+        category: null,
+        trucking: null,
+        traffic: null,
+        notes: null,
+        crewMembers: [],
+        equipment: [],
+        taskLines: [{ sequence: 1, description: 'Panel wiring on 5th Ave', costCode: '900.00' }],
+      },
+    ]);
+    const corroboratingReport = makePodReport([
+      {
+        sequence: 1,
+        crewNumber: '211',
+        label: 'CIVIL #1',
+        category: null,
+        trucking: null,
+        traffic: null,
+        notes: null,
+        crewMembers: [],
+        equipment: [],
+        taskLines: [{ sequence: 1, description: '12" TIE-IN', costCode: '164.01' }],
+      },
+    ]);
+    const activity = makeActivity({ activityId: '164.01-TIE-IN', activityDescription: 'Install 12" tie-in' });
+
+    // Two POD reports exist for the same date; only the second one actually corroborates.
+    const result = findPodCorroboration(activity, [nonCorroboratingReport, corroboratingReport]);
+
+    expect(result).not.toBeNull();
+    expect(result!.report.sourceDocumentId).toBe(corroboratingReport.sourceDocumentId);
+    expect(result!.report.sourceDocumentId).not.toBe(nonCorroboratingReport.sourceDocumentId);
+  });
+
   it('never uses an OFF section as corroborating evidence', () => {
     const report = makePodReport([
       {

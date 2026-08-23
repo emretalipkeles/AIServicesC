@@ -13,6 +13,9 @@ export interface DelayEventDto {
   eventStartDate: string | null;
   eventFinishDate: string | null;
   impactDurationHours: number | null;
+  impactedWindowStart: string | null;
+  impactedWindowEnd: string | null;
+  durationBasis: string | null;
   sourceReference: string | null;
   extractedFromCode: string | null;
   matchConfidence: number | null;
@@ -20,6 +23,10 @@ export interface DelayEventDto {
   delayEventConfidence: number | null;
   verificationStatus: string;
   createdAt: string;
+  /** Filename of the POD document that informed this event, if any. Null for older events. */
+  podDocumentName: string | null;
+  /** Short plain-language note on how POD evidence was actually used for this event/match. */
+  podUsageNote: string | null;
 }
 
 export interface AnalysisResult {

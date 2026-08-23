@@ -1,4 +1,4 @@
-import type { DelayEventCategory } from '../entities/ContractorDelayEvent';
+import type { DelayEventCategory, DurationBasis } from '../entities/ContractorDelayEvent';
 import type { ProjectDocumentType } from '../entities/ProjectDocument';
 import type { TokenUsageCallback } from './ITokenUsageRecorder';
 import type { IDRWorkActivity } from './IDocumentExtractionStrategy';
@@ -8,6 +8,11 @@ export interface ExtractedDelayEvent {
   eventCategory: DelayEventCategory | null;
   eventDate: Date | null;
   impactDurationHours: number | null;
+  /** Impacted window clock times (e.g. "08:00"), when the narrative supports them. */
+  impactedWindowStart?: string | null;
+  impactedWindowEnd?: string | null;
+  /** How impactDurationHours was derived. */
+  durationBasis?: DurationBasis | null;
   sourceReference: string;
   extractedFromCode: string;
   confidenceScore?: number;

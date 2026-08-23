@@ -7,6 +7,7 @@ import { AIMessage } from '../../domain/value-objects/AIMessage';
 import { ModelId } from '../../domain/value-objects/ModelId';
 import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
 import { auditNarrativeProvenance } from './NarrativeProvenanceCheck';
+import { normalizeClockTime, normalizeDurationBasis } from '../../domain/delay-analysis/DurationProvenance';
 
 interface IDRExtractionResponse {
   workActivities?: Array<{
@@ -203,6 +204,9 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
           eventCategory: this.parseCategory(item.eventCategory || item.category),
           eventDate: this.parseDate(item.eventDate || item.date),
           impactDurationHours,
+          impactedWindowStart: normalizeClockTime(item.impactedWindowStart),
+          impactedWindowEnd: normalizeClockTime(item.impactedWindowEnd),
+          durationBasis: normalizeDurationBasis(item.durationBasis),
           sourceReference: String(item.sourceReference || item.source || ''),
           extractedFromCode: String(item.extractedFromCode || item.code || 'GENERAL'),
           confidenceScore: this.parseConfidenceScore(item.confidenceScore, baseConfidence),

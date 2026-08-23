@@ -441,6 +441,18 @@ export const contractorDelayEvents = pgTable("contractor_delay_events", {
   verificationStatus: text("verification_status").notNull().default("pending"),
   verifiedBy: text("verified_by"),
   verifiedAt: timestamp("verified_at"),
+  // Duration provenance: the impacted window's clock times when the source narrative supports
+  // them (e.g. "08:00"/"09:30"), and how impactDurationHours was actually derived. Stored as
+  // dedicated columns (not metadata) because they are first-class, typed extraction output —
+  // see PROVENANCE note in ContractorDelayEvent.ts. Both null for events analyzed before this
+  // field existed; never backfilled.
+  impactedWindowStart: text("impacted_window_start"),
+  impactedWindowEnd: text("impacted_window_end"),
+  durationBasis: text("duration_basis"),
+  // POD provenance lives in `metadata` (jsonb) alongside the existing podEvidenceAvailable/
+  // podReportCount/podCorroborated audit fields — see ContractorDelayEvent.withActivityMatch's
+  // merge-only metadata patch convention. Not dedicated columns so unrelated metadata keys are
+  // never at risk of being clobbered by a schema change here.
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

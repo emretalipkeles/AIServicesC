@@ -86,6 +86,9 @@ Return a JSON object with the structure:
       "eventCategory": "one of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other",
       "eventDate": "YYYY-MM-DD",
       "impactDurationHours": number (REQUIRED - always estimate hours even if not explicit),
+      "impactedWindowStart": "HH:MM clock time the impact began, ONLY when the narrative states or implies a specific start time" or null,
+      "impactedWindowEnd": "HH:MM clock time the impact ended, ONLY when the narrative states or implies a specific end time" or null,
+      "durationBasis": "one of: timestamp_derived (calculated from two clock times in the narrative), document_stated (an explicit duration like '1.5 hours' was written), estimated (no times or explicit duration, you inferred a reasonable figure)",
       "sourceReference": "Include DSC/NCR/RFI number if mentioned (e.g., 'DSC 293', 'NCR-045') AND page/section reference",
       "extractedFromCode": "code tag if applicable",
       "confidenceScore": 0.0-1.0,
@@ -129,10 +132,15 @@ Fractional values are supported and expected — report 0.75 or 1.5 when that is
 5. If no clear indication: use reasonable estimate based on the nature of the delay (minimum 0.5h)
 
 Examples:
-- "CDF removal took 1.5 hours" → impactDurationHours: 1.5
-- "0800 stopped, 0930 resumed" → impactDurationHours: 1.5
-- "Waiting on SPU direction" (no resolution noted) → impactDurationHours: 2 (or more based on context)
-- "Large roots encountered, excavation stopped" → impactDurationHours: 1 (estimate)`;
+- "CDF removal took 1.5 hours" → impactDurationHours: 1.5, durationBasis: "document_stated"
+- "0800 stopped, 0930 resumed" → impactDurationHours: 1.5, impactedWindowStart: "08:00", impactedWindowEnd: "09:30", durationBasis: "timestamp_derived"
+- "Waiting on SPU direction" (no resolution noted) → impactDurationHours: 2 (or more based on context), durationBasis: "estimated"
+- "Large roots encountered, excavation stopped" → impactDurationHours: 1 (estimate), durationBasis: "estimated"
+
+## IMPACTED WINDOW — ONLY WHEN THE NARRATIVE SUPPORTS IT:
+impactedWindowStart/impactedWindowEnd must be null unless the narrative gives you real clock times for
+this specific event. Never invent times to satisfy the field. When durationBasis is "timestamp_derived",
+both window fields MUST be populated with the exact times used for the calculation.`;
   }
 
   buildUserPromptSuffix(): string {

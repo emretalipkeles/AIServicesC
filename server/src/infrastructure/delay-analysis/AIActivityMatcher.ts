@@ -118,25 +118,49 @@ export class AIActivityMatcher implements IActivityMatcher {
 
   /**
    * Enriches a match result with POD corroboration: appends a short note naming the
-   * corroborating POD section/task line/cost code to the reasoning, and sets the
-   * `podCorroborated` marker used for traceability in delay-event metadata.
+   * corroborating POD section/task line/cost code to the reasoning, sets the `podCorroborated`
+   * marker used for traceability in delay-event metadata, and always sets a structured
+   * `podUsageNote` describing how POD evidence was actually used (corroborated, reordered
+   * candidates, or supplied as context only) so the Results table can surface it even when
+   * corroboration did not occur.
    */
-  private applyPodCorroboration(result: MatchResult, matchedActivity: ScheduleActivity, podEvidence?: PodMatchEvidence): MatchResult {
+  private applyPodCorroboration(
+    result: MatchResult,
+    matchedActivity: ScheduleActivity,
+    podEvidence?: PodMatchEvidence,
+    reorderingDetected = false
+  ): MatchResult {
     if (!podEvidence?.reports?.length) {
       return result;
     }
     const corroboration = findPodCorroboration(matchedActivity, podEvidence.reports);
-    if (!corroboration) {
-      return result;
+    if (corroboration) {
+      const sectionLabel = [corroboration.section.crewNumber, corroboration.section.label].filter(Boolean).join(' ');
+      const evidenceNote = corroboration.costCode
+        ? `POD corroboration: ${sectionLabel} logged task "${corroboration.taskLine?.description}" under cost code ${corroboration.costCode}, matching this activity.`
+        : `POD corroboration: ${sectionLabel} logged task "${corroboration.taskLine?.description}", overlapping this activity's description ("${corroboration.matchedKeyword}").`;
+      return {
+        ...result,
+        podCorroborated: true,
+        podUsageNote: evidenceNote,
+        // Attribute provenance to the exact report that corroborated this match, never an
+        // arbitrary "first" report — a date can have multiple POD reports and only one may have
+        // actually supplied the evidence.
+        podSourceDocumentId: corroboration.report.sourceDocumentId,
+        reasoning: `${result.reasoning} ${evidenceNote}`,
+      };
     }
-    const sectionLabel = [corroboration.section.crewNumber, corroboration.section.label].filter(Boolean).join(' ');
-    const evidenceNote = corroboration.costCode
-      ? `POD corroboration: ${sectionLabel} logged task "${corroboration.taskLine?.description}" under cost code ${corroboration.costCode}, matching this activity.`
-      : `POD corroboration: ${sectionLabel} logged task "${corroboration.taskLine?.description}", overlapping this activity's description ("${corroboration.matchedKeyword}").`;
+
+    if (reorderingDetected) {
+      return {
+        ...result,
+        podUsageNote: 'POD evidence for this date reordered candidate activities toward the crews/equipment actually on-site, but did not directly corroborate this specific match.',
+      };
+    }
+
     return {
       ...result,
-      podCorroborated: true,
-      reasoning: `${result.reasoning} ${evidenceNote}`,
+      podUsageNote: 'A POD report existed for this date and was supplied as crew/equipment context, but it did not corroborate or influence this specific match.',
     };
   }
 
@@ -294,11 +318,13 @@ export class AIActivityMatcher implements IActivityMatcher {
 
     // Reorder POD-corroborated activities to the front BEFORE truncating to 100, so the
     // correct activity can't be cut off from the model's view when the schedule is long.
+    let podReorderingDetected = false;
     if (options?.podEvidence?.reports?.length) {
       const beforeIds = filteredActivities.slice(0, 100).map(a => a.activityId);
       filteredActivities = rankActivitiesByPodEvidence(filteredActivities, options.podEvidence.reports);
       const afterIds = filteredActivities.slice(0, 100).map(a => a.activityId);
       if (JSON.stringify(beforeIds) !== JSON.stringify(afterIds)) {
+        podReorderingDetected = true;
         console.log('[AI] MATCHING: POD evidence reordered candidate activities ahead of the 100-activity truncation');
       }
     }
@@ -342,7 +368,7 @@ export class AIActivityMatcher implements IActivityMatcher {
       if (result) {
         const matchedActivity = filteredActivities.find(a => a.id === result!.matchedActivityId);
         if (matchedActivity) {
-          result = this.applyPodCorroboration(result, matchedActivity, options?.podEvidence);
+          result = this.applyPodCorroboration(result, matchedActivity, options?.podEvidence, podReorderingDetected);
         }
         console.log(`[AI] MATCHING: Result -> ${result.cpmActivityId} (${result.confidence}% confidence${result.podCorroborated ? ', POD-corroborated' : ''})`);
       } else {

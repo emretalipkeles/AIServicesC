@@ -1,6 +1,6 @@
 import { eq, and, isNull, count } from 'drizzle-orm';
 import type { IContractorDelayEventRepository } from '../../../../domain/delay-analysis/repositories/IContractorDelayEventRepository';
-import { ContractorDelayEvent, type DelayEventCategory, type VerificationStatus } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
+import { ContractorDelayEvent, type DelayEventCategory, type VerificationStatus, type DurationBasis } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 import { contractorDelayEvents } from '@shared/schema';
 import { db } from '../../../database';
 
@@ -86,6 +86,9 @@ export class DrizzleContractorDelayEventRepository implements IContractorDelayEv
       eventStartDate: event.eventStartDate,
       eventFinishDate: event.eventFinishDate,
       impactDurationHours: event.impactDurationHours,
+      impactedWindowStart: event.impactedWindowStart,
+      impactedWindowEnd: event.impactedWindowEnd,
+      durationBasis: event.durationBasis,
       sourceReference: event.sourceReference,
       extractedFromCode: event.extractedFromCode,
       matchConfidence: event.matchConfidence,
@@ -118,6 +121,9 @@ export class DrizzleContractorDelayEventRepository implements IContractorDelayEv
         eventStartDate: event.eventStartDate,
         eventFinishDate: event.eventFinishDate,
         impactDurationHours: event.impactDurationHours,
+        impactedWindowStart: event.impactedWindowStart,
+        impactedWindowEnd: event.impactedWindowEnd,
+        durationBasis: event.durationBasis,
         sourceReference: event.sourceReference,
         extractedFromCode: event.extractedFromCode,
         matchConfidence: event.matchConfidence,
@@ -146,6 +152,9 @@ export class DrizzleContractorDelayEventRepository implements IContractorDelayEv
         eventStartDate: event.eventStartDate,
         eventFinishDate: event.eventFinishDate,
         impactDurationHours: event.impactDurationHours,
+        impactedWindowStart: event.impactedWindowStart,
+        impactedWindowEnd: event.impactedWindowEnd,
+        durationBasis: event.durationBasis,
         matchConfidence: event.matchConfidence,
         delayEventConfidence: event.delayEventConfidence,
         matchReasoning: event.matchReasoning,
@@ -212,6 +221,9 @@ export class DrizzleContractorDelayEventRepository implements IContractorDelayEv
       eventStartDate: row.eventStartDate,
       eventFinishDate: row.eventFinishDate,
       impactDurationHours: row.impactDurationHours,
+      impactedWindowStart: row.impactedWindowStart,
+      impactedWindowEnd: row.impactedWindowEnd,
+      durationBasis: row.durationBasis as DurationBasis | null,
       sourceReference: row.sourceReference,
       extractedFromCode: row.extractedFromCode,
       matchConfidence: row.matchConfidence,

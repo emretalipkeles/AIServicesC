@@ -19,6 +19,9 @@ export interface DelayEventDto {
   eventStartDate: string | null;
   eventFinishDate: string | null;
   impactDurationHours: number | null;
+  impactedWindowStart: string | null;
+  impactedWindowEnd: string | null;
+  durationBasis: string | null;
   sourceReference: string | null;
   extractedFromCode: string | null;
   matchConfidence: number | null;
@@ -26,6 +29,10 @@ export interface DelayEventDto {
   delayEventConfidence: number | null;
   verificationStatus: VerificationStatus;
   createdAt: string;
+  /** Resolved filename of the POD document that informed this event, if any (nullable — older events have none). */
+  podDocumentName: string | null;
+  /** Short plain-language note on how POD evidence was actually used for this event/match. */
+  podUsageNote: string | null;
 }
 
 export class ListDelayEventsQueryHandler {
@@ -41,14 +48,15 @@ export class ListDelayEventsQueryHandler {
       query.tenantId
     );
 
-    const [activityDataMap, documentTypeMap] = await Promise.all([
+    const [activityDataMap, documentMaps] = await Promise.all([
       this.fetchActivityData(events, query.projectId, query.tenantId),
-      this.fetchDocumentTypes(events, query.projectId, query.tenantId),
+      this.fetchDocumentMaps(events, query.projectId, query.tenantId),
     ]);
+    const { typeMap: documentTypeMap, filenameMap: documentFilenameMap } = documentMaps;
 
     const filtered = this.applyDateFilter(events, documentTypeMap, query.filterMonth, query.filterYear);
 
-    return filtered.map(event => this.mapToDto(event, activityDataMap, documentTypeMap));
+    return filtered.map(event => this.mapToDto(event, activityDataMap, documentTypeMap, documentFilenameMap));
   }
 
   private applyDateFilter(
@@ -111,41 +119,56 @@ export class ListDelayEventsQueryHandler {
     return activityDataMap;
   }
 
-  private async fetchDocumentTypes(
+  /**
+   * Resolves both document type (used for date-filter exemptions) and filename (used to
+   * surface which POD document informed an event) from the same document list, the same way
+   * `sourceDocumentType` has always been resolved — a `podSourceDocumentId` on an event's
+   * metadata is just another document id to resolve through this map.
+   */
+  private async fetchDocumentMaps(
     events: ContractorDelayEvent[],
     projectId: string,
     tenantId: string
-  ): Promise<Map<string, string>> {
-    const docTypeMap = new Map<string, string>();
+  ): Promise<{ typeMap: Map<string, string>; filenameMap: Map<string, string> }> {
+    const typeMap = new Map<string, string>();
+    const filenameMap = new Map<string, string>();
 
     if (!this.documentRepository) {
-      return docTypeMap;
+      return { typeMap, filenameMap };
     }
 
-    const sourceDocIds = events
-      .map(e => e.sourceDocumentId)
-      .filter((id): id is string => id !== null);
+    const hasAnySourceDoc = events.some(e => e.sourceDocumentId !== null)
+      || events.some(e => typeof e.metadata?.podSourceDocumentId === 'string');
 
-    if (sourceDocIds.length === 0) {
-      return docTypeMap;
+    if (!hasAnySourceDoc) {
+      return { typeMap, filenameMap };
     }
 
     const documents = await this.documentRepository.findByProjectId(projectId, tenantId);
 
     for (const doc of documents) {
-      docTypeMap.set(doc.id, doc.documentType);
+      typeMap.set(doc.id, doc.documentType);
+      filenameMap.set(doc.id, doc.filename);
     }
 
-    return docTypeMap;
+    return { typeMap, filenameMap };
   }
 
   private mapToDto(
     event: ContractorDelayEvent,
     activityDataMap: Map<string, { isCriticalPath: string; totalFloat: number | null }>,
-    documentTypeMap: Map<string, string>
+    documentTypeMap: Map<string, string>,
+    documentFilenameMap: Map<string, string>
   ): DelayEventDto {
     const activityData = event.matchedActivityId 
       ? activityDataMap.get(event.matchedActivityId) 
+      : null;
+
+    const podSourceDocumentId = typeof event.metadata?.podSourceDocumentId === 'string'
+      ? event.metadata.podSourceDocumentId
+      : null;
+    const podUsageNote = typeof event.metadata?.podUsageNote === 'string'
+      ? event.metadata.podUsageNote
       : null;
 
     return {
@@ -163,6 +186,9 @@ export class ListDelayEventsQueryHandler {
       eventStartDate: event.eventStartDate?.toISOString() ?? null,
       eventFinishDate: event.eventFinishDate?.toISOString() ?? null,
       impactDurationHours: event.impactDurationHours,
+      impactedWindowStart: event.impactedWindowStart,
+      impactedWindowEnd: event.impactedWindowEnd,
+      durationBasis: event.durationBasis,
       sourceReference: event.sourceReference,
       extractedFromCode: event.extractedFromCode,
       matchConfidence: event.matchConfidence,
@@ -170,6 +196,8 @@ export class ListDelayEventsQueryHandler {
       delayEventConfidence: event.delayEventConfidence,
       verificationStatus: event.verificationStatus,
       createdAt: event.createdAt.toISOString(),
+      podDocumentName: podSourceDocumentId ? documentFilenameMap.get(podSourceDocumentId) ?? null : null,
+      podUsageNote,
     };
   }
 }

@@ -4,3 +4,4 @@
 - [Upload resumability pattern](upload-resumability-pattern.md) — project_documents.file_data (bytea) + StartupReconciliationService recover uploads orphaned by a mid-process restart; exclude file_data from normal list/lookup selects.
 - [IDR narrative extraction fidelity](idr-narrative-extraction.md) — never key a "no delays" prompt escape on summary form fields or a missing activity-ID table; diary IDRs trip both by default.
 - [POD-aware delay activity matching](pod-aware-matching.md) — POD exclusion markers are free text with no schema column; rank/reorder POD evidence before the matcher's 100-activity truncation; metadata is a merge-only patch.
+- [Duration provenance validation helper](duration-provenance-helper.md) — clock-time/basis normalization for delay durations lives in one shared domain helper, used by both extractors and both analysis handlers.

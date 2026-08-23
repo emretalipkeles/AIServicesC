@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { formatDurationBasis, formatImpactedWindow } from "./format-duration";
 
 interface DelayEventData {
   wbs?: string | null;
@@ -10,6 +11,9 @@ interface DelayEventData {
   eventCategory?: string | null;
   eventStartDate?: string | null;
   impactDurationHours?: number | null;
+  impactedWindowStart?: string | null;
+  impactedWindowEnd?: string | null;
+  durationBasis?: string | null;
   sourceReference?: string | null;
   sourceDocumentId?: string | null;
   sourceDocumentType?: string | null;
@@ -18,6 +22,10 @@ interface DelayEventData {
   matchConfidence?: number | null;
   matchReasoning?: string | null;
   verificationStatus: string;
+  /** Filename of the POD document that informed this event, if any. */
+  podDocumentName?: string | null;
+  /** Short plain-language note on how POD evidence was actually used for this event/match. */
+  podUsageNote?: string | null;
 }
 
 const categoryColors: Record<string, { bg: string; text: string }> = {
@@ -106,8 +114,12 @@ export async function exportDelayEventsToExcel(
     { header: 'Category', key: 'category', width: 22 },
     { header: 'Date', key: 'date', width: 12 },
     { header: 'Delay Duration estimate (hrs)', key: 'duration', width: 22 },
+    { header: 'Impacted Window', key: 'impactedWindow', width: 20 },
+    { header: 'Duration Basis', key: 'durationBasis', width: 18 },
     { header: 'Source Type', key: 'sourceType', width: 14 },
     { header: 'Source Document', key: 'sourceDoc', width: 30 },
+    { header: 'POD Document', key: 'podDoc', width: 26 },
+    { header: 'POD Usage', key: 'podUsage', width: 35 },
     { header: 'Extracted From Code', key: 'extractedCode', width: 18 },
     { header: 'Source Reference', key: 'sourceRef', width: 25 },
     { header: 'Match Reasoning Confidence', key: 'confidence', width: 22 },
@@ -145,8 +157,12 @@ export async function exportDelayEventsToExcel(
       category: formatCategory(event.eventCategory),
       date: event.eventStartDate ? new Date(event.eventStartDate) : null,
       duration: event.impactDurationHours || null,
+      impactedWindow: formatImpactedWindow(event.impactedWindowStart, event.impactedWindowEnd) || '',
+      durationBasis: formatDurationBasis(event.durationBasis) || '',
       sourceType: formatSourceDocumentType(event.sourceDocumentType),
       sourceDoc: event.sourceDocumentId && documentNameMap ? documentNameMap.get(event.sourceDocumentId) || '' : '',
+      podDoc: event.podDocumentName || '',
+      podUsage: event.podUsageNote || '',
       extractedCode: event.extractedFromCode || '',
       sourceRef: event.sourceReference || '',
       confidence: event.matchConfidence ? `${event.matchConfidence}%` : '',
@@ -216,7 +232,7 @@ export async function exportDelayEventsToExcel(
         }
       }
 
-      if (colNumber === 14 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
+      if (colNumber === 18 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
         const confidence = event.matchConfidence;
         let bgColor: string;
         let textColor: string;
@@ -245,7 +261,7 @@ export async function exportDelayEventsToExcel(
 
   worksheet.autoFilter = {
     from: { row: 1, column: 1 },
-    to: { row: filteredEvents.length + 1, column: 16 },
+    to: { row: filteredEvents.length + 1, column: 20 },
   };
 
   const today = new Date();

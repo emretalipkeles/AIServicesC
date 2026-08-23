@@ -114,7 +114,11 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
           { header: 'Category', key: 'category', width: 22 },
           { header: 'Date', key: 'date', width: 12 },
           { header: 'Duration (hrs)', key: 'duration', width: 14 },
+          { header: 'Impacted Window', key: 'impactedWindow', width: 20 },
+          { header: 'Duration Basis', key: 'durationBasis', width: 18 },
           { header: 'Source Reference', key: 'sourceRef', width: 25 },
+          { header: 'POD Document', key: 'podDoc', width: 26 },
+          { header: 'POD Usage', key: 'podUsage', width: 35 },
           { header: 'Confidence', key: 'confidence', width: 12 },
           { header: 'Match Reasoning', key: 'reasoning', width: 45 },
           { header: 'Status', key: 'status', width: 14 },
@@ -159,6 +163,16 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
           return value;
         };
 
+        const durationBasisLabels: Record<string, string> = {
+          timestamp_derived: 'From timestamps',
+          document_stated: 'Stated in document',
+          estimated: 'AI estimate',
+        };
+        const formatDurationBasisLabel = (basis: string | null): string =>
+          basis ? (durationBasisLabels[basis] ?? '') : '';
+        const formatImpactedWindowLabel = (start: string | null, end: string | null): string =>
+          start && end ? `${start} \u2013 ${end}` : '';
+
         events.forEach((event, index) => {
           const rowData = {
             wbs: event.wbs || '',
@@ -170,7 +184,11 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
             category: event.eventCategory || '',
             date: event.eventStartDate ? new Date(event.eventStartDate) : null,
             duration: event.impactDurationHours || null,
+            impactedWindow: formatImpactedWindowLabel(event.impactedWindowStart, event.impactedWindowEnd),
+            durationBasis: formatDurationBasisLabel(event.durationBasis),
             sourceRef: event.sourceReference || '',
+            podDoc: event.podDocumentName || '',
+            podUsage: event.podUsageNote || '',
             confidence: event.matchConfidence ? `${event.matchConfidence}%` : '',
             reasoning: event.matchReasoning || '',
             status: event.verificationStatus,
@@ -211,7 +229,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
               }
             }
 
-            if (colNumber === 11 && event.matchConfidence) {
+            if (colNumber === 15 && event.matchConfidence) {
               const conf = event.matchConfidence;
               if (conf >= 80) {
                 cell.font = { color: { argb: 'FF16A34A' }, bold: true, size: 10 };
@@ -230,7 +248,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
 
         worksheet.autoFilter = {
           from: { row: 1, column: 1 },
-          to: { row: events.length + 1, column: 13 },
+          to: { row: events.length + 1, column: 17 },
         };
 
         const buffer = await workbook.xlsx.writeBuffer();

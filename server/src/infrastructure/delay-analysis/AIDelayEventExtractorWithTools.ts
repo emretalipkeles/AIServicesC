@@ -11,6 +11,7 @@ import type { IExtractionToolExecutor } from '../../domain/delay-analysis/interf
 import type { IToolExtractionSystemPromptStrategyFactory } from '../../domain/delay-analysis/interfaces/IToolExtractionSystemPromptStrategy';
 import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
 import { auditNarrativeProvenance } from './NarrativeProvenanceCheck';
+import { normalizeClockTime, normalizeDurationBasis } from '../../domain/delay-analysis/DurationProvenance';
 import { OPENAI_MODELS } from '../../domain/value-objects/ModelId';
 import type OpenAI from 'openai';
 import type { AzureOpenAI } from 'openai';
@@ -34,6 +35,9 @@ interface ExtractedEventRaw {
   eventDate?: string;
   date?: string;
   impactDurationHours?: number;
+  impactedWindowStart?: string;
+  impactedWindowEnd?: string;
+  durationBasis?: string;
   sourceReference?: string;
   source?: string;
   extractedFromCode?: string;
@@ -418,11 +422,18 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
       }
     }
 
+    const impactedWindowStart = normalizeClockTime(item.impactedWindowStart);
+    const impactedWindowEnd = normalizeClockTime(item.impactedWindowEnd);
+    const durationBasis = normalizeDurationBasis(item.durationBasis);
+
     return {
       eventDescription: String(item.eventDescription || item.description || ''),
       eventCategory: this.parseCategory(item.eventCategory || item.category),
       eventDate: this.parseDate(item.eventDate || item.date),
       impactDurationHours,
+      impactedWindowStart,
+      impactedWindowEnd,
+      durationBasis,
       sourceReference: String(item.sourceReference || item.source || ''),
       extractedFromCode: String(item.extractedFromCode || item.code || 'GENERAL'),
       confidenceScore: this.parseConfidenceScore(item.confidenceScore, baseConfidence),

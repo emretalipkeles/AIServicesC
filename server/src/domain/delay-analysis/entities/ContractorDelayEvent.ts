@@ -10,6 +10,12 @@ export type DelayEventCategory =
 
 export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'needs_review';
 
+/**
+ * How impactDurationHours was actually derived, so downstream UI can distinguish a
+ * timestamp-calculated figure from a document-stated figure or an AI estimate.
+ */
+export type DurationBasis = 'timestamp_derived' | 'document_stated' | 'estimated';
+
 export interface ContractorDelayEventProps {
   id: string;
   projectId: string;
@@ -24,6 +30,11 @@ export interface ContractorDelayEventProps {
   eventStartDate?: Date | null;
   eventFinishDate?: Date | null;
   impactDurationHours?: number | null;
+  /** Impacted window clock times (e.g. "08:00"), when the source narrative supports them. */
+  impactedWindowStart?: string | null;
+  impactedWindowEnd?: string | null;
+  /** How impactDurationHours was derived; null for events analyzed before this field existed. */
+  durationBasis?: DurationBasis | null;
   sourceReference?: string | null;
   extractedFromCode?: string | null;
   matchConfidence?: number | null;
@@ -51,6 +62,9 @@ export class ContractorDelayEvent {
   readonly eventStartDate: Date | null;
   readonly eventFinishDate: Date | null;
   readonly impactDurationHours: number | null;
+  readonly impactedWindowStart: string | null;
+  readonly impactedWindowEnd: string | null;
+  readonly durationBasis: DurationBasis | null;
   readonly sourceReference: string | null;
   readonly extractedFromCode: string | null;
   readonly matchConfidence: number | null;
@@ -77,6 +91,9 @@ export class ContractorDelayEvent {
     this.eventStartDate = props.eventStartDate ?? null;
     this.eventFinishDate = props.eventFinishDate ?? null;
     this.impactDurationHours = props.impactDurationHours ?? null;
+    this.impactedWindowStart = props.impactedWindowStart ?? null;
+    this.impactedWindowEnd = props.impactedWindowEnd ?? null;
+    this.durationBasis = props.durationBasis ?? null;
     this.sourceReference = props.sourceReference ?? null;
     this.extractedFromCode = props.extractedFromCode ?? null;
     this.matchConfidence = props.matchConfidence ?? null;

@@ -18,6 +18,12 @@ export interface PodCorroboration {
   taskLine: PodTaskLine | null;
   costCode: string | null;
   matchedKeyword: string | null;
+  /**
+   * The specific POD report whose task line corroborated the activity. Callers must attribute
+   * provenance to this exact report — never to an arbitrary "first" report — since a project day
+   * can have multiple POD reports and only one may have actually supplied the evidence.
+   */
+  report: PodReport;
 }
 
 const STOPWORDS = new Set([
@@ -47,13 +53,13 @@ function activityContainsCostCode(activity: ScheduleActivity, code: string): boo
 }
 
 /** Collects the on-project task lines (with their owning section) across a day's POD reports. */
-function collectOnProjectTaskLines(podReports: PodReport[]): Array<{ section: PodSection; taskLine: PodTaskLine }> {
-  const result: Array<{ section: PodSection; taskLine: PodTaskLine }> = [];
+function collectOnProjectTaskLines(podReports: PodReport[]): Array<{ section: PodSection; taskLine: PodTaskLine; report: PodReport }> {
+  const result: Array<{ section: PodSection; taskLine: PodTaskLine; report: PodReport }> = [];
   for (const report of podReports) {
     for (const section of report.sections) {
       if (classifyPodSection(section).isExcluded) continue;
       for (const taskLine of section.taskLines) {
-        result.push({ section, taskLine });
+        result.push({ section, taskLine, report });
       }
     }
   }
@@ -68,17 +74,17 @@ export function findPodCorroboration(activity: ScheduleActivity, podReports: Pod
   const onProjectLines = collectOnProjectTaskLines(podReports);
   const activityKeywords = extractKeywords(activity.activityDescription);
 
-  for (const { section, taskLine } of onProjectLines) {
+  for (const { section, taskLine, report } of onProjectLines) {
     if (taskLine.costCode && activityContainsCostCode(activity, taskLine.costCode)) {
-      return { section, taskLine, costCode: taskLine.costCode, matchedKeyword: null };
+      return { section, taskLine, costCode: taskLine.costCode, matchedKeyword: null, report };
     }
   }
 
-  for (const { section, taskLine } of onProjectLines) {
+  for (const { section, taskLine, report } of onProjectLines) {
     const lineKeywords = extractKeywords(taskLine.description);
     for (const keyword of Array.from(lineKeywords)) {
       if (activityKeywords.has(keyword)) {
-        return { section, taskLine, costCode: taskLine.costCode ?? null, matchedKeyword: keyword };
+        return { section, taskLine, costCode: taskLine.costCode ?? null, matchedKeyword: keyword, report };
       }
     }
   }

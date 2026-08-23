@@ -7,7 +7,7 @@ import { useProjectDocuments } from "@/lib/project-documents-api";
 import { GlassCard, SectionHeader, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles, TruncatedTextWithTooltip } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 import { exportDelayEventsToExcel, isNoDelayEvent, formatSourceDocumentType } from "@/lib/excel-export";
-import { formatDurationHours } from "@/lib/format-duration";
+import { formatDurationHours, formatDurationBasis, formatImpactedWindow } from "@/lib/format-duration";
 
 interface AnalysisResultsProps {
   projectId: string;
@@ -146,8 +146,9 @@ export function AnalysisResults({ projectId, filterMonth, filterYear }: Analysis
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Source Type</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Document</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs min-w-[120px]")}>Match Reason</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs min-w-[130px]")}>POD Evidence</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Date</th>
-                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Dur.</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs min-w-[130px]")}>Duration</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Event Conf.</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Match Conf.</th>
                     </tr>
@@ -167,6 +168,8 @@ export function AnalysisResults({ projectId, filterMonth, filterYear }: Analysis
                             (event.eventCategory || "").toLowerCase().includes(search) ||
                             (event.sourceReference || "").toLowerCase().includes(search) ||
                             (event.matchReasoning || "").toLowerCase().includes(search) ||
+                            (event.podDocumentName || "").toLowerCase().includes(search) ||
+                            (event.podUsageNote || "").toLowerCase().includes(search) ||
                             docName.toLowerCase().includes(search)
                           );
                         })
@@ -239,11 +242,17 @@ export function AnalysisResults({ projectId, filterMonth, filterYear }: Analysis
                                 label="Match Reasoning"
                               />
                             </td>
+                            <td className="p-2 max-w-[130px]">
+                              <PodEvidenceCell podDocumentName={event.podDocumentName} podUsageNote={event.podUsageNote} />
+                            </td>
                             <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">{formatDate(event.eventStartDate)}</td>
-                            <td className="p-2 text-xs">
-                              {event.impactDurationHours ? (
-                                <span className="font-medium">{formatDurationHours(event.impactDurationHours)}h</span>
-                              ) : "-"}
+                            <td className="p-2 max-w-[130px]">
+                              <DurationCell
+                                hours={event.impactDurationHours}
+                                windowStart={event.impactedWindowStart}
+                                windowEnd={event.impactedWindowEnd}
+                                basis={event.durationBasis}
+                              />
                             </td>
                             <td className="p-2">
                               <ConfidenceBadge confidence={event.delayEventConfidence} />
@@ -261,6 +270,84 @@ export function AnalysisResults({ projectId, filterMonth, filterYear }: Analysis
           )}
         </div>
       </GlassCard>
+    </div>
+  );
+}
+
+function PodEvidenceCell({
+  podDocumentName,
+  podUsageNote,
+}: {
+  podDocumentName: string | null;
+  podUsageNote: string | null;
+}) {
+  // No POD document was ever attached to this event/match: visually distinct from a POD that
+  // existed but did not corroborate, so "no POD available" and "POD available, not
+  // corroborating" read differently at a glance. When multiple POD reports existed for the date
+  // but none specifically corroborated this match, no single report can be honestly named — show
+  // the explanatory note instead of guessing a document name.
+  if (!podDocumentName) {
+    return podUsageNote ? (
+      <TruncatedTextWithTooltip
+        text={podUsageNote}
+        maxWidth="130px"
+        className="text-[11px] text-muted-foreground italic"
+        label="POD Usage"
+      />
+    ) : (
+      <span className="text-xs text-muted-foreground/60 italic">No POD for date</span>
+    );
+  }
+
+  const notCorroborating = !podUsageNote || /not corroborat|context only|no corroboration/i.test(podUsageNote);
+
+  return (
+    <div className="flex flex-col gap-0.5 max-w-[130px]">
+      <TruncatedTextWithTooltip
+        text={podDocumentName}
+        maxWidth="130px"
+        className={cn("text-xs font-medium", notCorroborating ? "text-muted-foreground" : "text-emerald-600 dark:text-emerald-400")}
+        label="POD Document"
+      />
+      <TruncatedTextWithTooltip
+        text={podUsageNote || "POD context was available but did not corroborate this match."}
+        maxWidth="130px"
+        className="text-[11px] text-muted-foreground"
+        label="POD Usage"
+      />
+    </div>
+  );
+}
+
+function DurationCell({
+  hours,
+  windowStart,
+  windowEnd,
+  basis,
+}: {
+  hours: number | null;
+  windowStart: string | null;
+  windowEnd: string | null;
+  basis: string | null;
+}) {
+  const window = formatImpactedWindow(windowStart, windowEnd);
+  const hoursLabel = formatDurationHours(hours);
+  const basisLabel = formatDurationBasis(basis);
+
+  if (!window && !hoursLabel) {
+    return <span className="text-xs text-muted-foreground/60 italic">No window recorded</span>;
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs font-medium whitespace-nowrap">
+        {window ? `${window}${hoursLabel ? ` (${hoursLabel} h)` : ""}` : hoursLabel ? `${hoursLabel}h` : "-"}
+      </span>
+      {basisLabel ? (
+        <span className="text-[11px] text-muted-foreground">{basisLabel}</span>
+      ) : (
+        <span className="text-[11px] text-muted-foreground/60 italic">basis not recorded</span>
+      )}
     </div>
   );
 }

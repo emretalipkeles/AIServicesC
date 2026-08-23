@@ -58,10 +58,10 @@ function makeActivity(id: string, description: string): ScheduleActivity {
   });
 }
 
-function makePodReport(): PodReport {
+function makePodReport(sourceDocumentId = 'pod-doc-1'): PodReport {
   return new PodReport({
     id: randomUUID(),
-    sourceDocumentId: 'pod-doc-1',
+    sourceDocumentId,
     projectId: PROJECT_ID,
     tenantId: TENANT_ID,
     reportDate: REPORT_DATE,
@@ -246,6 +246,8 @@ describe('RunAnalysisCommandHandler POD-aware matching', () => {
       podEvidenceAvailable: true,
       podReportCount: 1,
       podCorroborated: true,
+      podSourceDocumentId: 'pod-doc-1',
+      podUsageNote: 'POD context was available for this date and supplied to extraction as crew/equipment context.',
     });
     expect(updatedEvents[0].matchReasoning).toContain('POD');
   });
@@ -274,6 +276,8 @@ describe('RunAnalysisCommandHandler POD-aware matching', () => {
       podEvidenceAvailable: false,
       podReportCount: 0,
       podCorroborated: false,
+      podSourceDocumentId: null,
+      podUsageNote: null,
     });
   });
 
@@ -289,6 +293,72 @@ describe('RunAnalysisCommandHandler POD-aware matching', () => {
     expect(result.eventsMatched).toBe(1);
     expect(updatedEvents[0].matchedActivityId).toBe(activityA.id);
     expect(result.errors).toHaveLength(0);
+  });
+
+  it('does not attribute an arbitrary "first" POD document when multiple reports exist and the matcher found no specific corroborator', async () => {
+    const podEvidenceProvider: IPodEvidenceProvider = {
+      getEvidenceForDateRange: vi.fn().mockResolvedValue(
+        new Map([['2024-06-10', [makePodReport('pod-doc-1'), makePodReport('pod-doc-2')]]])
+      ),
+    };
+    const { handler, updatedEvents } = makeFakes({ podEvidenceProvider });
+
+    await handler.execute({
+      type: 'RunAnalysisCommand',
+      projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
+    } as any);
+
+    expect(updatedEvents).toHaveLength(1);
+    // Two reports exist for the date; the test's mock matcher marks the match as
+    // podCorroborated but (like the pre-fix real matcher) does not report which of the two
+    // supplied the evidence. In that ambiguous case, the event must not guess "the first" report
+    // — it should stay null with a note explaining multiple reports were available.
+    expect(updatedEvents[0].metadata).toMatchObject({
+      podReportCount: 2,
+      podSourceDocumentId: null,
+      podUsageNote: '2 POD reports were available for this date and supplied to extraction as context; the specific corroborating report (if any) is determined at match time.',
+    });
+  });
+
+  it('attributes the exact corroborating POD document when the matcher pinpoints it among multiple reports for the date', async () => {
+    const podEvidenceProvider: IPodEvidenceProvider = {
+      getEvidenceForDateRange: vi.fn().mockResolvedValue(
+        new Map([['2024-06-10', [makePodReport('pod-doc-1'), makePodReport('pod-doc-2')]]])
+      ),
+    };
+    const { handler, updatedEvents, matcher } = makeFakes({ podEvidenceProvider });
+    // Override the default fake matcher to simulate AIActivityMatcher pinpointing exactly which
+    // of the two same-date reports corroborated the match.
+    (matcher.matchEventToActivities as any).mockImplementation(
+      async (_desc: string, _date: Date | null, candidateActivities: ScheduleActivity[]): Promise<MatchResult> => {
+        const chosen = candidateActivities.find(a => a.activityId === '164.02')!;
+        return {
+          matchedActivityId: chosen.id,
+          cpmActivityId: chosen.activityId,
+          cpmActivityDescription: chosen.activityDescription,
+          wbs: chosen.wbs,
+          confidence: 92,
+          reasoning: 'Corroborated by POD cost code 164.02',
+          podCorroborated: true,
+          podUsageNote: 'POD corroboration: CIVIL #1 logged task "Storm drain tie-in" under cost code 164.02, matching this activity.',
+          podSourceDocumentId: 'pod-doc-2',
+        };
+      }
+    );
+
+    await handler.execute({
+      type: 'RunAnalysisCommand',
+      projectId: PROJECT_ID,
+      tenantId: TENANT_ID,
+    } as any);
+
+    expect(updatedEvents).toHaveLength(1);
+    expect(updatedEvents[0].metadata).toMatchObject({
+      podReportCount: 2,
+      podCorroborated: true,
+      podSourceDocumentId: 'pod-doc-2',
+    });
   });
 
   it('degrades gracefully (still completes) when the POD evidence provider throws', async () => {

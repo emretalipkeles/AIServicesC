@@ -18,6 +18,7 @@ import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfac
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 import { extractReportDateFromIDR } from '../../../../infrastructure/delay-analysis/ReportDateExtractor';
 import { renderPodDayContext } from '../../../../infrastructure/delay-analysis/PodContextRenderer';
+import { normalizeClockTime, normalizeDurationBasis, deriveEventFinishDate } from '../../../../domain/delay-analysis/DurationProvenance';
 
 const MIN_MATCH_CONFIDENCE_FOR_SKIP = 85;
 
@@ -334,6 +335,20 @@ export class RunSingleDocumentAnalysisCommandHandler {
           preMatchedCount++;
         }
 
+        const windowStart = normalizeClockTime(extracted.impactedWindowStart);
+        const windowEnd = normalizeClockTime(extracted.impactedWindowEnd);
+        const durationBasis = normalizeDurationBasis(extracted.durationBasis);
+        const podReportsForDate = effectivePodEvidence?.reports ?? [];
+        // Only attribute a specific POD document at creation time when exactly one report
+        // exists for the date — with multiple reports, the actual corroborating report (if any)
+        // is only known once matching runs, so naming "the first" here would be misleading.
+        const podSourceDocumentId = podReportsForDate.length === 1 ? podReportsForDate[0].sourceDocumentId : null;
+        const podCreationUsageNote = podReportsForDate.length === 1
+          ? 'POD context was available for this date and supplied to extraction as crew/equipment context.'
+          : podReportsForDate.length > 1
+            ? `${podReportsForDate.length} POD reports were available for this date and supplied to extraction as context; the specific corroborating report (if any) is determined at match time.`
+            : null;
+
         const event = new ContractorDelayEvent({
           id: eventId,
           projectId: command.projectId,
@@ -346,8 +361,11 @@ export class RunSingleDocumentAnalysisCommandHandler {
           eventDescription: extracted.eventDescription,
           eventCategory: extracted.eventCategory,
           eventStartDate: extracted.eventDate,
-          eventFinishDate: null,
+          eventFinishDate: deriveEventFinishDate(extracted.eventDate, windowStart, windowEnd),
           impactDurationHours: normalizeImpactDuration(extracted.impactDurationHours),
+          impactedWindowStart: windowStart,
+          impactedWindowEnd: windowEnd,
+          durationBasis,
           sourceReference: extracted.sourceReference,
           extractedFromCode: extracted.extractedFromCode,
           matchConfidence: hasPreMatch ? (enforcedConfidence ?? Math.round(extracted.matchConfidence! * 100)) : null,
@@ -362,10 +380,15 @@ export class RunSingleDocumentAnalysisCommandHandler {
           // run's POD influence stays auditable from the event rather than only from prompt logs.
           // `podCorroborated` starts false on every event and is only raised by an actual
           // corroborated match, so "not corroborated" is always distinguishable from "never checked".
+          // podSourceDocumentId/podUsageNote at creation time describe extraction-time context;
+          // the post-match metadata patch below overwrites podUsageNote once actual matching
+          // usage (corroboration/reordering/context-only) is known.
           metadata: {
-            podEvidenceAvailable: (effectivePodEvidence?.reports?.length ?? 0) > 0,
-            podReportCount: effectivePodEvidence?.reports?.length ?? 0,
+            podEvidenceAvailable: podReportsForDate.length > 0,
+            podReportCount: podReportsForDate.length,
             podCorroborated: false,
+            podSourceDocumentId,
+            podUsageNote: podCreationUsageNote,
           },
           createdAt: now,
           updatedAt: now,
@@ -518,7 +541,14 @@ export class RunSingleDocumentAnalysisCommandHandler {
                 matchResult.wbs,
                 matchResult.confidence,
                 matchResult.reasoning,
-                { podCorroborated: matchResult.podCorroborated === true }
+                {
+                  podCorroborated: matchResult.podCorroborated === true,
+                  ...(matchResult.podUsageNote ? { podUsageNote: matchResult.podUsageNote } : {}),
+                  // Only overrides podSourceDocumentId when the matcher pinpointed the exact
+                  // corroborating report; otherwise the creation-time value (set only when
+                  // unambiguous) is left as-is rather than guessed.
+                  ...(matchResult.podSourceDocumentId ? { podSourceDocumentId: matchResult.podSourceDocumentId } : {}),
+                }
               );
 
               await this.eventRepository.update(matchedEvent);
