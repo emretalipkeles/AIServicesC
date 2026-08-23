@@ -23,6 +23,30 @@ describe('NarrativeProvenanceCheck timestamp detection', () => {
     expect(sourceReferenceHasTimestamp('Discrepancies section, report dated 6/9/2022')).toBe(false);
   });
 
+  it('detects a four-digit time span, including evening shifts', () => {
+    // Inspectors cite stoppages as a window, and the bare-time branch alone rejects both halves:
+    // the hyphen reads as date punctuation and evening times fall outside its 0000-1859 ceiling.
+    expect(containsNarrativeTimestamps('Diary 0830-0845 rebar cage moved')).toBe(true);
+    expect(containsNarrativeTimestamps('Diary 0730-1400: panels replaced')).toBe(true);
+    expect(containsNarrativeTimestamps('Civil #7 1900 – 2100 night shift')).toBe(true);
+    expect(sourceReferenceHasTimestamp('Diary 0730-1400: At 3rd/Madison, panels damaged')).toBe(true);
+    expect(sourceReferenceHasTimestamp('Contract Work Performed, Civil #7 1900—2100: night pour')).toBe(true);
+    // A hyphenated calendar date must still not qualify — its second half is two digits, not four.
+    expect(containsNarrativeTimestamps('Report dated 2022-06-14 by M. Mansfield')).toBe(false);
+  });
+
+  it('does not treat other four-digit ranges in a report as a time span', () => {
+    // Inspector reports are full of numeric ranges that read as HHMM-HHMM. Without a time cue or a
+    // closing colon these must not count, or the audit would call every report timestamped.
+    expect(containsNarrativeTimestamps('Project No. 2023-2024 close-out')).toBe(false);
+    expect(containsNarrativeTimestamps('Rev. 2019-2020 of the C-39 form')).toBe(false);
+    expect(containsNarrativeTimestamps('Qty: 1200-1400 LF of conduit')).toBe(false);
+    expect(containsNarrativeTimestamps('Elev. 0830-0845 at the SW corner')).toBe(false);
+    expect(containsNarrativeTimestamps('Station 0730-1400 along Madison')).toBe(false);
+    // Out-of-range values are not times in any form.
+    expect(containsNarrativeTimestamps('Diary 2465-2599 pipe run')).toBe(false);
+  });
+
   it('recognizes a timestamp cited at the start of a source reference', () => {
     expect(sourceReferenceHasTimestamp('Diary, 0730: panels damaged during removal')).toBe(true);
     expect(sourceReferenceHasTimestamp('Contract Work Performed section, Page 1')).toBe(false);

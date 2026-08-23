@@ -30,6 +30,13 @@ A log-only provenance audit (does a timestamped document yield zero events? do i
 timestamp in their source reference?) surfaces them without touching results. Keep such audits
 strictly non-mutating: they must never drop or rewrite events.
 
+Detecting "a timestamp" in this document family is harder than it looks. A bare four-digit time
+collides with years, and a four-digit *span* collides with year ranges, quantities, station values,
+and elevations ("Project No. 2023-2024", "Qty: 1200-1400 LF"). Require context: bounds below 1900
+for a bare time, and a preceding time cue (diary/at/from/shift/#7) or a closing colon for a span.
+Inspectors write shift windows both ways — "Diary, 0730:" and "Diary 0730-1400:" — and capitalize
+freely, so the pattern must be case-insensitive or half the citations read as unsourced.
+
 ## Durations
 
 Durations calculated from diary timestamp gaps are naturally fractional. Any rounding to whole
