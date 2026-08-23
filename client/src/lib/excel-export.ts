@@ -46,6 +46,18 @@ function formatCategory(category: string | null | undefined): string {
   return category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function getYearAndPeriod(eventStartDate: string | null | undefined): { year: number | ''; period: string } {
+  if (!eventStartDate) return { year: '', period: '' };
+  const d = new Date(eventStartDate);
+  if (isNaN(d.getTime())) return { year: '', period: '' };
+  return { year: d.getFullYear(), period: MONTH_NAMES[d.getMonth()] };
+}
+
 function formatCriticalPath(value: string | null | undefined): string {
   if (!value || value === 'unknown') return '';
   if (value === 'yes') return 'Yes';
@@ -113,6 +125,8 @@ export async function exportDelayEventsToExcel(
     { header: 'Delay Event Confidence', key: 'delayEventConfidence', width: 22 },
     { header: 'Category', key: 'category', width: 22 },
     { header: 'Date', key: 'date', width: 12 },
+    { header: 'Year', key: 'year', width: 10 },
+    { header: 'Period', key: 'period', width: 14 },
     { header: 'Delay Duration estimate (hrs)', key: 'duration', width: 22 },
     { header: 'Impacted Window', key: 'impactedWindow', width: 20 },
     { header: 'Duration Basis', key: 'durationBasis', width: 18 },
@@ -156,6 +170,8 @@ export async function exportDelayEventsToExcel(
       delayEventConfidence: event.delayEventConfidence ? `${event.delayEventConfidence}%` : '',
       category: formatCategory(event.eventCategory),
       date: event.eventStartDate ? new Date(event.eventStartDate) : null,
+      year: getYearAndPeriod(event.eventStartDate).year,
+      period: getYearAndPeriod(event.eventStartDate).period,
       duration: event.impactDurationHours || null,
       impactedWindow: formatImpactedWindow(event.impactedWindowStart, event.impactedWindowEnd) || '',
       durationBasis: formatDurationBasis(event.durationBasis) || '',
@@ -190,7 +206,7 @@ export async function exportDelayEventsToExcel(
         right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
       };
 
-      if (colNumber === 3 || colNumber === 4 || colNumber === 9) {
+      if (colNumber === 3 || colNumber === 4 || colNumber === 9 || colNumber === 10 || colNumber === 11) {
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
       }
 
@@ -232,7 +248,7 @@ export async function exportDelayEventsToExcel(
         }
       }
 
-      if (colNumber === 18 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
+      if (colNumber === 20 && event.matchConfidence !== null && event.matchConfidence !== undefined) {
         const confidence = event.matchConfidence;
         let bgColor: string;
         let textColor: string;
@@ -261,7 +277,7 @@ export async function exportDelayEventsToExcel(
 
   worksheet.autoFilter = {
     from: { row: 1, column: 1 },
-    to: { row: filteredEvents.length + 1, column: 20 },
+    to: { row: filteredEvents.length + 1, column: 22 },
   };
 
   const today = new Date();

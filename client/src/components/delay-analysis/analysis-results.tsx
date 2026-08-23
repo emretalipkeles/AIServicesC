@@ -1,26 +1,84 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Download, CheckCircle, AlertCircle, Clock, TrendingUp } from "lucide-react";
-import { useDelayEvents } from "@/lib/analysis-api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BarChart3, Download, CheckCircle, AlertCircle, Clock, TrendingUp, CalendarRange } from "lucide-react";
+import { useDelayEvents, type DelayEventDto } from "@/lib/analysis-api";
 import { useProjectDocuments } from "@/lib/project-documents-api";
-import { GlassCard, SectionHeader, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles, TruncatedTextWithTooltip } from "./ui/premium-components";
+import { GlassCard, SectionHeader, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles, TruncatedTextWithTooltip, selectTriggerStyles } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 import { exportDelayEventsToExcel, isNoDelayEvent, formatSourceDocumentType } from "@/lib/excel-export";
 import { formatDurationHours, formatDurationBasis, formatImpactedWindow } from "@/lib/format-duration";
 
 interface AnalysisResultsProps {
   projectId: string;
-  filterMonth: number;
-  filterYear: number;
 }
 
 const DELAY_EVENT_CONFIDENCE_THRESHOLD = 20;
 
-export function AnalysisResults({ projectId, filterMonth, filterYear }: AnalysisResultsProps) {
-  const { data: events = [], isLoading } = useDelayEvents(projectId, filterMonth, filterYear);
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const ALL_PERIODS_VALUE = "all";
+
+function periodKey(month: number, year: number): string {
+  return `${year}-${month}`;
+}
+
+function getEventYearAndPeriod(eventStartDate: string | null): { year: number | null; period: string | null } {
+  if (!eventStartDate) return { year: null, period: null };
+  const d = new Date(eventStartDate);
+  if (isNaN(d.getTime())) return { year: null, period: null };
+  return { year: d.getFullYear(), period: MONTH_NAMES[d.getMonth()] };
+}
+
+/**
+ * Mirrors ListDelayEventsQueryHandler's applyDateFilter on the server: field_memo/ncr sourced
+ * events are not tied to a single reporting period, so they stay visible under every period
+ * selection rather than being hidden when their (often absent/unrelated) event date doesn't
+ * match. Kept in sync deliberately rather than reused, since this is client-side display
+ * filtering rather than the server's authoritative period-scoped query.
+ */
+function matchesPeriod(event: DelayEventDto, month: number, year: number): boolean {
+  if (event.sourceDocumentType === 'field_memo' || event.sourceDocumentType === 'ncr') {
+    return true;
+  }
+  if (!event.eventStartDate) return false;
+  const d = new Date(event.eventStartDate);
+  return d.getMonth() + 1 === month && d.getFullYear() === year;
+}
+
+export function AnalysisResults({ projectId }: AnalysisResultsProps) {
+  // The Results tab keeps its own period selection, independent of the Delay Events tab's
+  // month/year selector (which drives "Run AI Analysis"). Fetching unfiltered lets us both
+  // build the list of periods that actually have data and support an "All periods" view.
+  const { data: allEvents = [], isLoading } = useDelayEvents(projectId);
   const { data: documents = [] } = useProjectDocuments(projectId);
   const [filterText, setFilterText] = useState("");
+  const [periodSelection, setPeriodSelection] = useState<string>(ALL_PERIODS_VALUE);
+
+  const availablePeriods = useMemo(() => {
+    const seen = new Map<string, { month: number; year: number }>();
+    allEvents.forEach(e => {
+      if (!e.eventStartDate) return;
+      const d = new Date(e.eventStartDate);
+      if (isNaN(d.getTime())) return;
+      const month = d.getMonth() + 1;
+      const year = d.getFullYear();
+      seen.set(periodKey(month, year), { month, year });
+    });
+    return Array.from(seen.values()).sort((a, b) => (b.year - a.year) || (b.month - a.month));
+  }, [allEvents]);
+
+  const events = useMemo(() => {
+    if (periodSelection === ALL_PERIODS_VALUE) return allEvents;
+    const [yearStr, monthStr] = periodSelection.split("-");
+    const year = parseInt(yearStr);
+    const month = parseInt(monthStr);
+    return allEvents.filter(e => matchesPeriod(e, month, year));
+  }, [allEvents, periodSelection]);
 
   const documentNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -79,12 +137,30 @@ export function AnalysisResults({ projectId, filterMonth, filterYear }: Analysis
           description="Delay events matched to CPM schedule activities with confidence scores"
           gradient="blue"
           action={
-            matchedEvents.length > 0 && (
-              <Button onClick={handleExport} className="gap-2">
-                <Download className="w-4 h-4" />
-                Export to Excel
-              </Button>
-            )
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <CalendarRange className="w-4 h-4 text-muted-foreground" />
+                <Select value={periodSelection} onValueChange={setPeriodSelection}>
+                  <SelectTrigger className={cn(selectTriggerStyles, "w-[170px]")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_PERIODS_VALUE}>All Periods</SelectItem>
+                    {availablePeriods.map(({ month, year }) => (
+                      <SelectItem key={periodKey(month, year)} value={periodKey(month, year)}>
+                        {MONTH_NAMES[month - 1]} {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {matchedEvents.length > 0 && (
+                <Button onClick={handleExport} className="gap-2">
+                  <Download className="w-4 h-4" />
+                  Export to Excel
+                </Button>
+              )}
+            </div>
           }
         />
         <div className="p-6">
@@ -148,6 +224,8 @@ export function AnalysisResults({ projectId, filterMonth, filterYear }: Analysis
                       <th className={cn(tableHeaderCellStyles, "text-xs min-w-[120px]")}>Match Reason</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs min-w-[130px]")}>POD Evidence</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Date</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Year</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs")}>Period</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs min-w-[130px]")}>Duration</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Event Conf.</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Match Conf.</th>
@@ -246,6 +324,12 @@ export function AnalysisResults({ projectId, filterMonth, filterYear }: Analysis
                               <PodEvidenceCell podDocumentName={event.podDocumentName} podUsageNote={event.podUsageNote} />
                             </td>
                             <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">{formatDate(event.eventStartDate)}</td>
+                            <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
+                              {getEventYearAndPeriod(event.eventStartDate).year ?? "-"}
+                            </td>
+                            <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
+                              {getEventYearAndPeriod(event.eventStartDate).period ?? "-"}
+                            </td>
                             <td className="p-2 max-w-[130px]">
                               <DurationCell
                                 hours={event.impactDurationHours}

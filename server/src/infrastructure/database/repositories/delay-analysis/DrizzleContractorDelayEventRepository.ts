@@ -1,4 +1,4 @@
-import { eq, and, isNull, count } from 'drizzle-orm';
+import { eq, and, isNull, count, sql } from 'drizzle-orm';
 import type { IContractorDelayEventRepository } from '../../../../domain/delay-analysis/repositories/IContractorDelayEventRepository';
 import { ContractorDelayEvent, type DelayEventCategory, type VerificationStatus, type DurationBasis } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 import { contractorDelayEvents } from '@shared/schema';

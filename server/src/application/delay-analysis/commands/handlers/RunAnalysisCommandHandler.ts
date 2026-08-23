@@ -445,13 +445,44 @@ export class RunAnalysisCommandHandler {
           console.log(`[RunAnalysisCommandHandler] Collected ${totalWorkActivities} work activities from ${documentContexts.size} documents for force-matching`);
         }
 
+        // Period-scoped rerun retention: capture exactly which *pre-existing* events this run is
+        // about to replace, by id, BEFORE saving anything new. Recording specific ids up front
+        // (rather than a broad "document + period" predicate applied after saving) means the
+        // deletion pass below can never catch the new events this same run is about to insert.
+        // Scoped to exactly the documents that were *successfully* reprocessed above
+        // (successfulDocIds) — a document that failed extraction keeps its prior events for this
+        // period untouched, since there's nothing new to replace them with. When the run itself
+        // is period-scoped (filterMonth/filterYear set), only that document's events in the
+        // target month/year — plus its undated events, which can't be attributed to any period
+        // and would otherwise accumulate a duplicate on every rerun — are captured; events from
+        // that same document belonging to other periods are left out and survive untouched.
+        // Unscoped runs keep the original "replace everything for this document" behavior.
+        const staleEventIdsToClear: string[] = [];
+        for (const docId of Array.from(successfulDocIds)) {
+          const existingEvents = await this.eventRepository.findByDocumentId(docId, command.tenantId);
+          for (const existing of existingEvents) {
+            if (command.filterMonth !== undefined && command.filterYear !== undefined) {
+              const d = existing.eventStartDate ? new Date(existing.eventStartDate) : null;
+              const matchesTargetPeriod = d && !isNaN(d.getTime())
+                && d.getMonth() + 1 === command.filterMonth
+                && d.getFullYear() === command.filterYear;
+              const isUndated = !existing.eventStartDate;
+              if (matchesTargetPeriod || isUndated) {
+                staleEventIdsToClear.push(existing.id);
+              }
+            } else {
+              staleEventIdsToClear.push(existing.id);
+            }
+          }
+        }
+
         progress.report({
           stage: 'deduplicating_events',
           message: `Deduplicating ${allExtractedEvents.length} extracted events...`,
           percentage: 42,
         });
 
-        const deduplicatedEvents = this.deduplicationService.deduplicateWithSources(allExtractedEvents);
+        let deduplicatedEvents = this.deduplicationService.deduplicateWithSources(allExtractedEvents);
 
         const duplicatesRemoved = allExtractedEvents.length - deduplicatedEvents.length;
         if (duplicatesRemoved > 0) {
@@ -462,22 +493,30 @@ export class RunAnalysisCommandHandler {
           });
         }
 
-        let totalCleared = 0;
-        for (const docId of Array.from(successfulDocIds)) {
-          const existingEvents = await this.eventRepository.findByDocumentId(docId, command.tenantId);
-          if (existingEvents.length > 0) {
-            await this.eventRepository.deleteByDocumentId(docId, command.tenantId);
-            totalCleared += existingEvents.length;
-          }
-        }
-
-        if (totalCleared > 0) {
-          console.log(`[RunAnalysisCommandHandler] Cleared ${totalCleared} previous events from ${successfulDocIds.size} successfully re-processed documents`);
-          progress.report({
-            stage: 'saving_events',
-            message: `Cleared ${totalCleared} previous events before saving new results`,
-            percentage: 46,
+        // Period-scoped runs only clear (and are only allowed to replace) each successfully
+        // reprocessed document's events for the target month/year — never that document's events
+        // from other periods (see the scoped clear above). Field memo/NCR documents are always
+        // reprocessed regardless of period and can legitimately describe delays on dates outside
+        // the target month/year; without this filter, re-extracting them on every period rerun
+        // would persist a fresh duplicate of those out-of-period events on top of the ones an
+        // earlier run already saved (which this run intentionally left untouched). So a
+        // newly-extracted event is only saved when it has no determinable date (can't be period-
+        // checked, so it's allowed through as before) or it falls within the target period;
+        // anything else is dropped rather than saved as a duplicate outside this run's scope.
+        if (command.filterMonth !== undefined && command.filterYear !== undefined) {
+          const targetMonth = command.filterMonth;
+          const targetYear = command.filterYear;
+          const beforeFilterCount = deduplicatedEvents.length;
+          deduplicatedEvents = deduplicatedEvents.filter(deduped => {
+            if (!deduped.event.eventDate) return true;
+            const d = new Date(deduped.event.eventDate);
+            if (isNaN(d.getTime())) return true;
+            return d.getMonth() + 1 === targetMonth && d.getFullYear() === targetYear;
           });
+          const outOfPeriodDropped = beforeFilterCount - deduplicatedEvents.length;
+          if (outOfPeriodDropped > 0) {
+            console.log(`[RunAnalysisCommandHandler] Dropped ${outOfPeriodDropped} newly extracted event(s) dated outside the target period ${targetMonth}/${targetYear} to avoid duplicating prior runs' results for those periods`);
+          }
         }
 
         progress.report({
@@ -596,7 +635,22 @@ export class RunAnalysisCommandHandler {
             preMatchedEvents.push(event);
           }
         }
-        
+
+        // Period-scoped rerun retention: the exact pre-existing events captured by id above
+        // (staleEventIdsToClear) are only deleted AFTER every newly extracted/deduplicated event
+        // has been saved successfully. If saving throws partway through (DB error, etc.),
+        // execution never reaches this block, so a failed rerun can produce transient duplicates
+        // at worst — it can never delete prior results without having successfully persisted
+        // their replacements first. Deleting by the ids captured before any new event was saved
+        // (rather than re-applying a document/period predicate now) also guarantees this pass
+        // can never catch the new events just inserted above.
+        if (staleEventIdsToClear.length > 0) {
+          for (const staleId of staleEventIdsToClear) {
+            await this.eventRepository.delete(staleId, command.tenantId);
+          }
+          console.log(`[RunAnalysisCommandHandler] Cleared ${staleEventIdsToClear.length} previous events from ${successfulDocIds.size} successfully re-processed documents`);
+        }
+
         if (preMatchedEvents.length > 0 && shouldMatch) {
           const allDocuments = await this.documentRepository.findByProjectId(
             command.projectId,

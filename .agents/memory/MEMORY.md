@@ -5,3 +5,4 @@
 - [IDR narrative extraction fidelity](idr-narrative-extraction.md) — never key a "no delays" prompt escape on summary form fields or a missing activity-ID table; diary IDRs trip both by default.
 - [POD-aware delay activity matching](pod-aware-matching.md) — POD exclusion markers are free text with no schema column; rank/reorder POD evidence before the matcher's 100-activity truncation; metadata is a merge-only patch.
 - [Duration provenance validation helper](duration-provenance-helper.md) — clock-time/basis normalization for delay durations lives in one shared domain helper, used by both extractors and both analysis handlers.
+- [Period-scoped rerun deletion safety](period-scoped-rerun-deletion-safety.md) — delete-by-id after successful save, never a broad predicate before/after; field_memo/NCR docs re-extract every period and need explicit out-of-period + undated filtering to avoid duplicates.

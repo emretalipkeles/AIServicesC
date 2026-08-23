@@ -258,11 +258,7 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
                   />
                 )}
                 {activeTab === "results" && (
-                  <AnalysisResults
-                    projectId={projectId}
-                    filterMonth={filterMonth}
-                    filterYear={filterYear}
-                  />
+                  <AnalysisResults projectId={projectId} />
                 )}
               </motion.div>
             </AnimatePresence>

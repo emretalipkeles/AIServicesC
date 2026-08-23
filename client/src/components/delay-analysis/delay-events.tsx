@@ -4,6 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Activity, Play, Download, Loader2, DollarSign, CheckCircle, AlertCircle, Clock, Zap, Calendar } from "lucide-react";
 import { useDelayEvents, runAnalysisWithProgress, fetchRunTokenUsage, fetchAnalysisStatus } from "@/lib/analysis-api";
 import { useProjectDocuments } from "@/lib/project-documents-api";
@@ -47,6 +57,7 @@ export function DelayEvents({ projectId, filterMonth, filterYear, onFilterMonthC
   const { data: events = [], isLoading } = useDelayEvents(projectId, filterMonth, filterYear);
   const { data: documents = [] } = useProjectDocuments(projectId);
   const [filterText, setFilterText] = useState("");
+  const [showRerunConfirm, setShowRerunConfirm] = useState(false);
 
   const documentNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -145,6 +156,19 @@ export function DelayEvents({ projectId, filterMonth, filterYear, onFilterMonthC
   const matchedEvents = events.filter(e => e.cpmActivityId !== null);
   const highConfidence = matchedEvents.filter(e => (e.matchConfidence ?? 0) >= 80);
   const pendingEvents = events.filter(e => e.verificationStatus === 'pending');
+
+  const handleRunAnalysisClick = () => {
+    if (events.length > 0) {
+      setShowRerunConfirm(true);
+      return;
+    }
+    handleRunAnalysis();
+  };
+
+  const handleConfirmRerun = () => {
+    setShowRerunConfirm(false);
+    handleRunAnalysis();
+  };
 
   const handleRunAnalysis = async () => {
     startAnalysis();
@@ -266,7 +290,7 @@ export function DelayEvents({ projectId, filterMonth, filterYear, onFilterMonthC
               </div>
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                 <Button
-                  onClick={handleRunAnalysis}
+                  onClick={handleRunAnalysisClick}
                   disabled={analysis.isAnalyzing}
                   className="gap-2 bg-gradient-to-r from-primary to-primary/80 shadow-lg shadow-primary/25"
                 >
@@ -339,7 +363,7 @@ export function DelayEvents({ projectId, filterMonth, filterYear, onFilterMonthC
                 Upload IDRs with CODE_CIE tags and run AI analysis to extract delay events
               </p>
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Button onClick={handleRunAnalysis} disabled={analysis.isAnalyzing} className="gap-2">
+                <Button onClick={handleRunAnalysisClick} disabled={analysis.isAnalyzing} className="gap-2">
                   <Play className="w-4 h-4" />
                   Run AI Analysis
                 </Button>
@@ -375,6 +399,26 @@ export function DelayEvents({ projectId, filterMonth, filterYear, onFilterMonthC
           )}
         </div>
       </GlassCard>
+
+      <AlertDialog open={showRerunConfirm} onOpenChange={setShowRerunConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace existing results for this period?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {MONTHS.find(m => m.value === filterMonth)?.label} {filterYear} already has {events.length}{" "}
+              delay event{events.length === 1 ? "" : "s"}. Rerunning analysis will delete and replace all
+              results for this period. Results for every other month/year are not affected. This cannot
+              be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmRerun}>
+              Delete & Rerun
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
