@@ -6,6 +6,7 @@ import type { IDRWorkActivity } from '../../domain/delay-analysis/interfaces/IDo
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 import { ModelId } from '../../domain/value-objects/ModelId';
 import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
+import { auditNarrativeProvenance } from './NarrativeProvenanceCheck';
 
 interface IDRExtractionResponse {
   workActivities?: Array<{
@@ -81,6 +82,14 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
       if (parseResult.workActivities && parseResult.workActivities.length > 0) {
         console.log(`[AIDelayEventExtractor] Extracted ${parseResult.workActivities.length} work activities from ${documentFilename}`);
       }
+
+      auditNarrativeProvenance(
+        '[AIDelayEventExtractor]',
+        documentType,
+        documentFilename,
+        documentContent,
+        parseResult.events
+      );
 
       return {
         events: parseResult.events,

@@ -7,6 +7,7 @@ import { useProjectDocuments } from "@/lib/project-documents-api";
 import { GlassCard, SectionHeader, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles, TruncatedTextWithTooltip } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 import { exportDelayEventsToExcel, isNoDelayEvent, formatSourceDocumentType } from "@/lib/excel-export";
+import { formatDurationHours } from "@/lib/format-duration";
 
 interface AnalysisResultsProps {
   projectId: string;
@@ -241,7 +242,7 @@ export function AnalysisResults({ projectId, filterMonth, filterYear }: Analysis
                             <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">{formatDate(event.eventStartDate)}</td>
                             <td className="p-2 text-xs">
                               {event.impactDurationHours ? (
-                                <span className="font-medium">{event.impactDurationHours}h</span>
+                                <span className="font-medium">{formatDurationHours(event.impactDurationHours)}h</span>
                               ) : "-"}
                             </td>
                             <td className="p-2">

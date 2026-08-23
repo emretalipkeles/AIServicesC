@@ -38,7 +38,9 @@ function normalizeImpactDuration(value: unknown): number | null {
   if (value == null) return null;
   const num = typeof value === 'string' ? parseFloat(value) : Number(value);
   if (isNaN(num) || !isFinite(num)) return null;
-  return Math.round(num);
+  // Durations calculated from diary timestamp gaps are frequently fractional (0.75h, 1.5h).
+  // Keep two decimals rather than rounding to whole hours, which used to destroy those values.
+  return Math.round(num * 100) / 100;
 }
 
 function validateMatchAgainstReportDate(
@@ -182,6 +184,10 @@ export class RunSingleDocumentAnalysisCommandHandler {
 
     let workActivities: IDRWorkActivity[] = [];
     let reportDate: Date | null = null;
+    // POD evidence for the document's *effective* report date. Starts from the stored date and is
+    // re-resolved below if extraction recovers a different one, so the audit metadata written onto
+    // each event always describes the same evidence matching later uses.
+    let effectivePodEvidence: PodMatchEvidence | undefined;
 
     // Resolve up front from the document's own stored report date; if extraction later derives
     // a better date (IDR fallback parsing), matching below re-resolves POD evidence for it.
@@ -211,6 +217,10 @@ export class RunSingleDocumentAnalysisCommandHandler {
       reportDate = doc.reportDate ?? (doc.documentType === 'idr'
         ? extractReportDateFromIDR(doc.rawContent!)
         : null);
+
+      effectivePodEvidence = reportDate === (doc.reportDate ?? null)
+        ? preExtractionPodEvidence
+        : await this.loadPodEvidenceForDate(command.projectId, command.tenantId, reportDate);
 
       if (extractionResult.workActivities && extractionResult.workActivities.length > 0) {
         workActivities = extractionResult.workActivities;
@@ -348,7 +358,15 @@ export class RunSingleDocumentAnalysisCommandHandler {
           verificationStatus: 'pending',
           verifiedBy: null,
           verifiedAt: null,
-          metadata: null,
+          // Records whether POD evidence existed for this document's date at extraction time, so a
+          // run's POD influence stays auditable from the event rather than only from prompt logs.
+          // `podCorroborated` starts false on every event and is only raised by an actual
+          // corroborated match, so "not corroborated" is always distinguishable from "never checked".
+          metadata: {
+            podEvidenceAvailable: (effectivePodEvidence?.reports?.length ?? 0) > 0,
+            podReportCount: effectivePodEvidence?.reports?.length ?? 0,
+            podCorroborated: false,
+          },
           createdAt: now,
           updatedAt: now,
         });
@@ -450,7 +468,7 @@ export class RunSingleDocumentAnalysisCommandHandler {
 
         // Resolved once for the document's report date and reused for every event's match
         // call below, per the "load once per run, not per event" database-efficiency rule.
-        const matchPodEvidence = await this.loadPodEvidenceForDate(command.projectId, command.tenantId, reportDate);
+        const matchPodEvidence = effectivePodEvidence;
 
         for (let i = 0; i < unmatchedEvents.length; i++) {
           const event = unmatchedEvents[i];
@@ -500,7 +518,7 @@ export class RunSingleDocumentAnalysisCommandHandler {
                 matchResult.wbs,
                 matchResult.confidence,
                 matchResult.reasoning,
-                matchResult.podCorroborated ? { podCorroborated: true } : undefined
+                { podCorroborated: matchResult.podCorroborated === true }
               );
 
               await this.eventRepository.update(matchedEvent);

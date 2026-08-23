@@ -240,7 +240,13 @@ describe('RunAnalysisCommandHandler POD-aware matching', () => {
 
     expect(updatedEvents).toHaveLength(1);
     expect(updatedEvents[0].matchedActivityId).toBe(activityCorroborated.id);
-    expect(updatedEvents[0].metadata).toEqual({ podCorroborated: true });
+    // POD availability is recorded at extraction time and corroboration at match time, so a run's
+    // POD influence is auditable from the event itself.
+    expect(updatedEvents[0].metadata).toEqual({
+      podEvidenceAvailable: true,
+      podReportCount: 1,
+      podCorroborated: true,
+    });
     expect(updatedEvents[0].matchReasoning).toContain('POD');
   });
 
@@ -263,7 +269,12 @@ describe('RunAnalysisCommandHandler POD-aware matching', () => {
 
     expect(updatedEvents).toHaveLength(1);
     expect(updatedEvents[0].matchedActivityId).toBe(activityA.id);
-    expect(updatedEvents[0].metadata).toBeNull();
+    // No POD data for the date: availability is recorded as false and nothing was corroborated.
+    expect(updatedEvents[0].metadata).toEqual({
+      podEvidenceAvailable: false,
+      podReportCount: 0,
+      podCorroborated: false,
+    });
   });
 
   it('completes analysis unchanged when there is no podEvidenceProvider wired at all', async () => {

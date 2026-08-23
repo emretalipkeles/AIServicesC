@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { GlassCard, SectionHeader, ProgressIndicator, StatCard, TableFilter, selectTriggerStyles } from "./ui/premium-components";
 import { cn } from "@/lib/utils";
 import { exportDelayEventsToExcel } from "@/lib/excel-export";
+import { formatDurationHours } from "@/lib/format-duration";
 
 const MONTHS = [
   { value: 1, label: "January" },
@@ -434,7 +435,7 @@ function EventCard({ event, index }: EventCardProps) {
             )}
             {event.impactDurationHours && (
               <span className="text-xs text-muted-foreground">
-                {event.impactDurationHours}h impact
+                {formatDurationHours(event.impactDurationHours)}h impact
               </span>
             )}
           </div>

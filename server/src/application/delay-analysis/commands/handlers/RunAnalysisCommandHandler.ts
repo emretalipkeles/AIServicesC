@@ -74,7 +74,33 @@ function normalizeImpactDuration(value: unknown): number | null {
   if (value == null) return null;
   const num = typeof value === 'string' ? parseFloat(value) : Number(value);
   if (isNaN(num) || !isFinite(num)) return null;
-  return Math.round(num);
+  // Durations calculated from diary timestamp gaps are frequently fractional (0.75h, 1.5h).
+  // Keep two decimals rather than rounding to whole hours, which used to destroy those values.
+  return Math.round(num * 100) / 100;
+}
+
+/**
+ * Builds the metadata patch stored on a newly extracted event.
+ * `podEvidenceAvailable` records whether POD data existed for the document's date at extraction time,
+ * so a run's POD influence can be audited from the events themselves.
+ */
+function buildEventMetadata(
+  sourceDocumentIds: string[],
+  podAudit: { podEvidenceAvailable: boolean; podReportCount: number } | undefined
+): Record<string, unknown> | null {
+  // `podCorroborated` starts false on every event and is only raised by an actual corroborated
+  // match, so "not corroborated" is always distinguishable from "never checked".
+  const metadata: Record<string, unknown> = {
+    podEvidenceAvailable: podAudit?.podEvidenceAvailable ?? false,
+    podReportCount: podAudit?.podReportCount ?? 0,
+    podCorroborated: false,
+  };
+
+  if (sourceDocumentIds.length > 1) {
+    metadata.allSourceDocumentIds = sourceDocumentIds;
+  }
+
+  return metadata;
 }
 
 function validateMatchAgainstReportDate(
@@ -222,6 +248,10 @@ export class RunAnalysisCommandHandler {
     // whichever set of documents is available first (extraction's fieldReports, or all project
     // documents if this run only matches).
     let podEvidenceByDate = new Map<string, PodReport[]>();
+    // Records, per source document, whether POD evidence was actually available at extraction time.
+    // Persisted onto each event's metadata so POD influence on a run is auditable afterwards rather
+    // than only inferable from prompt logs.
+    const podAuditByDocumentId = new Map<string, { podEvidenceAvailable: boolean; podReportCount: number }>();
 
     if (shouldExtract) {
       progress.report({
@@ -331,6 +361,13 @@ export class RunAnalysisCommandHandler {
             const eventPodEvidence = reportDate === (doc.reportDate ?? null)
               ? docPodEvidence
               : this.buildPodMatchEvidence(podEvidenceByDate, reportDate);
+
+            // Recorded against the *effective* report date (which may have been recovered from the
+            // document body), so the audit agrees with the POD evidence matching later uses.
+            podAuditByDocumentId.set(doc.id, {
+              podEvidenceAvailable: (eventPodEvidence?.reports?.length ?? 0) > 0,
+              podReportCount: eventPodEvidence?.reports?.length ?? 0,
+            });
 
             if (extractionResult.workActivities && extractionResult.workActivities.length > 0) {
               documentContexts.set(doc.id, {
@@ -519,9 +556,10 @@ export class RunAnalysisCommandHandler {
             verificationStatus: 'pending',
             verifiedBy: null,
             verifiedAt: null,
-            metadata: deduped.sourceDocumentIds.length > 1 
-              ? { allSourceDocumentIds: deduped.sourceDocumentIds } 
-              : null,
+            metadata: buildEventMetadata(
+              deduped.sourceDocumentIds,
+              podAuditByDocumentId.get(deduped.primarySourceDocumentId ?? '')
+            ),
             createdAt: now,
             updatedAt: now,
           });
@@ -732,7 +770,7 @@ export class RunAnalysisCommandHandler {
                   matchResult.wbs,
                   matchResult.confidence,
                   matchResult.reasoning,
-                  matchResult.podCorroborated ? { podCorroborated: true } : undefined
+                  { podCorroborated: matchResult.podCorroborated === true }
                 );
 
                 await this.eventRepository.update(matchedEvent);

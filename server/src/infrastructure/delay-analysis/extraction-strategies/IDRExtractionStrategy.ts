@@ -96,15 +96,24 @@ CRITICAL ANALYSIS REQUIREMENTS:
   * Apply the exclusions from the knowledge base - DSCs, owner-directed suspensions, etc.
 
 =============================================================================
-DIARY SECTION ANALYSIS (IMPORTANT)
+DIARY / NARRATIVE ANALYSIS — MANDATORY, DO THIS BEFORE ANY CONCLUSION
 =============================================================================
 
-IDRs contain "Diary" sections with timestamped narrative entries. These are CRITICAL sources of delay information that you MUST analyze carefully.
+IDRs carry their most important delay information in timestamped narrative prose, NOT in the summary
+form fields. You MUST walk this narrative entry by entry before deciding whether any delays exist.
 
-**DIARY FORMAT:**
-Diary entries typically look like:
-- "Diary - [Inspector Name]" or "Diary – [Crew Name]"
-- Followed by timestamped entries throughout the day
+**WHERE THE NARRATIVE LIVES:**
+The timestamped narrative may be labelled "Diary", "Diary - [Inspector Name]", or it may be an
+unlabelled block of timestamped prose under a heading such as "Description of Work Done". Treat ALL of
+these identically — a heading of "Description of Work Done" does not make the content routine.
+
+**MANDATORY WALK-THROUGH:**
+Read each timestamped entry in order and ask of each one: does this entry describe the contractor
+damaging, redoing, or correcting work; breaking down; waiting on something it should have had ready;
+working in the wrong place; or failing to coordinate its own crews? Narrative entries frequently record
+contractor-caused problems in plain, undramatic language, e.g. "when they removed them they damaged two
+of the new panels" or "crew waited for the correct fitting to arrive". These ARE delay events even
+though no form field flags them and no code tags them.
 
 **TIME FORMATS TO RECOGNIZE:**
 Inspectors use various formats: 0700, 07:00, 7:00, 7am, 7:00 AM, 7 AM, 0700hrs
@@ -123,8 +132,20 @@ When diary entries show work stoppage and resumption, CALCULATE the delay durati
 4. Coordination problems noted by inspector
 5. Quality issues that halted work
 
-**SOURCE REFERENCE FORMAT FOR DIARY ENTRIES:**
-Include the timestamp in sourceReference: "Diary, 1415: [brief description]" or "Diary 0800-0930: [description]"
+**SOURCE REFERENCE FORMAT FOR DIARY ENTRIES — REQUIRED:**
+If an event comes from a timestamped narrative entry, its sourceReference MUST begin with the timestamp
+of the entry it came from, in one of these forms:
+- Single entry: "Diary, 1415: [brief description]"
+- Spanning a stoppage and resumption: "Diary 0800-0930: [description]"
+A sourceReference for a narrative-sourced event that omits the timestamp is INVALID. Only events taken
+from non-timestamped sections (form fields, discrepancy blocks, attached memos) may omit it, and those
+must instead cite the section they came from.
+
+**DURATION FROM TIMESTAMPS TAKES PRECEDENCE OVER ESTIMATION:**
+When the narrative gives you a stoppage time and a resumption time, you MUST compute the elapsed time
+and report it exactly — including fractions such as 0.75, 1.5, or 2.25. Do NOT round a computed gap to
+a whole number, and do NOT fall back to a generic estimate when the timestamps let you calculate the
+real figure. Only use estimation when the narrative provides no resolvable times.
 
 =============================================================================
 DELAY EVENT CONFIDENCE ASSESSMENT
@@ -169,14 +190,35 @@ Return a JSON object with TWO arrays:
   ]
 }
 
-CRITICAL RULE — NO CONTRACTOR DELAYS DETECTED:
-If the document clearly indicates there are NO contractor-caused delays — for example:
-- The "Contractor Inefficiencies" field says "N/A", "None", or is empty
-- The "Contractor's Work Activity" table is empty or absent
-- The narrative explicitly states no contractor delays or issues occurred
-- There are no CODE_CIE entries and no observable contractor-caused delays in the diary/narrative
-Then you MUST return an EMPTY delayEvents array: "delayEvents": []
-Do NOT fabricate or invent delay events with default durations. If no real contractor delay is evident, return zero events.
+CRITICAL RULE — WHEN TO RETURN ZERO DELAY EVENTS:
+
+Return an EMPTY delayEvents array ("delayEvents": []) ONLY after you have read the full narrative and
+found no contractor-caused delay in it. Returning zero events is a conclusion you reach at the END of
+your analysis, never a shortcut you take at the start.
+
+**THESE ARE NOT GROUNDS FOR RETURNING ZERO EVENTS — DO NOT STOP ON THEM:**
+- A summary form field such as "Delays and Reason", "Contractor Inefficiencies", "Discrepancies", or
+  "Any Cause for Dispute or Change Order" reads "None", "N/A", or is blank. These are pre-printed
+  checkbox-style fields that inspectors routinely leave as "None" while describing real contractor
+  problems in the narrative on the very same page. A "None" in these fields is NOT evidence of absence.
+- The "Contractor's Work Activity" table is missing, empty, or the document has no activity IDs at all.
+  Many valid IDRs have no such table. Its absence affects MATCHING only — it has no bearing whatsoever
+  on whether delay events exist.
+- There are no CODE_CIE tags in the document. CODE_CIE is an optional convenience label. Most projects
+  never use it. Its absence means you must read the narrative more carefully, not less.
+
+**BEFORE you may conclude "no delays", you MUST have:**
+1. Read every timestamped narrative entry from first to last.
+2. Read the "Discussion with Contractor or Others", "Discrepancies", and "Extra Work" sections.
+3. Confirmed that no entry describes contractor-caused damage, rework, redoing of completed work,
+   equipment breakdown, crew or material shortfall, waiting caused by the contractor's own
+   unpreparedness, work in the wrong location, or a coordination failure attributable to the contractor.
+
+**STILL DO NOT FABRICATE.** If the narrative genuinely shows only normal productive work, return zero
+events. A clean report is a legitimate outcome. The goal is to stop exiting before reading — not to
+manufacture events from routine progress notes. Routine descriptions of planned work proceeding
+normally are NOT delays, and owner-caused, third-party, and differing-site-condition events remain
+excluded per the knowledge base.
 
 NOTES:
 - workActivities: Extract from "Contractor's Work Activity" table. Return empty array [] if no such table exists.

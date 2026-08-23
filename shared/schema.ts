@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, jsonb, boolean, index, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, real, jsonb, boolean, index, customType } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -432,7 +432,7 @@ export const contractorDelayEvents = pgTable("contractor_delay_events", {
   eventCategory: text("event_category"),
   eventStartDate: timestamp("event_start_date"),
   eventFinishDate: timestamp("event_finish_date"),
-  impactDurationHours: integer("impact_duration_hours"),
+  impactDurationHours: real("impact_duration_hours"),
   sourceReference: text("source_reference"),
   extractedFromCode: text("extracted_from_code"),
   matchConfidence: integer("match_confidence"),

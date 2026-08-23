@@ -10,6 +10,7 @@ import type { IDRWorkActivity } from '../../domain/delay-analysis/interfaces/IDo
 import type { IExtractionToolExecutor } from '../../domain/delay-analysis/interfaces/IExtractionToolExecutor';
 import type { IToolExtractionSystemPromptStrategyFactory } from '../../domain/delay-analysis/interfaces/IToolExtractionSystemPromptStrategy';
 import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
+import { auditNarrativeProvenance } from './NarrativeProvenanceCheck';
 import { OPENAI_MODELS } from '../../domain/value-objects/ModelId';
 import type OpenAI from 'openai';
 import type { AzureOpenAI } from 'openai';
@@ -291,6 +292,13 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
           console.log(`[AI] TOOL-EXTRACTION:   ✓ "${e.eventDescription?.substring(0, 50)}..." -> ${e.matchedActivityId}`);
         });
       }
+      auditNarrativeProvenance(
+        '[AI] TOOL-EXTRACTION:',
+        documentType,
+        documentFilename,
+        documentContent,
+        parseResult.events
+      );
       console.log('');
 
       return {
