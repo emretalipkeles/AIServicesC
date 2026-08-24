@@ -15,8 +15,17 @@ interface PositionedTextItem {
 const FOOTER_LINE_PATTERN = /heavyjob|hcssapps\.com/i;
 const PAGE_NUMBER_LINE_PATTERN = /^\d{1,4}$/;
 
-/** Prefix for the page-boundary marker lines this parser inserts; see DiarySegmenter's PAGE_MARKER. */
-export const PAGE_MARKER_PREFIX = '\u0000PAGE:';
+/**
+ * Prefix for the page-boundary marker lines this parser inserts; see DiarySegmenter's PAGE_MARKER.
+ *
+ * Uses a Unicode Private Use Area code point rather than NUL (`\u0000`): the marker line is part
+ * of `rawContent`, which is persisted verbatim to a Postgres `text` column before segmentation
+ * ever runs. Postgres text columns reject embedded NUL bytes outright ("invalid byte sequence for
+ * encoding UTF8"), which made every diary upload fail at parse time regardless of document
+ * content. `\uE000` is valid UTF-8, never appears in real PDF text, and round-trips through
+ * Postgres cleanly.
+ */
+export const PAGE_MARKER_PREFIX = '\uE000PAGE:';
 
 /**
  * Diary-specific PDF parser for Jansen's HeavyJob Foreman Diary exports.
