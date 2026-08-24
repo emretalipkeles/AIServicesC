@@ -12,6 +12,8 @@ export interface ProjectDocumentDto {
   hasContent: boolean;
   createdAt: string;
   updatedAt: string;
+  structuredExtractionStatus: string | null;
+  structuredExtractionSummary: string | null;
 }
 
 export interface UploadResult {
@@ -57,7 +59,7 @@ export interface BatchUploadResult {
   totalBatches: number;
 }
 
-export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'pod' | 'other';
+export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'pod' | 'daily_report' | 'other';
 
 const BATCH_SIZE = 25;
 

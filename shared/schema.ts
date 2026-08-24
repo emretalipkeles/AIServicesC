@@ -281,6 +281,10 @@ export const projectDocuments = pgTable("project_documents", {
   // surface instead of being silently swallowed while `status` stays 'completed' for the raw parse.
   structuredExtractionStatus: text("structured_extraction_status"),
   structuredExtractionError: text("structured_extraction_error"),
+  // Human-readable outcome summary for a document-type-specific structured extraction step
+  // (e.g. "Split into 27 dated entries, 2021-09-23 to 2021-10-30" for a Foreman Diary upload).
+  // Null when the document type has no such summary or extraction has not run yet.
+  structuredExtractionSummary: text("structured_extraction_summary"),
   // Original uploaded bytes, kept only while status is 'pending'/'processing' so a server
   // restart mid-upload can resume/retry without asking the user to re-upload. Cleared once
   // processing reaches a terminal state (completed, or failed after exhausting retries) to
@@ -307,7 +311,7 @@ export const insertProjectDocumentSchema = createInsertSchema(projectDocuments).
 export type InsertProjectDocument = z.infer<typeof insertProjectDocumentSchema>;
 export type ProjectDocument = typeof projectDocuments.$inferSelect;
 
-export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'pod' | 'other';
+export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'pod' | 'daily_report' | 'other';
 
 // Play of the Day (POD) — daily construction assignment sheets made of repeating,
 // loosely-structured blocks (e.g. "CIVIL #1", "SUBCONTRACTORS", "UPO"). The tables below
@@ -391,6 +395,57 @@ export const podTaskLines = pgTable("pod_task_lines", {
 
 export type PodTaskLineRow = typeof podTaskLines.$inferSelect;
 export type InsertPodTaskLineRow = typeof podTaskLines.$inferInsert;
+
+// Foreman Diary daily reports (Jansen's internal HeavyJob diary exports) — supporting/field-
+// context documents, mirroring the POD tree's conventions. A single uploaded PDF covers a
+// whole date range, so it is split into one diary_reports row per calendar date found, each
+// with one or more author-scoped diary_entries note blocks.
+//
+// Deliberate modeling decisions (do not "fix"):
+// - Like POD, diaries never produce delay events; they are read-only reference context.
+// - Saving re-parsed results for a source document replaces only that document's own rows
+//   (see DrizzleDiaryReportRepository), so overlapping uploads for the same date coexist.
+export const diaryReports = pgTable("diary_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sourceDocumentId: varchar("source_document_id").notNull().references(() => projectDocuments.id, { onDelete: "cascade" }),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  reportDate: timestamp("report_date").notNull(),
+  // Sequence preserves this source document's own day-record ordering (document order), since
+  // multiple diary_reports rows for the same date can come from different source documents.
+  sequence: integer("sequence").notNull(),
+  // Records which segmentation path produced this day's entries, so a run can be audited.
+  extractionMethod: text("extraction_method").notNull().default("deterministic"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  sourceDocumentIdx: index("diary_reports_source_document_idx").on(table.sourceDocumentId),
+  reportDateIdx: index("diary_reports_report_date_idx").on(table.reportDate),
+}));
+
+export type DiaryReportRow = typeof diaryReports.$inferSelect;
+export type InsertDiaryReportRow = typeof diaryReports.$inferInsert;
+
+export const diaryEntries = pgTable("diary_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull().references(() => diaryReports.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(),
+  authorName: text("author_name").notNull(),
+  weather: text("weather"),
+  // Empty string (never the literal "No notes found" placeholder text) when the source PDF's
+  // Note block for this author was blank that day.
+  noteText: text("note_text").notNull().default(""),
+  // 1-based PDF page(s) this entry's Diary block was read from, so Results-tab evidence can
+  // reference a page for the user. Null for AI-fallback entries (no page-by-page PDF walk).
+  pageNumber: integer("page_number"),
+  pageRangeEnd: integer("page_range_end"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  reportIdx: index("diary_entries_report_idx").on(table.reportId),
+}));
+
+export type DiaryEntryRow = typeof diaryEntries.$inferSelect;
+export type InsertDiaryEntryRow = typeof diaryEntries.$inferInsert;
 
 export const scheduleActivities = pgTable("schedule_activities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

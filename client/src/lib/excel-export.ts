@@ -26,6 +26,12 @@ interface DelayEventData {
   podDocumentName?: string | null;
   /** Short plain-language note on how POD evidence was actually used for this event/match. */
   podUsageNote?: string | null;
+  /** Filename of the Foreman Diary document that informed this event, if any. */
+  diaryDocumentName?: string | null;
+  /** Short plain-language note on how diary evidence was available for this event's date. */
+  diaryUsageNote?: string | null;
+  /** PDF page reference (e.g. "p. 12" or "pp. 12-14") for the diary document, when known. */
+  diaryPageReference?: string | null;
   /** Set when a claimed 'bounded_by_next_entry' duration was rejected and capped; explains why. */
   rejectedBoundedClaimNote?: string | null;
 }
@@ -137,6 +143,8 @@ export async function exportDelayEventsToExcel(
     { header: 'Source Document', key: 'sourceDoc', width: 30 },
     { header: 'POD Document', key: 'podDoc', width: 26 },
     { header: 'POD Usage', key: 'podUsage', width: 35 },
+    { header: 'Daily Report Document', key: 'diaryDoc', width: 26 },
+    { header: 'Daily Report Usage', key: 'diaryUsage', width: 35 },
     { header: 'Extracted From Code', key: 'extractedCode', width: 18 },
     { header: 'Source Reference', key: 'sourceRef', width: 25 },
     { header: 'Match Reasoning Confidence', key: 'confidence', width: 22 },
@@ -183,6 +191,10 @@ export async function exportDelayEventsToExcel(
       sourceDoc: event.sourceDocumentId && documentNameMap ? documentNameMap.get(event.sourceDocumentId) || '' : '',
       podDoc: event.podDocumentName || '',
       podUsage: event.podUsageNote || '',
+      diaryDoc: event.diaryDocumentName
+        ? (event.diaryPageReference ? `${event.diaryDocumentName} (${event.diaryPageReference})` : event.diaryDocumentName)
+        : '',
+      diaryUsage: event.diaryUsageNote || '',
       extractedCode: event.extractedFromCode || '',
       sourceRef: event.sourceReference || '',
       confidence: event.matchConfidence ? `${event.matchConfidence}%` : '',

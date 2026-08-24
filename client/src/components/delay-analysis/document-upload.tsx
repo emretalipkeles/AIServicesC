@@ -37,6 +37,7 @@ const documentTypeLabels: Partial<Record<ProjectDocumentType, string>> = {
   contract_plan: "Contract Plan",
   dsc_claim: "DSC Claim",
   pod: "Play of the Day (POD)",
+  daily_report: "Daily Reports / Foreman Diaries",
   other: "Other",
 };
 
@@ -542,6 +543,8 @@ const DocumentRow = React.memo(function DocumentRow({ doc, onDelete, onAnalyze, 
 
   const canAnalyze = doc.status === 'completed' && analyzableDocTypes.includes(doc.documentType);
   const isPodSupportingContext = doc.status === 'completed' && doc.documentType === 'pod';
+  const isDiarySupportingContext = doc.status === 'completed' && doc.documentType === 'daily_report';
+  const diaryFoundNoEntries = isDiarySupportingContext && doc.structuredExtractionStatus === 'failed';
 
   return (
     <div
@@ -595,6 +598,25 @@ const DocumentRow = React.memo(function DocumentRow({ doc, onDelete, onAnalyze, 
             title="POD reports aren't analyzed for delay events themselves, but their crew, equipment, and cost-code data is used as supporting evidence when matching delays to schedule activities."
           >
             Used as supporting context
+          </span>
+        )}
+        {isDiarySupportingContext && !diaryFoundNoEntries && (
+          <span
+            className="text-xs text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full whitespace-nowrap"
+            title={doc.structuredExtractionSummary
+              ? `${doc.structuredExtractionSummary}. Diary notes aren't analyzed for delay events themselves, but are used as supporting reference context during IDR/NCR/Field Memo analysis.`
+              : "Diary notes aren't analyzed for delay events themselves, but are used as supporting reference context during IDR/NCR/Field Memo analysis."}
+          >
+            {doc.structuredExtractionSummary ?? "Used as supporting context"}
+          </span>
+        )}
+        {isDiarySupportingContext && diaryFoundNoEntries && (
+          <span
+            className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full whitespace-nowrap"
+            title={doc.structuredExtractionSummary ?? "No dated diary entries could be found in this document"}
+          >
+            <AlertCircle className="w-3 h-3" />
+            No dated entries found
           </span>
         )}
         {canAnalyze && (

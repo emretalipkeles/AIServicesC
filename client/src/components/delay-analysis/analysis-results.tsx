@@ -224,6 +224,7 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Document</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs min-w-[120px]")}>Match Reason</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs min-w-[130px]")}>POD Evidence</th>
+                      <th className={cn(tableHeaderCellStyles, "text-xs min-w-[130px]")}>Daily Report Evidence</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Date</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Year</th>
                       <th className={cn(tableHeaderCellStyles, "text-xs")}>Period</th>
@@ -249,6 +250,9 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                             (event.matchReasoning || "").toLowerCase().includes(search) ||
                             (event.podDocumentName || "").toLowerCase().includes(search) ||
                             (event.podUsageNote || "").toLowerCase().includes(search) ||
+                            (event.diaryDocumentName || "").toLowerCase().includes(search) ||
+                            (event.diaryUsageNote || "").toLowerCase().includes(search) ||
+                            (event.diaryPageReference || "").toLowerCase().includes(search) ||
                             (event.rejectedBoundedClaimNote || "").toLowerCase().includes(search) ||
                             docName.toLowerCase().includes(search)
                           );
@@ -324,6 +328,13 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                             </td>
                             <td className="p-2 max-w-[130px]">
                               <PodEvidenceCell podDocumentName={event.podDocumentName} podUsageNote={event.podUsageNote} />
+                            </td>
+                            <td className="p-2 max-w-[130px]">
+                              <DiaryEvidenceCell
+                                diaryDocumentName={event.diaryDocumentName}
+                                diaryUsageNote={event.diaryUsageNote}
+                                diaryPageReference={event.diaryPageReference}
+                              />
                             </td>
                             <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">{formatDate(event.eventStartDate)}</td>
                             <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
@@ -401,6 +412,63 @@ function PodEvidenceCell({
         maxWidth="130px"
         className="text-[11px] text-muted-foreground"
         label="POD Usage"
+      />
+    </div>
+  );
+}
+
+function DiaryEvidenceCell({
+  diaryDocumentName,
+  diaryUsageNote,
+  diaryPageReference,
+}: {
+  diaryDocumentName: string | null;
+  diaryUsageNote: string | null;
+  diaryPageReference: string | null;
+}) {
+  // Unlike POD, diary evidence never corroborates a specific match (it is never passed to the
+  // activity matcher) — it only records whether foreman diary notes existed for this event's
+  // date and were supplied to extraction as reference context. So there is no "corroborating vs
+  // not" color distinction here, just "available" vs "not available for this date".
+  if (!diaryDocumentName) {
+    return diaryUsageNote ? (
+      <TruncatedTextWithTooltip
+        text={diaryUsageNote}
+        maxWidth="130px"
+        className="text-[11px] text-muted-foreground italic"
+        label="Daily Report Usage"
+      />
+    ) : (
+      <span className="text-xs text-muted-foreground/60 italic">No daily report for date</span>
+    );
+  }
+
+  // Page reference lets a reviewer jump straight to the source page in the diary PDF instead
+  // of searching a 70+ page document for the date; not always available (e.g. entries that
+  // came from the AI-fallback path have no page attribution).
+  const documentLabel = diaryPageReference ? `${diaryDocumentName} (${diaryPageReference})` : diaryDocumentName;
+  const usageNoteText = diaryUsageNote || "Foreman diary notes were available for this date.";
+  // Both lines in this cell get the same combined tooltip (document + page + usage note): a
+  // reviewer hovering whichever line catches their eye first — often the usage note, since
+  // it reads as the "explanation" — should never land on a tooltip that omits the page
+  // reference just because they picked the other line.
+  const combinedTooltip = `${documentLabel}\n\n${usageNoteText}`;
+
+  return (
+    <div className="flex flex-col gap-0.5 max-w-[130px]">
+      <TruncatedTextWithTooltip
+        text={documentLabel}
+        tooltipText={combinedTooltip}
+        maxWidth="130px"
+        className="text-xs font-medium text-emerald-600 dark:text-emerald-400"
+        label="Daily Report Evidence"
+      />
+      <TruncatedTextWithTooltip
+        text={usageNoteText}
+        tooltipText={combinedTooltip}
+        maxWidth="130px"
+        className="text-[11px] text-muted-foreground"
+        label="Daily Report Evidence"
       />
     </div>
   );

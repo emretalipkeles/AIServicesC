@@ -6,3 +6,5 @@
 - [POD-aware delay activity matching](pod-aware-matching.md) — POD exclusion markers are free text with no schema column; rank/reorder POD evidence before the matcher's 100-activity truncation; metadata is a merge-only patch.
 - [Duration provenance validation helper](duration-provenance-helper.md) — clock-time/basis normalization for delay durations lives in one shared domain helper, used by both extractors and both analysis handlers.
 - [Period-scoped rerun deletion safety](period-scoped-rerun-deletion-safety.md) — delete-by-id after successful save, never a broad predicate before/after; field_memo/NCR docs re-extract every period and need explicit out-of-period + undated filtering to avoid duplicates.
+- [HeavyJob diary export text layout](heavyjob-diary-layout.md) — "Diary" row label and author name are on separate lines, not inline; verify segmenters against the real sample text, not hand-written fixtures.
+- [Evidence audit metadata pattern](evidence-audit-metadata-pattern.md) — POD/diary Results-tab provenance is a metadata snapshot taken at extraction time, not a live join; a source-only evidence type (no matcher step) still needs its own audit fields.

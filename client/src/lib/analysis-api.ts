@@ -27,6 +27,12 @@ export interface DelayEventDto {
   podDocumentName: string | null;
   /** Short plain-language note on how POD evidence was actually used for this event/match. */
   podUsageNote: string | null;
+  /** Filename of the Foreman Diary document that informed this event, if any. Null for older events or dates with no diary coverage. */
+  diaryDocumentName: string | null;
+  /** Short plain-language note on how diary evidence was available for this event's date. */
+  diaryUsageNote: string | null;
+  /** PDF page reference (e.g. "p. 12" or "pp. 12-14") for the diary document, when known. */
+  diaryPageReference: string | null;
   /** Set when a claimed 'bounded_by_next_entry' duration was rejected and capped; explains why. */
   rejectedBoundedClaimNote: string | null;
 }

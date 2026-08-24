@@ -2,6 +2,7 @@ import type { IDocumentParser } from '../../domain/delay-analysis/interfaces/IDo
 import type { IDocumentParserFactory } from '../../domain/delay-analysis/interfaces/IDocumentParserFactory';
 import { PdfDocumentParser } from './PdfDocumentParser';
 import { PdfPodDocumentParser } from './PdfPodDocumentParser';
+import { PdfDiaryDocumentParser } from './PdfDiaryDocumentParser';
 import { WordDocumentParser } from './WordDocumentParser';
 
 export class DocumentParserFactory implements IDocumentParserFactory {
@@ -9,9 +10,10 @@ export class DocumentParserFactory implements IDocumentParserFactory {
 
   constructor() {
     this.parsers = [
-      // Ordered before PdfDocumentParser: PdfDocumentParser declines POD documents,
-      // but the more specific parser is still listed first for clarity of precedence.
+      // Ordered before PdfDocumentParser: PdfDocumentParser declines POD/diary documents,
+      // but the more specific parsers are still listed first for clarity of precedence.
       new PdfPodDocumentParser(),
+      new PdfDiaryDocumentParser(),
       new PdfDocumentParser(),
       new WordDocumentParser(),
     ];

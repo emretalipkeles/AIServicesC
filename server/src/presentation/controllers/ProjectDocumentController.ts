@@ -136,6 +136,8 @@ export class ProjectDocumentController {
         hasContent: document.rawContent !== null && document.rawContent.length > 0,
         createdAt: document.createdAt.toISOString(),
         updatedAt: document.updatedAt.toISOString(),
+        structuredExtractionStatus: document.structuredExtractionStatus,
+        structuredExtractionSummary: document.structuredExtractionSummary,
       });
     } catch (error) {
       console.error('Error fetching document:', error);

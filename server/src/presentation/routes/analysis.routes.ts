@@ -120,6 +120,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
           { header: 'Source Reference', key: 'sourceRef', width: 25 },
           { header: 'POD Document', key: 'podDoc', width: 26 },
           { header: 'POD Usage', key: 'podUsage', width: 35 },
+          { header: 'Daily Report Document', key: 'diaryDoc', width: 26 },
+          { header: 'Daily Report Usage', key: 'diaryUsage', width: 35 },
           { header: 'Confidence', key: 'confidence', width: 12 },
           { header: 'Match Reasoning', key: 'reasoning', width: 45 },
           { header: 'Status', key: 'status', width: 14 },
@@ -192,6 +194,10 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
             sourceRef: event.sourceReference || '',
             podDoc: event.podDocumentName || '',
             podUsage: event.podUsageNote || '',
+            diaryDoc: event.diaryDocumentName
+              ? (event.diaryPageReference ? `${event.diaryDocumentName} (${event.diaryPageReference})` : event.diaryDocumentName)
+              : '',
+            diaryUsage: event.diaryUsageNote || '',
             confidence: event.matchConfidence ? `${event.matchConfidence}%` : '',
             reasoning: event.matchReasoning || '',
             status: event.verificationStatus,
@@ -311,7 +317,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
     container.services.idrMatchPolicy,
     container.services.analysisRunTracker,
     container.services.fieldMemoContextProvider ?? undefined,
-    container.services.podEvidenceProvider ?? undefined
+    container.services.podEvidenceProvider ?? undefined,
+    container.services.diaryEvidenceProvider ?? undefined
   );
 
   const createTokenCallback = (projectId: string): TokenUsageCallback => {
@@ -439,7 +446,8 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
     container.services.activityMatcher!,
     container.services.idrMatchPolicy,
     container.services.fieldMemoContextProvider ?? undefined,
-    container.services.podEvidenceProvider ?? undefined
+    container.services.podEvidenceProvider ?? undefined,
+    container.services.diaryEvidenceProvider ?? undefined
   );
 
   app.get(

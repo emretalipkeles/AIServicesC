@@ -61,6 +61,13 @@ export interface ExtractionOptions {
    * IActivityMatcher's podEvidence for the equivalent used by the standalone matcher).
    */
   podContext?: string;
+  /**
+   * Rendered, size-capped Foreman Diary context text for the document's report date, if any
+   * diary reports exist for that date. Purely untrusted reference context: diaries never
+   * produce delay events of their own, they only corroborate/enrich delays already found in
+   * field reports. Mirrors podContext's role.
+   */
+  diaryContext?: string;
 }
 
 export interface IDelayEventExtractor {

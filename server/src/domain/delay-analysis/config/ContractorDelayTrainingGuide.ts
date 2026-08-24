@@ -509,6 +509,9 @@ const DOCUMENT_TYPE_SECTIONS: Record<ProjectDocumentType, ReadonlyArray<Knowledg
   // POD documents are never sent through delay-event extraction, so no knowledge base
   // sections are needed for them.
   pod: [],
+  // Foreman Diaries are never sent through delay-event extraction either (supporting
+  // context only, like POD), so no knowledge base sections are needed for them.
+  daily_report: [],
 };
 
 export class ContractorDelayTrainingGuide implements IDelayKnowledgeBase {

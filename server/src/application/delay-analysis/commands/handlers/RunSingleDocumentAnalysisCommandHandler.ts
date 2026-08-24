@@ -14,11 +14,16 @@ import type { IFieldMemoContextProvider } from '../../../../domain/delay-analysi
 import type { IPodEvidenceProvider } from '../../../../domain/delay-analysis/interfaces/IPodEvidenceProvider';
 import { toPodEvidenceDateKey } from '../../../../domain/delay-analysis/interfaces/IPodEvidenceProvider';
 import type { PodMatchEvidence } from '../../../../domain/delay-analysis/interfaces/IActivityMatcher';
+import type { IDiaryEvidenceProvider, DiaryMatchEvidence } from '../../../../domain/delay-analysis/interfaces/IDiaryEvidenceProvider';
+import { toDiaryEvidenceDateKey } from '../../../../domain/delay-analysis/interfaces/IDiaryEvidenceProvider';
+import { renderDiaryPageReference } from '../../../../infrastructure/delay-analysis/diary/DiaryPageReference';
 import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfaces/IProgressReporter';
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 import { extractReportDateFromIDR } from '../../../../infrastructure/delay-analysis/ReportDateExtractor';
 import { renderPodDayContext } from '../../../../infrastructure/delay-analysis/PodContextRenderer';
+import { renderDiaryDayContext } from '../../../../infrastructure/delay-analysis/DiaryContextRenderer';
 import { resolveDurationProvenance } from '../../../../domain/delay-analysis/DurationProvenance';
+import { findDiaryCorroboration, renderDiaryCorroborationNote } from '../../../../domain/delay-analysis/config/DiaryCorroboration';
 
 const MIN_MATCH_CONFIDENCE_FOR_SKIP = 85;
 
@@ -79,7 +84,8 @@ export class RunSingleDocumentAnalysisCommandHandler {
     private readonly matcher: IActivityMatcher,
     private readonly idrMatchPolicy?: IIDRMatchEnforcementPolicy,
     private readonly fieldMemoContextProvider?: IFieldMemoContextProvider,
-    private readonly podEvidenceProvider?: IPodEvidenceProvider
+    private readonly podEvidenceProvider?: IPodEvidenceProvider,
+    private readonly diaryEvidenceProvider?: IDiaryEvidenceProvider
   ) {}
 
   /**
@@ -107,6 +113,34 @@ export class RunSingleDocumentAnalysisCommandHandler {
       return { contextText, reports };
     } catch (error) {
       console.warn('[SingleDocAnalysis] Failed to load POD evidence (continuing without it):', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Resolves Foreman Diary evidence for a document's report date, mirroring
+   * loadPodEvidenceForDate. Diaries are prompt-only reference context — a failure here is
+   * logged and treated as "no diary evidence", never a dependency of analysis completing.
+   */
+  private async loadDiaryEvidenceForDate(
+    projectId: string,
+    tenantId: string,
+    date: Date | null
+  ): Promise<DiaryMatchEvidence | undefined> {
+    if (!this.diaryEvidenceProvider || !date) {
+      return undefined;
+    }
+    try {
+      const evidenceByDate = await this.diaryEvidenceProvider.getEvidenceForDateRange(projectId, tenantId, date, date);
+      const reports = evidenceByDate.get(toDiaryEvidenceDateKey(date)) ?? [];
+      if (reports.length === 0) {
+        return undefined;
+      }
+      const contextText = renderDiaryDayContext(reports);
+      if (!contextText) return undefined;
+      return { contextText, reports };
+    } catch (error) {
+      console.warn('[SingleDocAnalysis] Failed to load diary evidence (continuing without it):', error);
       return undefined;
     }
   }
@@ -189,10 +223,18 @@ export class RunSingleDocumentAnalysisCommandHandler {
     // re-resolved below if extraction recovers a different one, so the audit metadata written onto
     // each event always describes the same evidence matching later uses.
     let effectivePodEvidence: PodMatchEvidence | undefined;
+    // Same re-resolution pattern for Foreman Diary evidence; there is no matcher step for
+    // diaries, so this value is only consumed for the creation-time audit metadata below.
+    let effectiveDiaryEvidence: DiaryMatchEvidence | undefined;
 
     // Resolve up front from the document's own stored report date; if extraction later derives
     // a better date (IDR fallback parsing), matching below re-resolves POD evidence for it.
     const preExtractionPodEvidence = await this.loadPodEvidenceForDate(
+      command.projectId,
+      command.tenantId,
+      doc.reportDate ?? null
+    );
+    const preExtractionDiaryEvidence = await this.loadDiaryEvidenceForDate(
       command.projectId,
       command.tenantId,
       doc.reportDate ?? null
@@ -212,6 +254,7 @@ export class RunSingleDocumentAnalysisCommandHandler {
           enableToolBasedMatching: options?.enableToolBasedMatching ?? true,
           fieldMemoContext: fieldMemoContext ?? undefined,
           podContext: preExtractionPodEvidence?.contextText ?? undefined,
+          diaryContext: preExtractionDiaryEvidence?.contextText ?? undefined,
         }
       );
 
@@ -222,6 +265,10 @@ export class RunSingleDocumentAnalysisCommandHandler {
       effectivePodEvidence = reportDate === (doc.reportDate ?? null)
         ? preExtractionPodEvidence
         : await this.loadPodEvidenceForDate(command.projectId, command.tenantId, reportDate);
+
+      effectiveDiaryEvidence = reportDate === (doc.reportDate ?? null)
+        ? preExtractionDiaryEvidence
+        : await this.loadDiaryEvidenceForDate(command.projectId, command.tenantId, reportDate);
 
       if (extractionResult.workActivities && extractionResult.workActivities.length > 0) {
         workActivities = extractionResult.workActivities;
@@ -354,6 +401,26 @@ export class RunSingleDocumentAnalysisCommandHandler {
             ? `${podReportsForDate.length} POD reports were available for this date and supplied to extraction as context; the specific corroborating report (if any) is determined at match time.`
             : null;
 
+        // Diaries have no matcher step to later disambiguate multiple reports, so this
+        // creation-time attribution is the final audit value (unlike POD's, which the
+        // post-match patch below can override).
+        const diaryReportsForDate = effectiveDiaryEvidence?.reports ?? [];
+        const diarySourceDocumentId = diaryReportsForDate.length === 1 ? diaryReportsForDate[0].sourceDocumentId : null;
+        const diaryPageReference = diaryReportsForDate.length === 1 ? renderDiaryPageReference(diaryReportsForDate[0].entries) : null;
+        // A specific corroborating note (keyword overlap against the event description) always
+        // wins over the generic "notes were available" sentence, mirroring POD's corroboration
+        // note naming the specific task line rather than just saying POD context existed.
+        const diaryCorroboration = diaryReportsForDate.length > 0
+          ? findDiaryCorroboration(extracted.eventDescription, diaryReportsForDate)
+          : null;
+        const diaryUsageNote = diaryCorroboration
+          ? renderDiaryCorroborationNote(diaryCorroboration)
+          : diarySourceDocumentId
+            ? 'Foreman diary notes were available for this date and supplied to extraction as reference context.'
+            : diaryReportsForDate.length > 1
+              ? `Foreman diary notes from ${diaryReportsForDate.length} source documents were available for this date and supplied to extraction as reference context.`
+              : null;
+
         const event = new ContractorDelayEvent({
           id: eventId,
           projectId: command.projectId,
@@ -394,6 +461,11 @@ export class RunSingleDocumentAnalysisCommandHandler {
             podCorroborated: false,
             podSourceDocumentId,
             podUsageNote: podCreationUsageNote,
+            diaryEvidenceAvailable: diaryReportsForDate.length > 0,
+            diaryReportCount: diaryReportsForDate.length,
+            diarySourceDocumentId,
+            diaryUsageNote,
+            diaryPageReference,
             ...(provenance.rejectedBoundedClaimNote ? { rejectedBoundedClaimNote: provenance.rejectedBoundedClaimNote } : {}),
           },
           createdAt: now,

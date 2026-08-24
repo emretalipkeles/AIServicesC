@@ -248,6 +248,11 @@ describe('RunAnalysisCommandHandler POD-aware matching', () => {
       podCorroborated: true,
       podSourceDocumentId: 'pod-doc-1',
       podUsageNote: 'POD context was available for this date and supplied to extraction as crew/equipment context.',
+      diaryEvidenceAvailable: false,
+      diaryReportCount: 0,
+      diarySourceDocumentId: null,
+      diaryUsageNote: null,
+      diaryPageReference: null,
     });
     expect(updatedEvents[0].matchReasoning).toContain('POD');
   });
@@ -278,6 +283,11 @@ describe('RunAnalysisCommandHandler POD-aware matching', () => {
       podCorroborated: false,
       podSourceDocumentId: null,
       podUsageNote: null,
+      diaryEvidenceAvailable: false,
+      diaryReportCount: 0,
+      diarySourceDocumentId: null,
+      diaryUsageNote: null,
+      diaryPageReference: null,
     });
   });
 

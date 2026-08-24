@@ -33,6 +33,12 @@ export interface DelayEventDto {
   podDocumentName: string | null;
   /** Short plain-language note on how POD evidence was actually used for this event/match. */
   podUsageNote: string | null;
+  /** Resolved filename of the Foreman Diary document that informed this event, if any (nullable — older events and events with no diary coverage have none). */
+  diaryDocumentName: string | null;
+  /** Short plain-language note on how diary evidence was available for this event's date. */
+  diaryUsageNote: string | null;
+  /** PDF page reference (e.g. "p. 12" or "pp. 12-14") for the diary document, when a single source document and page attribution are both known. */
+  diaryPageReference: string | null;
   /** Set when a claimed 'bounded_by_next_entry' duration was rejected and capped; explains why. */
   rejectedBoundedClaimNote: string | null;
 }
@@ -140,7 +146,8 @@ export class ListDelayEventsQueryHandler {
     }
 
     const hasAnySourceDoc = events.some(e => e.sourceDocumentId !== null)
-      || events.some(e => typeof e.metadata?.podSourceDocumentId === 'string');
+      || events.some(e => typeof e.metadata?.podSourceDocumentId === 'string')
+      || events.some(e => typeof e.metadata?.diarySourceDocumentId === 'string');
 
     if (!hasAnySourceDoc) {
       return { typeMap, filenameMap };
@@ -171,6 +178,15 @@ export class ListDelayEventsQueryHandler {
       : null;
     const podUsageNote = typeof event.metadata?.podUsageNote === 'string'
       ? event.metadata.podUsageNote
+      : null;
+    const diarySourceDocumentId = typeof event.metadata?.diarySourceDocumentId === 'string'
+      ? event.metadata.diarySourceDocumentId
+      : null;
+    const diaryUsageNote = typeof event.metadata?.diaryUsageNote === 'string'
+      ? event.metadata.diaryUsageNote
+      : null;
+    const diaryPageReference = typeof event.metadata?.diaryPageReference === 'string'
+      ? event.metadata.diaryPageReference
       : null;
     const rejectedBoundedClaimNote = typeof event.metadata?.rejectedBoundedClaimNote === 'string'
       ? event.metadata.rejectedBoundedClaimNote
@@ -203,6 +219,9 @@ export class ListDelayEventsQueryHandler {
       createdAt: event.createdAt.toISOString(),
       podDocumentName: podSourceDocumentId ? documentFilenameMap.get(podSourceDocumentId) ?? null : null,
       podUsageNote,
+      diaryDocumentName: diarySourceDocumentId ? documentFilenameMap.get(diarySourceDocumentId) ?? null : null,
+      diaryUsageNote,
+      diaryPageReference,
       rejectedBoundedClaimNote,
     };
   }

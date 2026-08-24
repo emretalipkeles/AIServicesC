@@ -1,4 +1,4 @@
-export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'pod' | 'other';
+export type ProjectDocumentType = 'idr' | 'ncr' | 'field_memo' | 'cpm_schedule' | 'contract_plan' | 'dsc_claim' | 'pod' | 'daily_report' | 'other';
 export type DocumentProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export interface ProjectDocumentProps {
@@ -15,6 +15,7 @@ export interface ProjectDocumentProps {
   errorMessage?: string | null;
   structuredExtractionStatus?: 'completed' | 'failed' | null;
   structuredExtractionError?: string | null;
+  structuredExtractionSummary?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +34,7 @@ export class ProjectDocument {
   readonly errorMessage: string | null;
   readonly structuredExtractionStatus: 'completed' | 'failed' | null;
   readonly structuredExtractionError: string | null;
+  readonly structuredExtractionSummary: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 
@@ -50,6 +52,7 @@ export class ProjectDocument {
     this.errorMessage = props.errorMessage ?? null;
     this.structuredExtractionStatus = props.structuredExtractionStatus ?? null;
     this.structuredExtractionError = props.structuredExtractionError ?? null;
+    this.structuredExtractionSummary = props.structuredExtractionSummary ?? null;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
     this.validate();
@@ -70,6 +73,14 @@ export class ProjectDocument {
 
   isSchedule(): boolean {
     return this.documentType === 'cpm_schedule';
+  }
+
+  /**
+   * Supporting/field-context documents (POD, Foreman Diaries) are never routed into
+   * delay-event extraction; they only ever enrich extraction from field reports.
+   */
+  isSupportingContext(): boolean {
+    return this.documentType === 'pod' || this.documentType === 'daily_report';
   }
 
   withProcessingStatus(status: DocumentProcessingStatus, errorMessage?: string): ProjectDocument {
@@ -107,12 +118,14 @@ export class ProjectDocument {
 
   withStructuredExtractionStatus(
     structuredExtractionStatus: 'completed' | 'failed',
-    structuredExtractionError?: string
+    structuredExtractionError?: string,
+    structuredExtractionSummary?: string
   ): ProjectDocument {
     return new ProjectDocument({
       ...this,
       structuredExtractionStatus,
       structuredExtractionError: structuredExtractionError ?? null,
+      structuredExtractionSummary: structuredExtractionSummary ?? null,
       updatedAt: new Date(),
     });
   }

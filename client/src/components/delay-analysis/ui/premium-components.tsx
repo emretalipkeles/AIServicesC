@@ -873,6 +873,12 @@ interface TruncatedTextWithTooltipProps {
   className?: string;
   label?: string;
   longTextThreshold?: number;
+  /**
+   * Overrides what the hover tooltip shows, when it needs more context than the compact
+   * truncated `text` alone (e.g. a usage note plus the document/page it refers to). Falls
+   * back to `text` so most callers are unaffected.
+   */
+  tooltipText?: string | null;
 }
 
 export function TruncatedTextWithTooltip({ 
@@ -880,13 +886,15 @@ export function TruncatedTextWithTooltip({
   maxWidth = "200px", 
   className,
   label,
-  longTextThreshold = 500
+  longTextThreshold = 500,
+  tooltipText,
 }: TruncatedTextWithTooltipProps) {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
   if (!text) return <span className="text-muted-foreground">-</span>;
 
-  const isLongText = text.length > longTextThreshold;
+  const fullText = tooltipText || text;
+  const isLongText = fullText.length > longTextThreshold;
 
   return (
     <>
@@ -917,7 +925,7 @@ export function TruncatedTextWithTooltip({
           )}
         >
           <div className="space-y-2">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{fullText}</p>
             {isLongText && (
               <button
                 onClick={() => setDrawerOpen(true)}
@@ -937,7 +945,7 @@ export function TruncatedTextWithTooltip({
         isOpen={drawerOpen} 
         onClose={() => setDrawerOpen(false)}
         title={label || "Full Text"}
-        content={<p className="whitespace-pre-wrap text-foreground">{text}</p>}
+        content={<p className="whitespace-pre-wrap text-foreground">{fullText}</p>}
       />
     </>
   );

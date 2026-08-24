@@ -22,6 +22,7 @@ const DOCUMENT_COLUMNS = {
   errorMessage: projectDocuments.errorMessage,
   structuredExtractionStatus: projectDocuments.structuredExtractionStatus,
   structuredExtractionError: projectDocuments.structuredExtractionError,
+  structuredExtractionSummary: projectDocuments.structuredExtractionSummary,
   createdAt: projectDocuments.createdAt,
   updatedAt: projectDocuments.updatedAt,
 };
@@ -40,6 +41,7 @@ type DocumentRow = {
   errorMessage: string | null;
   structuredExtractionStatus: string | null;
   structuredExtractionError: string | null;
+  structuredExtractionSummary: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 };
@@ -163,6 +165,7 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
       errorMessage: document.errorMessage,
       structuredExtractionStatus: document.structuredExtractionStatus,
       structuredExtractionError: document.structuredExtractionError,
+      structuredExtractionSummary: document.structuredExtractionSummary,
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
     });
@@ -186,6 +189,7 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
         errorMessage: doc.errorMessage,
         structuredExtractionStatus: doc.structuredExtractionStatus,
         structuredExtractionError: doc.structuredExtractionError,
+        structuredExtractionSummary: doc.structuredExtractionSummary,
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt,
       }))
@@ -209,6 +213,7 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
         errorMessage: document.errorMessage,
         structuredExtractionStatus: document.structuredExtractionStatus,
         structuredExtractionError: document.structuredExtractionError,
+        structuredExtractionSummary: document.structuredExtractionSummary,
         updatedAt: document.updatedAt,
         ...(isTerminal ? { fileData: null } : {}),
       })
@@ -353,6 +358,7 @@ export class DrizzleProjectDocumentRepository implements IProjectDocumentReposit
       errorMessage: row.errorMessage,
       structuredExtractionStatus: row.structuredExtractionStatus as 'completed' | 'failed' | null,
       structuredExtractionError: row.structuredExtractionError,
+      structuredExtractionSummary: row.structuredExtractionSummary,
       createdAt: row.createdAt ?? new Date(),
       updatedAt: row.updatedAt ?? new Date(),
     });

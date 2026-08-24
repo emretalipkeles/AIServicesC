@@ -7,8 +7,8 @@ export class PdfDocumentParser implements IDocumentParser {
   ];
 
   canParse(contentType: string, documentType?: string): boolean {
-    if (documentType === 'pod') {
-      // POD PDFs are handled by PdfPodDocumentParser, which reads text in visual order.
+    if (documentType === 'pod' || documentType === 'daily_report') {
+      // POD and Foreman Diary PDFs are handled by their own visual-order parsers.
       return false;
     }
     return this.supportedTypes.includes(contentType.toLowerCase());

@@ -13,6 +13,8 @@ export interface ProjectDocumentDto {
   hasContent: boolean;
   createdAt: string;
   updatedAt: string;
+  structuredExtractionStatus: string | null;
+  structuredExtractionSummary: string | null;
 }
 
 export class ListProjectDocumentsQueryHandler {
@@ -40,6 +42,8 @@ export class ListProjectDocumentsQueryHandler {
       hasContent: doc.rawContent !== null && doc.rawContent.length > 0,
       createdAt: doc.createdAt.toISOString(),
       updatedAt: doc.updatedAt.toISOString(),
+      structuredExtractionStatus: doc.structuredExtractionStatus ?? null,
+      structuredExtractionSummary: doc.structuredExtractionSummary ?? null,
     }));
   }
 }

@@ -118,6 +118,14 @@ import { PODExtractionStrategy } from "./delay-analysis/extraction-strategies/PO
 import type { IPodExtractionStrategy } from "../domain/delay-analysis/interfaces/IPodExtractionStrategy";
 import { ProcessPodDocumentCommandHandler } from "../application/delay-analysis/commands/handlers/ProcessPodDocumentCommandHandler";
 import { PodPostParseHandler } from "../application/delay-analysis/commands/handlers/PodPostParseHandler";
+import { DrizzleDiaryReportRepository } from "./database/repositories/delay-analysis/DrizzleDiaryReportRepository";
+import type { IDiaryReportRepository } from "../domain/delay-analysis/repositories/IDiaryReportRepository";
+import { DrizzleDiaryEvidenceRepository } from "./database/repositories/delay-analysis/DrizzleDiaryEvidenceRepository";
+import type { IDiaryEvidenceProvider } from "../domain/delay-analysis/interfaces/IDiaryEvidenceProvider";
+import { DiaryExtractionStrategy } from "./delay-analysis/extraction-strategies/DiaryExtractionStrategy";
+import type { IDiaryExtractionStrategy } from "../domain/delay-analysis/interfaces/IDiaryExtractionStrategy";
+import { ProcessDiaryDocumentCommandHandler } from "../application/delay-analysis/commands/handlers/ProcessDiaryDocumentCommandHandler";
+import { DiaryPostParseHandler } from "../application/delay-analysis/commands/handlers/DiaryPostParseHandler";
 import { PostParseDocumentHandlerFactory } from "./delay-analysis/PostParseDocumentHandlerFactory";
 import type { IPostParseDocumentHandlerFactory } from "../domain/delay-analysis/interfaces/IPostParseDocumentHandlerFactory";
 import { UploadDocumentsCommandHandler } from "../application/delay-analysis/commands/handlers/UploadDocumentsCommandHandler";
@@ -142,6 +150,7 @@ export interface AppContainer {
     contractorDelayEvent: IContractorDelayEventRepository;
     aiTokenUsage: IAITokenUsageRepository;
     podReport: IPodReportRepository;
+    diaryReport: IDiaryReportRepository;
   };
   
   services: {
@@ -158,6 +167,7 @@ export interface AppContainer {
     fieldMemoContextProvider: IFieldMemoContextProvider | null;
     postParseDocumentHandlerFactory: IPostParseDocumentHandlerFactory;
     podEvidenceProvider: IPodEvidenceProvider | null;
+    diaryEvidenceProvider: IDiaryEvidenceProvider | null;
   };
 
   documentUpload: {
@@ -303,6 +313,7 @@ export function createAppContainer(): AppContainer {
   const aiTokenUsageRepository = new DrizzleAITokenUsageRepository();
   const documentParserFactory = new DocumentParserFactory();
   const podReportRepository = new DrizzlePodReportRepository();
+  const diaryReportRepository = new DrizzleDiaryReportRepository();
 
   const getActivitiesByIdsHandler = new GetActivitiesByIdsQueryHandler(scheduleActivityRepository);
   const scheduleActivitiesTool = new GetScheduleActivitiesTool(getActivitiesByIdsHandler);
@@ -350,6 +361,12 @@ export function createAppContainer(): AppContainer {
   const podEvidenceProvider: IPodEvidenceProvider = new DrizzlePodEvidenceRepository();
   console.log('[Bootstrap] DrizzlePodEvidenceRepository initialized for POD-aware matching');
 
+  // Read-side Foreman Diary evidence repository, kept separate from the write-side
+  // diaryReportRepository per CQRS. Optional dependency: analysis degrades to today's
+  // behavior without it (diaries never feed the matcher, only the extraction prompt).
+  const diaryEvidenceProvider: IDiaryEvidenceProvider = new DrizzleDiaryEvidenceRepository();
+  console.log('[Bootstrap] DrizzleDiaryEvidenceRepository initialized for diary-aware extraction context');
+
   // POD structured extraction is wired through the same post-parse handler seam that the
   // upload flow resolves by document type. Without an AI client, POD uploads still save
   // their raw project_documents row; they simply get no structured rows (graceful degradation).
@@ -363,6 +380,18 @@ export function createAppContainer(): AppContainer {
     console.log('[Bootstrap] POD structured extraction handler registered');
   } else {
     console.warn('[Bootstrap] No AI client configured - POD uploads will save raw content only');
+  }
+
+  // Foreman Diary structured extraction: deterministic segmentation first (no AI client
+  // needed), AI fallback only when segmentation's confidence signal says the layout didn't
+  // match. Registered on the same post-parse seam as POD.
+  {
+    const diaryExtractionStrategy: IDiaryExtractionStrategy = new DiaryExtractionStrategy();
+    const processDiaryDocumentHandler = new ProcessDiaryDocumentCommandHandler(
+      diaryReportRepository, diaryExtractionStrategy, aiClient, projectDocumentRepository
+    );
+    postParseHandlers.push(new DiaryPostParseHandler(processDiaryDocumentHandler));
+    console.log('[Bootstrap] Foreman Diary structured extraction handler registered' + (aiClient ? '' : ' (AI fallback unavailable - deterministic segmentation only)'));
   }
   const postParseDocumentHandlerFactory: IPostParseDocumentHandlerFactory =
     new PostParseDocumentHandlerFactory(postParseHandlers);
@@ -463,6 +492,7 @@ export function createAppContainer(): AppContainer {
       contractorDelayEvent: contractorDelayEventRepository,
       aiTokenUsage: aiTokenUsageRepository,
       podReport: podReportRepository,
+      diaryReport: diaryReportRepository,
     },
     services: {
       isAIConfigured: bedrockClientProvider.isConfigured(),
@@ -478,6 +508,7 @@ export function createAppContainer(): AppContainer {
       fieldMemoContextProvider,
       postParseDocumentHandlerFactory,
       podEvidenceProvider,
+      diaryEvidenceProvider,
     },
     documentUpload: {
       uploadDocumentsHandler,
