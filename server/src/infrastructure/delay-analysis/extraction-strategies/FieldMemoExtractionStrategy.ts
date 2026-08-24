@@ -5,6 +5,7 @@ import type {
 } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
 import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
+import { renderDelayEventOutputFormatBlock } from '../../../domain/delay-analysis/DelayEventExtractionContract';
 
 export class FieldMemoExtractionStrategy implements IDocumentExtractionStrategy {
   readonly documentType: ProjectDocumentType = 'field_memo';
@@ -46,17 +47,15 @@ CRITICAL ANALYSIS REQUIREMENTS:
 - VERIFY RESPONSIBILITY: Ensure the delay is contractor-caused, not owner-directed or external. Apply the exclusions and decision framework from the knowledge base.
 - DURATION: Extract or estimate duration when possible
 
-For each delay event found, extract:
-- eventDescription: Clear description of the delay event
-- eventCategory: One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other
-- eventDate: The date of the event if mentioned (YYYY-MM-DD format)
-- impactDurationHours: Estimated hours of impact if determinable
-- sourceReference: The section/paragraph where this was found
-- extractedFromCode: "FIELD_MEMO" or any specific reference code found
-- confidenceScore: Your confidence this is a real contractor delay (0.0-1.0)
-- delayEventConfidence: Your confidence that this is truly a delay event vs. a routine observation (0.0-1.0). Use the knowledge base categories, exclusions, decision framework, and gray area guidance to assess.
+${renderDelayEventOutputFormatBlock({
+  impactDurationHours: 'number (estimate based on scope when not explicitly stated)',
+  durationBasis: "estimated when inferred from scope; document_stated when explicitly written; never bounded_by_next_entry — Field Memos are directives, not timestamped narratives",
+  fallbackEstimateHours: 'omit/null — Field Memos never use bounded_by_next_entry',
+  sourceReference: '"the section/paragraph where this was found"',
+  extractedFromCode: '"FIELD_MEMO" or any specific reference code found',
+})}
 
-Return a JSON array of extracted events. If no delays are found, return an empty array.
+If no delays are found, return an empty delayEvents array.
 
 Document content:
 ${truncatedContent}`;

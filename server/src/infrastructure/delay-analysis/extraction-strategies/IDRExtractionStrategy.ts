@@ -5,6 +5,7 @@ import type {
 } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
 import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
+import { renderDelayEventOutputFormatBlock } from '../../../domain/delay-analysis/DelayEventExtractionContract';
 
 export class IDRExtractionStrategy implements IDocumentExtractionStrategy {
   readonly documentType: ProjectDocumentType = 'idr';
@@ -197,32 +198,17 @@ RESPONSE FORMAT
 
 Return a JSON object with TWO arrays:
 
-{
-  "workActivities": [
-    {
-      "activityId": "2-W-0471",
-      "description": "Stage 1 WM: Excavate Services",
-      "comments": "WM STA 7+00 to 21+50"
-    }
-  ],
-  "delayEvents": [
-    {
-      "eventDescription": "Clear description of the delay event",
-      "eventCategory": "One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other",
-      "eventDate": "YYYY-MM-DD",
-      "impactDurationHours": 2.0 (REQUIRED - always provide a number, never null),
-      "impactedWindowStart": "HH:MM clock time the impact began, ONLY when the narrative gives a real time" or null,
-      "impactedWindowEnd": "HH:MM clock time the impact ended, ONLY when the narrative gives a real time" or null,
-      "durationBasis": "one of: timestamp_derived (start/resume times for THIS SAME event), document_stated (explicit duration written), bounded_by_next_entry (event's start time bounded by the NEXT, different narrative entry's timestamp), estimated (inferred with no times/explicit duration)",
-      "fallbackEstimateHours": "REQUIRED whenever durationBasis is 'bounded_by_next_entry', otherwise omit/null. Your independent estimate of the delay's real length, ignoring the next-entry window entirely, for the server to use if it rejects that window as implausible.",
-      "sourceReference": "MUST include DSC/NCR number if mentioned (e.g., 'DSC 293: Page 2'). Format: 'DSC XXX' + location",
-      "extractedFromCode": "CODE_CIE or IDR_OBSERVATION",
-      "confidenceScore": 0.85,
-      "delayEventConfidence": 0.85,
-      "responsibilityConfirmed": true
-    }
-  ]
-}
+${renderDelayEventOutputFormatBlock({
+  impactDurationHours: '2.0 (REQUIRED - always provide a number, never null)',
+  impactedWindowStart: '"HH:MM clock time the impact began, ONLY when the narrative gives a real time" or null',
+  impactedWindowEnd: '"HH:MM clock time the impact ended, ONLY when the narrative gives a real time" or null',
+  durationBasis: "one of: timestamp_derived (start/resume times for THIS SAME event), document_stated (explicit duration written), bounded_by_next_entry (event's start time bounded by the NEXT, different narrative entry's timestamp), estimated (inferred with no times/explicit duration)",
+  fallbackEstimateHours: "REQUIRED whenever durationBasis is 'bounded_by_next_entry', otherwise omit/null. Your independent estimate of the delay's real length, ignoring the next-entry window entirely, for the server to use if it rejects that window as implausible.",
+  sourceReference: `"MUST include DSC/NCR number if mentioned (e.g., 'DSC 293: Page 2'). Format: 'DSC XXX' + location"`,
+  extractedFromCode: '"CODE_CIE or IDR_OBSERVATION"',
+}, {
+  workActivitiesExample: '[\n    {"activityId": "2-W-0471", "description": "Stage 1 WM: Excavate Services", "comments": "WM STA 7+00 to 21+50"}\n  ]',
+})}
 
 CRITICAL RULE — WHEN TO RETURN ZERO DELAY EVENTS:
 

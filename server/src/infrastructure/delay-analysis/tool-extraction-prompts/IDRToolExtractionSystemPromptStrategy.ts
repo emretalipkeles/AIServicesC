@@ -1,6 +1,7 @@
 import type { IToolExtractionSystemPromptStrategy } from '../../../domain/delay-analysis/interfaces/IToolExtractionSystemPromptStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
 import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
+import { renderDelayEventOutputFormatBlock } from '../../../domain/delay-analysis/DelayEventExtractionContract';
 
 export class IDRToolExtractionSystemPromptStrategy implements IToolExtractionSystemPromptStrategy {
   readonly documentType: ProjectDocumentType = 'idr';
@@ -89,35 +90,17 @@ Activity IDs can appear in many formats. Do NOT restrict to any single pattern. 
 - Also: "Activity 1234", "Activity ID: XXX", "WBS XX.XX.XX"
 - Call the tool with ALL detected IDs at once for efficiency
 
-## OUTPUT FORMAT:
-Return a JSON object with the structure:
-{
-  "delayEvents": [
-    {
-      "eventDescription": "Clear description of what caused the delay",
-      "eventCategory": "one of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other",
-      "eventDate": "YYYY-MM-DD",
-      "impactDurationHours": number (REQUIRED - always estimate hours even if not explicit),
-      "impactedWindowStart": "HH:MM clock time the impact began, ONLY when the narrative states or implies a specific start time" or null,
-      "impactedWindowEnd": "HH:MM clock time the impact ended, ONLY when the narrative states or implies a specific end time" or null,
-      "durationBasis": "one of: timestamp_derived (start/resume times stated for THIS SAME event), document_stated (an explicit duration like '1.5 hours' was written), bounded_by_next_entry (event starts at a stated clock time and the NEXT narrative entry — a different event/observation — closes the window), estimated (no times or explicit duration, you inferred a reasonable figure)",
-      "fallbackEstimateHours": "REQUIRED whenever durationBasis is 'bounded_by_next_entry', otherwise omit/null. Your independent best-guess duration for this delay based on its nature (as if you had no next-entry timestamp to bound against at all) — e.g. a rejected concrete truck typically costs 0.5-1h waiting for redispatch, not the full gap to an unrelated later entry. This is used only if your bounded claim turns out not to be credible; never just repeat the bounded window's own span here.",
-      "sourceReference": "Include DSC/NCR/RFI number if mentioned (e.g., 'DSC 293', 'NCR-045') AND page/section reference",
-      "extractedFromCode": "code tag if applicable",
-      "confidenceScore": 0.0-1.0,
-      "delayEventConfidence": 0.0-1.0,
-      "responsibilityConfirmed": true/false,
-      "matchedActivityId": "activity ID if matched" or null,
-      "matchedActivityDescription": "description of matched activity from tool results" or null,
-      "matchedActivityWbs": "WBS code of matched activity" or null,
-      "matchConfidence": 0.0-1.0 if matched or null,
-      "matchReasoning": "brief explanation of why this activity matches" or null
-    }
-  ],
-  "workActivities": [
-    {"activityId": "XXX", "description": "...", "comments": "..."}
-  ]
-}
+${renderDelayEventOutputFormatBlock({
+  impactDurationHours: 'number (REQUIRED - always estimate hours even if not explicit)',
+  impactedWindowStart: '"HH:MM clock time the impact began, ONLY when the narrative states or implies a specific start time" or null',
+  impactedWindowEnd: '"HH:MM clock time the impact ended, ONLY when the narrative states or implies a specific end time" or null',
+  durationBasis: "one of: timestamp_derived (start/resume times stated for THIS SAME event), document_stated (an explicit duration like '1.5 hours' was written), bounded_by_next_entry (event starts at a stated clock time and the NEXT narrative entry — a different event/observation — closes the window), estimated (no times or explicit duration, you inferred a reasonable figure)",
+  fallbackEstimateHours: "REQUIRED whenever durationBasis is 'bounded_by_next_entry', otherwise omit/null. Your independent best-guess duration for this delay based on its nature (as if you had no next-entry timestamp to bound against at all) — e.g. a rejected concrete truck typically costs 0.5-1h waiting for redispatch, not the full gap to an unrelated later entry. This is used only if your bounded claim turns out not to be credible; never just repeat the bounded window's own span here.",
+  sourceReference: `"Include DSC/NCR/RFI number if mentioned (e.g., 'DSC 293', 'NCR-045') AND page/section reference"`,
+  extractedFromCode: '"code tag if applicable"',
+}, {
+  workActivitiesExample: '[\n    {"activityId": "XXX", "description": "...", "comments": "..."}\n  ]',
+})}
 
 ## MATCHING RULES — STRICT IDR-FIRST ENFORCEMENT:
 (These rules govern which activity an event is attached to. They NEVER govern whether an event exists —

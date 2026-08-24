@@ -1,6 +1,7 @@
 import type { IToolExtractionSystemPromptStrategy } from '../../../domain/delay-analysis/interfaces/IToolExtractionSystemPromptStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
 import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
+import { renderDelayEventOutputFormatBlock } from '../../../domain/delay-analysis/DelayEventExtractionContract';
 
 export class FieldMemoToolExtractionSystemPromptStrategy implements IToolExtractionSystemPromptStrategy {
   readonly documentType: ProjectDocumentType = 'field_memo';
@@ -51,32 +52,16 @@ Each "Issue" section in a Field Memo typically contains:
 - **planning_mobilization**: Staging area setup failures, site preparation deficiencies
 - **other**: Environmental compliance (stormwater, erosion control, hazardous materials), regulatory violations
 
-## OUTPUT FORMAT:
-Return a JSON object with the structure:
-{
-  "delayEvents": [
-    {
-      "eventDescription": "Clear description: what the issue is AND what corrective action is required",
-      "eventCategory": "one of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other",
-      "eventDate": "YYYY-MM-DD (use the Field Memo date)",
-      "impactDurationHours": number (estimate based on scope of corrective action),
-      "impactedWindowStart": null (Field Memos are directives, not timestamped narratives — leave null),
-      "impactedWindowEnd": null (leave null for the same reason),
-      "durationBasis": "estimated (Field Memo durations are always estimated by scope, never timestamp-derived or document-stated)",
-      "sourceReference": "Field Memo #XXX, Issue: [brief issue title]",
-      "extractedFromCode": "FM_XXX (the memo number)",
-      "confidenceScore": 0.0-1.0,
-      "delayEventConfidence": 0.0-1.0,
-      "responsibilityConfirmed": true/false,
-      "matchedActivityId": "activity ID if matched via tool" or null,
-      "matchedActivityDescription": "description of matched activity" or null,
-      "matchedActivityWbs": "WBS code of matched activity" or null,
-      "matchConfidence": 0.0-1.0 if matched or null,
-      "matchReasoning": "why this activity matches the corrective action" or null
-    }
-  ],
-  "workActivities": []
-}
+${renderDelayEventOutputFormatBlock({
+  eventDate: '"YYYY-MM-DD (use the Field Memo date)"',
+  impactDurationHours: 'number (estimate based on scope of corrective action)',
+  impactedWindowStart: 'null (Field Memos are directives, not timestamped narratives — leave null)',
+  impactedWindowEnd: 'null (leave null for the same reason)',
+  durationBasis: "estimated (Field Memo durations are always estimated by scope, never timestamp-derived, document-stated, or bounded_by_next_entry)",
+  fallbackEstimateHours: 'omit/null — Field Memos never use bounded_by_next_entry',
+  sourceReference: '"Field Memo #XXX, Issue: [brief issue title]"',
+  extractedFromCode: '"FM_XXX (the memo number)"',
+})}
 
 ## MATCHING RULES FOR FIELD MEMOS:
 - Field Memos rarely contain activity IDs — if you find any, use the get_schedule_activities tool to look them up

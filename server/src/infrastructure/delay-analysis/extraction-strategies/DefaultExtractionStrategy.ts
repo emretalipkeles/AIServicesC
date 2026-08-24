@@ -5,6 +5,7 @@ import type {
 } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
 import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
+import { renderDelayEventOutputFormatBlock } from '../../../domain/delay-analysis/DelayEventExtractionContract';
 
 export class DefaultExtractionStrategy implements IDocumentExtractionStrategy {
   readonly documentType: ProjectDocumentType = 'other';
@@ -30,17 +31,9 @@ EXTRACTION INSTRUCTIONS
 
 Using the knowledge base, analyze the document and extract delay events.
 
-For each delay event found, extract:
-- eventDescription: Clear description of the delay event
-- eventCategory: One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other
-- eventDate: The date of the event if mentioned (YYYY-MM-DD format)
-- impactDurationHours: Estimated hours of impact if mentioned
-- sourceReference: Include DSC/NCR/RFI number if mentioned (e.g., 'DSC 293') AND page/section reference
-- extractedFromCode: Any delay code if present, otherwise "GENERAL"
-- confidenceScore: Your confidence this is a real contractor delay (0.0-1.0)
-- delayEventConfidence: Your confidence that this is truly a delay event vs. a routine observation (0.0-1.0). Use the knowledge base categories, exclusions, and decision framework to assess.
+${renderDelayEventOutputFormatBlock()}
 
-Return a JSON array of extracted events. If no delays are found, return an empty array.
+If no delays are found, return an empty delayEvents array.
 
 Document content:
 ${truncatedContent}`;

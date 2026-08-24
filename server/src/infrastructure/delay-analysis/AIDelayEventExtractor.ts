@@ -8,16 +8,12 @@ import { ModelId } from '../../domain/value-objects/ModelId';
 import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
 import { auditNarrativeProvenance } from './NarrativeProvenanceCheck';
 import { normalizeClockTime, normalizeDurationBasis } from '../../domain/delay-analysis/DurationProvenance';
-import { AIResponseTruncatedError } from '../../domain/errors/DomainError';
-
-interface IDRExtractionResponse {
-  workActivities?: Array<{
-    activityId?: string;
-    description?: string;
-    comments?: string;
-  }>;
-  delayEvents?: Array<Record<string, unknown>>;
-}
+import { AIResponseTruncatedError, AIResponseSchemaViolationError } from '../../domain/errors/DomainError';
+import {
+  delayExtractionResponseSchema,
+  normalizeDelayExtractionResponse,
+  type RawExtractedDelayEvent,
+} from '../../domain/delay-analysis/DelayEventExtractionContract';
 
 export class AIDelayEventExtractor implements IDelayEventExtractor {
   private readonly strategyFactory: IDocumentExtractionStrategyFactory;
@@ -80,7 +76,7 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
         response.content, 
         strategyResult.baseConfidence, 
         documentType,
-        strategyResult.extractWorkActivities ?? false
+        documentFilename
       );
 
       if (parseResult.workActivities && parseResult.workActivities.length > 0) {
@@ -105,10 +101,11 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
         workActivities: parseResult.workActivities,
       };
     } catch (error) {
-      if (error instanceof AIResponseTruncatedError) {
-        // Don't let a truncated response degrade into an empty event list that looks
-        // identical to a genuine "no delays found" result — surface it as a failure.
-        console.error('[AIDelayEventExtractor] AI response truncated:', error.message);
+      if (error instanceof AIResponseTruncatedError || error instanceof AIResponseSchemaViolationError) {
+        // Don't let a truncated or contract-violating response degrade into an empty event
+        // list that looks identical to a genuine "no delays found" result — surface it as
+        // a failure.
+        console.error(`[AIDelayEventExtractor] ${error.constructor.name}:`, error.message);
         throw error;
       }
       console.error('Error extracting delay events:', error);
@@ -123,124 +120,97 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
     }
   }
 
+  /**
+   * Parses and validates the model's response against the shared delay-event extraction
+   * contract (DelayEventExtractionContract.ts) — the same contract AIDelayEventExtractorWithTools
+   * enforces. This extractor is not wired into bootstrap.ts (AIDelayEventExtractorWithTools is
+   * the production path) and so cannot set response_format, but its parser still validates
+   * against the same schema and fails loudly on a violation rather than silently degrading.
+   */
   private parseExtractionResponse(
-    response: string, 
-    baseConfidence: number, 
+    response: string,
+    baseConfidence: number,
     documentType: string,
-    expectWorkActivities: boolean = false
+    documentFilename: string
   ): { events: ExtractedDelayEvent[]; workActivities?: IDRWorkActivity[] } {
-    try {
-      let eventsArray: Array<Record<string, unknown>> = [];
-      let workActivities: IDRWorkActivity[] | undefined;
+    const context = `AIDelayEventExtractor.parseExtractionResponse (${documentFilename})`;
+    const jsonBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const cleanedResponse = (jsonBlockMatch ? jsonBlockMatch[1] : response).trim();
 
-      if (expectWorkActivities) {
-        const jsonBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
-        const cleanedResponse = jsonBlockMatch ? jsonBlockMatch[1].trim() : response;
-        
-        const objectStartIndex = cleanedResponse.indexOf('{');
-        if (objectStartIndex !== -1) {
-          let braceCount = 0;
-          let objectEndIndex = objectStartIndex;
-          
-          for (let i = objectStartIndex; i < cleanedResponse.length; i++) {
-            if (cleanedResponse[i] === '{') braceCount++;
-            if (cleanedResponse[i] === '}') braceCount--;
-            if (braceCount === 0) {
-              objectEndIndex = i + 1;
-              break;
-            }
-          }
-          
-          const objectStr = cleanedResponse.substring(objectStartIndex, objectEndIndex);
-          
-          try {
-            const parsed = JSON.parse(objectStr) as IDRExtractionResponse;
-            
-            if (parsed.workActivities && Array.isArray(parsed.workActivities)) {
-              workActivities = parsed.workActivities
-                .filter(wa => wa.activityId && wa.activityId.trim().length > 0)
-                .map(wa => ({
-                  activityId: String(wa.activityId || '').trim(),
-                  description: String(wa.description || '').trim(),
-                  comments: wa.comments ? String(wa.comments).trim() : undefined,
-                }));
-            }
-            if (parsed.delayEvents && Array.isArray(parsed.delayEvents)) {
-              eventsArray = parsed.delayEvents;
-            }
-          } catch (parseError) {
-            console.warn('[AIDelayEventExtractor] Failed to parse IDR object format, falling back to array:', parseError);
-            const arrayMatch = response.match(/\[[\s\S]*\]/);
-            if (arrayMatch) {
-              const parsed = JSON.parse(arrayMatch[0]);
-              if (Array.isArray(parsed)) {
-                eventsArray = parsed;
-              }
-            }
-          }
-        } else {
-          const arrayMatch = response.match(/\[[\s\S]*\]/);
-          if (arrayMatch) {
-            const parsed = JSON.parse(arrayMatch[0]);
-            if (Array.isArray(parsed)) {
-              eventsArray = parsed;
-            }
-          }
-        }
+    if (cleanedResponse.length === 0) {
+      throw new AIResponseSchemaViolationError(context, 'response was empty');
+    }
+
+    let rawParsed: unknown;
+    try {
+      rawParsed = JSON.parse(cleanedResponse);
+    } catch (error) {
+      throw new AIResponseSchemaViolationError(
+        context,
+        `response was not valid JSON (${error instanceof Error ? error.message : 'unknown parse error'})`
+      );
+    }
+
+    const validation = delayExtractionResponseSchema.safeParse(rawParsed);
+    if (!validation.success) {
+      throw new AIResponseSchemaViolationError(context, validation.error.message);
+    }
+
+    const { rawEvents, rawWorkActivities } = normalizeDelayExtractionResponse(validation.data);
+
+    const workActivities: IDRWorkActivity[] | undefined = rawWorkActivities.length > 0
+      ? rawWorkActivities
+          .filter((wa) => wa.activityId && wa.activityId.trim().length > 0)
+          .map((wa) => ({
+            activityId: String(wa.activityId || '').trim(),
+            description: String(wa.description || '').trim(),
+            comments: wa.comments ? String(wa.comments).trim() : undefined,
+          }))
+      : undefined;
+
+    const events = rawEvents.map((item: RawExtractedDelayEvent) => {
+      let impactDurationHours: number | null = null;
+
+      if (documentType === 'ncr') {
+        impactDurationHours = null;
       } else {
-        const jsonMatch = response.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          if (Array.isArray(parsed)) {
-            eventsArray = parsed;
-          }
-        }
+        impactDurationHours = typeof item.impactDurationHours === 'number'
+          ? item.impactDurationHours
+          : this.parseNumber(item.impactDurationHours);
       }
 
-      const events = eventsArray.map((item: Record<string, unknown>) => {
-        let impactDurationHours: number | null = null;
-        
-        if (documentType === 'ncr') {
-          impactDurationHours = null;
-        } else {
-          impactDurationHours = typeof item.impactDurationHours === 'number' 
-            ? item.impactDurationHours 
-            : this.parseNumber(item.impactDurationHours);
+      return {
+        eventDescription: String(item.eventDescription || item.description || ''),
+        eventCategory: this.parseCategory(item.eventCategory || item.category),
+        eventDate: this.parseDate(item.eventDate || item.date),
+        impactDurationHours,
+        impactedWindowStart: normalizeClockTime(item.impactedWindowStart),
+        impactedWindowEnd: normalizeClockTime(item.impactedWindowEnd),
+        durationBasis: normalizeDurationBasis(item.durationBasis),
+        fallbackEstimateHours: typeof item.fallbackEstimateHours === 'number'
+          ? item.fallbackEstimateHours
+          : this.parseNumber(item.fallbackEstimateHours),
+        sourceReference: String(item.sourceReference || item.source || ''),
+        extractedFromCode: String(item.extractedFromCode || item.code || 'GENERAL'),
+        confidenceScore: this.parseConfidenceScore(item.confidenceScore, baseConfidence),
+        delayEventConfidence: this.parseConfidenceScore(item.delayEventConfidence, baseConfidence),
+        responsibilityConfirmed: typeof item.responsibilityConfirmed === 'boolean'
+          ? item.responsibilityConfirmed
+          : undefined,
+        reworkDescription: item.reworkDescription
+          ? String(item.reworkDescription)
+          : undefined,
+      };
+    }).filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0)
+      .filter((e: ExtractedDelayEvent) => {
+        if (e.delayEventConfidence !== null && e.delayEventConfidence !== undefined && e.delayEventConfidence < 0.10) {
+          console.log(`[AIDelayEventExtractor] Dropping low-confidence event (${e.delayEventConfidence}): ${e.eventDescription.substring(0, 80)}`);
+          return false;
         }
+        return true;
+      });
 
-        return {
-          eventDescription: String(item.eventDescription || item.description || ''),
-          eventCategory: this.parseCategory(item.eventCategory || item.category),
-          eventDate: this.parseDate(item.eventDate || item.date),
-          impactDurationHours,
-          impactedWindowStart: normalizeClockTime(item.impactedWindowStart),
-          impactedWindowEnd: normalizeClockTime(item.impactedWindowEnd),
-          durationBasis: normalizeDurationBasis(item.durationBasis),
-          sourceReference: String(item.sourceReference || item.source || ''),
-          extractedFromCode: String(item.extractedFromCode || item.code || 'GENERAL'),
-          confidenceScore: this.parseConfidenceScore(item.confidenceScore, baseConfidence),
-          delayEventConfidence: this.parseConfidenceScore(item.delayEventConfidence, baseConfidence),
-          responsibilityConfirmed: typeof item.responsibilityConfirmed === 'boolean' 
-            ? item.responsibilityConfirmed 
-            : undefined,
-          reworkDescription: item.reworkDescription 
-            ? String(item.reworkDescription) 
-            : undefined,
-        };
-      }).filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0)
-        .filter((e: ExtractedDelayEvent) => {
-          if (e.delayEventConfidence !== null && e.delayEventConfidence !== undefined && e.delayEventConfidence < 0.10) {
-            console.log(`[AIDelayEventExtractor] Dropping low-confidence event (${e.delayEventConfidence}): ${e.eventDescription.substring(0, 80)}`);
-            return false;
-          }
-          return true;
-        });
-
-      return { events, workActivities };
-    } catch (error) {
-      console.error('Error parsing extraction response:', error);
-      return { events: [] };
-    }
+    return { events, workActivities };
   }
 
   private parseConfidenceScore(value: unknown, baseConfidence: number): number {

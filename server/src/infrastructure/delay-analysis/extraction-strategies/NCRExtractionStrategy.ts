@@ -5,6 +5,7 @@ import type {
 } from '../../../domain/delay-analysis/interfaces/IDocumentExtractionStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
 import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
+import { renderDelayEventOutputFormatBlock } from '../../../domain/delay-analysis/DelayEventExtractionContract';
 
 export class NCRExtractionStrategy implements IDocumentExtractionStrategy {
   readonly documentType: ProjectDocumentType = 'ncr';
@@ -56,18 +57,19 @@ CRITICAL ANALYSIS REQUIREMENTS:
   * Third-party damage
   (Per the exclusions in the knowledge base above)
 
-For each delay event found, extract:
-- eventDescription: Clear description including what failed and corrective action
-- eventCategory: One of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other (most NCRs should be quality_rework)
-- eventDate: The date of the NCR or incident (YYYY-MM-DD format)
-- impactDurationHours: Only include if explicitly stated in the NCR document. Leave null/empty if not mentioned. DO NOT estimate.
-- sourceReference: MUST include NCR/DSC number (e.g., 'NCR-045', 'DSC 293') AND section reference
-- extractedFromCode: The NCR number (e.g., "NCR-045")
-- confidenceScore: Your confidence this causes delay (typically 0.85-1.0 for NCRs)
-- delayEventConfidence: Your confidence that this is truly a delay event (0.0-1.0). For NCRs, this should typically be 0.85-1.0 since NCRs document definite quality failures requiring corrective action.
-- reworkDescription: Specific corrective action required
+${renderDelayEventOutputFormatBlock({
+  eventDate: '"YYYY-MM-DD (the NCR or incident date)"',
+  impactDurationHours: 'null (only include if explicitly stated in the NCR document — DO NOT estimate)',
+  durationBasis: "document_stated if a duration was explicitly written, otherwise null — NEVER 'estimated' or 'bounded_by_next_entry' for NCRs",
+  fallbackEstimateHours: 'omit/null — NCRs never use bounded_by_next_entry',
+  sourceReference: '"MUST include NCR/DSC number (e.g., \'NCR-045\', \'DSC 293\') AND section reference"',
+  extractedFromCode: '"the NCR number (e.g., \'NCR-045\')"',
+  confidenceScore: '0.85-1.0 (NCRs are high confidence)',
+  delayEventConfidence: '0.85-1.0 (NCRs document definite quality failures requiring corrective action)',
+  reworkDescription: '"specific corrective action required"',
+})}
 
-Return a JSON array of extracted events. If no delays are found (rare for NCRs), return an empty array.
+If no delays are found (rare for NCRs), return an empty delayEvents array.
 
 Document content:
 ${truncatedContent}`;

@@ -1,6 +1,7 @@
 import type { IToolExtractionSystemPromptStrategy } from '../../../domain/delay-analysis/interfaces/IToolExtractionSystemPromptStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
 import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
+import { renderDelayEventOutputFormatBlock } from '../../../domain/delay-analysis/DelayEventExtractionContract';
 
 export class DefaultToolExtractionSystemPromptStrategy implements IToolExtractionSystemPromptStrategy {
   readonly documentType: ProjectDocumentType = 'other';
@@ -23,32 +24,7 @@ ${knowledgeBaseContent}
 4. **Match events to activities** — Match each delay event to the most relevant schedule activity
 5. **Output the final JSON**
 
-## OUTPUT FORMAT:
-Return a JSON object with the structure:
-{
-  "delayEvents": [
-    {
-      "eventDescription": "Clear description of what caused the delay",
-      "eventCategory": "one of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other",
-      "eventDate": "YYYY-MM-DD",
-      "impactDurationHours": number or null,
-      "impactedWindowStart": "HH:MM clock time the impact began, ONLY when the document gives a real time" or null,
-      "impactedWindowEnd": "HH:MM clock time the impact ended, ONLY when the document gives a real time" or null,
-      "durationBasis": "one of: timestamp_derived, document_stated, estimated" or null,
-      "sourceReference": "section/paragraph reference",
-      "extractedFromCode": "reference code if applicable",
-      "confidenceScore": 0.0-1.0,
-      "delayEventConfidence": 0.0-1.0,
-      "responsibilityConfirmed": true/false,
-      "matchedActivityId": "activity ID if matched" or null,
-      "matchedActivityDescription": "description of matched activity" or null,
-      "matchedActivityWbs": "WBS code of matched activity" or null,
-      "matchConfidence": 0.0-1.0 if matched or null,
-      "matchReasoning": "why this activity matches" or null
-    }
-  ],
-  "workActivities": []
-}`;
+${renderDelayEventOutputFormatBlock()}`;
   }
 
   buildUserPromptSuffix(): string {

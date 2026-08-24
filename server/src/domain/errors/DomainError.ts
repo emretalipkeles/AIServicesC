@@ -50,3 +50,17 @@ export class AIResponseTruncatedError extends DomainError {
     super(`${context}: AI response was truncated (finish_reason=length) at max_completion_tokens=${maxTokens}. Increase the token budget or reduce input size.`);
   }
 }
+
+/**
+ * Raised when an AI extraction response cannot be parsed as JSON at all, or parses but
+ * fails the delay-event extraction contract (see DelayEventExtractionContract.ts) — e.g. an
+ * enum value outside the known set, or a 'bounded_by_next_entry' claim missing the required
+ * fallbackEstimateHours. Callers must surface this as a per-document failure instead of
+ * silently degrading to an empty/partial event list, which would look identical to a
+ * genuine "no delays found" result.
+ */
+export class AIResponseSchemaViolationError extends DomainError {
+  constructor(context: string, details: string) {
+    super(`${context}: AI response violated the delay-event extraction contract: ${details}`);
+  }
+}

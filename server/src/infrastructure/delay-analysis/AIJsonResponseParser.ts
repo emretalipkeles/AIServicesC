@@ -3,13 +3,15 @@
  *
  * Model responses often wrap JSON in a markdown code fence and/or include leading or
  * trailing prose. This strips an optional ```json fence and then extracts the first
- * balanced-brace object, mirroring the parsing approach already used by
- * AIDelayEventExtractor.parseExtractionResponse for its object-shaped (IDR) responses.
+ * balanced-brace object. Used by the POD/Diary extraction handlers.
  *
- * NOTE: AIDelayEventExtractor is not refactored to use this helper — its parsing is
- * interleaved with delay-event-specific fallback logic (array-shaped responses, work
- * activity extraction) closely enough that adopting this helper there risked a behavior
- * change. The small duplication is intentional; see extraction pipeline notes.
+ * NOTE: the delay-event extractors (AIDelayEventExtractorWithTools and the legacy
+ * AIDelayEventExtractor) do not use this helper. Their response_format/schema already
+ * constrains the model to a single JSON object or a bare array, so they only strip a
+ * markdown fence and hand the result straight to JSON.parse plus the shared Zod schema in
+ * DelayEventExtractionContract.ts — a JSON.parse failure or a schema violation is a thrown
+ * AIResponseSchemaViolationError, not brace-scanned recovery. See that module for the
+ * single source of truth both extractors and every extraction prompt now share.
  */
 export function extractJsonObjectFromResponse(response: string): Record<string, unknown> | null {
   const jsonBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);

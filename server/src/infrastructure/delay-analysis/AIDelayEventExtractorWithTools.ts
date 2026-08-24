@@ -13,7 +13,13 @@ import { DocumentExtractionStrategyFactory } from './extraction-strategies/Docum
 import { auditNarrativeProvenance } from './NarrativeProvenanceCheck';
 import { normalizeClockTime, normalizeDurationBasis } from '../../domain/delay-analysis/DurationProvenance';
 import { OPENAI_MODELS } from '../../domain/value-objects/ModelId';
-import { AIResponseTruncatedError } from '../../domain/errors/DomainError';
+import { AIResponseTruncatedError, AIResponseSchemaViolationError } from '../../domain/errors/DomainError';
+import {
+  buildDelayExtractionJsonSchema,
+  delayExtractionResponseSchema,
+  normalizeDelayExtractionResponse,
+  type RawExtractedDelayEvent,
+} from '../../domain/delay-analysis/DelayEventExtractionContract';
 import type OpenAI from 'openai';
 import type { AzureOpenAI } from 'openai';
 
@@ -26,33 +32,6 @@ function getToolExtractionModel(): string {
 export interface ExtractionWithToolsOptions extends ExtractionOptions {
   tenantId: string;
   projectId: string;
-}
-
-interface ExtractedEventRaw {
-  eventDescription?: string;
-  description?: string;
-  eventCategory?: string;
-  category?: string;
-  eventDate?: string;
-  date?: string;
-  impactDurationHours?: number;
-  impactedWindowStart?: string;
-  impactedWindowEnd?: string;
-  durationBasis?: string;
-  fallbackEstimateHours?: number;
-  sourceReference?: string;
-  source?: string;
-  extractedFromCode?: string;
-  code?: string;
-  confidenceScore?: number;
-  responsibilityConfirmed?: boolean;
-  reworkDescription?: string;
-  matchedActivityId?: string;
-  matchedActivityDescription?: string;
-  matchedActivityWbs?: string;
-  matchConfidence?: number;
-  matchReasoning?: string;
-  delayEventConfidence?: number;
 }
 
 export class AIDelayEventExtractorWithTools implements IDelayEventExtractor {
@@ -199,6 +178,14 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
           tools,
           max_completion_tokens: MAX_COMPLETION_TOKENS,
           temperature: 0,
+          response_format: {
+            type: 'json_schema',
+            json_schema: {
+              name: 'delay_event_extraction',
+              strict: true,
+              schema: buildDelayExtractionJsonSchema(),
+            },
+          },
         });
 
         const choice = response.choices[0];
@@ -299,7 +286,8 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
       const parseResult = this.parseExtractionResponse(
         finalContent,
         strategyResult.baseConfidence,
-        documentType
+        documentType,
+        documentFilename
       );
 
       console.log('');
@@ -335,11 +323,11 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
         workActivities: parseResult.workActivities,
       };
     } catch (error) {
-      if (error instanceof AIResponseTruncatedError) {
-        // Never let a truncated response degrade into an empty/short event list that
-        // looks identical to a genuine "no delays found" result — surface it as a
-        // failure so the caller records it as a per-document extraction error.
-        console.error('[AIDelayEventExtractorWithTools] AI response truncated:', error.message);
+      if (error instanceof AIResponseTruncatedError || error instanceof AIResponseSchemaViolationError) {
+        // Never let a truncated or contract-violating response degrade into an empty/short
+        // event list that looks identical to a genuine "no delays found" result — surface
+        // it as a failure so the caller records it as a per-document extraction error.
+        console.error(`[AIDelayEventExtractorWithTools] ${error.constructor.name}:`, error.message);
         throw error;
       }
       console.error('[AIDelayEventExtractorWithTools] Error extracting delay events:', error);
@@ -354,86 +342,72 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
     }
   }
 
+  /**
+   * Parses and validates the model's response against the shared delay-event extraction
+   * contract (DelayEventExtractionContract.ts). response_format already constrains the
+   * shape the API accepts, so the only recovery step retained here is stripping a markdown
+   * fence some models still wrap plain JSON in — there is no more brace/bracket scanning.
+   * A response that isn't valid JSON, or is valid JSON that fails the schema (unknown enum
+   * value, or a 'bounded_by_next_entry' claim missing fallbackEstimateHours), throws
+   * AIResponseSchemaViolationError instead of silently returning an empty event list.
+   */
   private parseExtractionResponse(
     response: string,
     baseConfidence: number,
-    documentType: string
+    documentType: string,
+    documentFilename: string
   ): { events: ExtractedDelayEvent[]; workActivities?: IDRWorkActivity[] } {
+    const context = `AIDelayEventExtractorWithTools.parseExtractionResponse (${documentFilename})`;
+    const jsonBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const cleanedResponse = (jsonBlockMatch ? jsonBlockMatch[1] : response).trim();
+
+    if (cleanedResponse.length === 0) {
+      throw new AIResponseSchemaViolationError(context, 'response was empty');
+    }
+
+    let rawParsed: unknown;
     try {
-      const jsonBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const cleanedResponse = jsonBlockMatch ? jsonBlockMatch[1].trim() : response;
+      rawParsed = JSON.parse(cleanedResponse);
+    } catch (error) {
+      throw new AIResponseSchemaViolationError(
+        context,
+        `response was not valid JSON (${error instanceof Error ? error.message : 'unknown parse error'})`
+      );
+    }
 
-      const arrayStartIndex = cleanedResponse.indexOf('[');
-      const objectStartIndex = cleanedResponse.indexOf('{');
+    const validation = delayExtractionResponseSchema.safeParse(rawParsed);
+    if (!validation.success) {
+      throw new AIResponseSchemaViolationError(context, validation.error.message);
+    }
 
-      if (objectStartIndex === -1 && arrayStartIndex === -1) {
-        console.warn('[AIDelayEventExtractorWithTools] No JSON object or array found in response');
-        return { events: [] };
-      }
+    const { rawEvents, rawWorkActivities } = normalizeDelayExtractionResponse(validation.data);
 
-      let parsed: Record<string, unknown>;
-
-      if (arrayStartIndex !== -1 && (objectStartIndex === -1 || arrayStartIndex < objectStartIndex)) {
-        console.log('[AIDelayEventExtractorWithTools] Response is a top-level JSON array — wrapping as {delayEvents: [...]}');
-        let bracketCount = 0;
-        let arrayEndIndex = arrayStartIndex;
-        for (let i = arrayStartIndex; i < cleanedResponse.length; i++) {
-          if (cleanedResponse[i] === '[') bracketCount++;
-          if (cleanedResponse[i] === ']') bracketCount--;
-          if (bracketCount === 0) {
-            arrayEndIndex = i + 1;
-            break;
-          }
-        }
-        const arrayStr = cleanedResponse.substring(arrayStartIndex, arrayEndIndex);
-        parsed = { delayEvents: JSON.parse(arrayStr) };
-      } else {
-        let braceCount = 0;
-        let objectEndIndex = objectStartIndex;
-        for (let i = objectStartIndex; i < cleanedResponse.length; i++) {
-          if (cleanedResponse[i] === '{') braceCount++;
-          if (cleanedResponse[i] === '}') braceCount--;
-          if (braceCount === 0) {
-            objectEndIndex = i + 1;
-            break;
-          }
-        }
-        const objectStr = cleanedResponse.substring(objectStartIndex, objectEndIndex);
-        parsed = JSON.parse(objectStr);
-      }
-
-      let workActivities: IDRWorkActivity[] | undefined;
-      if (parsed.workActivities && Array.isArray(parsed.workActivities)) {
-        workActivities = (parsed.workActivities as Array<{ activityId?: string; description?: string; comments?: string }>)
+    const workActivities: IDRWorkActivity[] | undefined = rawWorkActivities.length > 0
+      ? rawWorkActivities
           .filter((wa) => wa.activityId && wa.activityId.trim().length > 0)
           .map((wa) => ({
             activityId: String(wa.activityId || '').trim(),
             description: String(wa.description || '').trim(),
             comments: wa.comments ? String(wa.comments).trim() : undefined,
-          }));
-      }
+          }))
+      : undefined;
 
-      const eventsArray = (parsed.delayEvents || parsed.events || []) as ExtractedEventRaw[];
-      const events: ExtractedDelayEvent[] = eventsArray
-        .map((item: ExtractedEventRaw) => this.mapToDelayEvent(item, baseConfidence, documentType))
-        .filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0)
-        .filter((e: ExtractedDelayEvent) => {
-          if (e.delayEventConfidence !== null && e.delayEventConfidence !== undefined && e.delayEventConfidence < 0.10) {
-            console.log(`[AIDelayEventExtractorWithTools] Dropping low-confidence event (${e.delayEventConfidence}): ${e.eventDescription.substring(0, 80)}`);
-            return false;
-          }
-          return true;
-        });
+    const events: ExtractedDelayEvent[] = rawEvents
+      .map((item) => this.mapToDelayEvent(item, baseConfidence, documentType))
+      .filter((e: ExtractedDelayEvent) => e.eventDescription.length > 0)
+      .filter((e: ExtractedDelayEvent) => {
+        if (e.delayEventConfidence !== null && e.delayEventConfidence !== undefined && e.delayEventConfidence < 0.10) {
+          console.log(`[AIDelayEventExtractorWithTools] Dropping low-confidence event (${e.delayEventConfidence}): ${e.eventDescription.substring(0, 80)}`);
+          return false;
+        }
+        return true;
+      });
 
-      return { events, workActivities };
-    } catch (error) {
-      console.error('[AIDelayEventExtractorWithTools] Error parsing response:', error);
-      return { events: [] };
-    }
+    return { events, workActivities };
   }
 
   private mapToDelayEvent(
-    item: ExtractedEventRaw,
+    item: RawExtractedDelayEvent,
     baseConfidence: number,
     documentType: string
   ): ExtractedDelayEvent {

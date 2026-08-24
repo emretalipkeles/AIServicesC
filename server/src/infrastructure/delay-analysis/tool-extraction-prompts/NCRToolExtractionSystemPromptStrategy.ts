@@ -1,6 +1,7 @@
 import type { IToolExtractionSystemPromptStrategy } from '../../../domain/delay-analysis/interfaces/IToolExtractionSystemPromptStrategy';
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
 import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
+import { renderDelayEventOutputFormatBlock } from '../../../domain/delay-analysis/DelayEventExtractionContract';
 
 export class NCRToolExtractionSystemPromptStrategy implements IToolExtractionSystemPromptStrategy {
   readonly documentType: ProjectDocumentType = 'ncr';
@@ -38,33 +39,19 @@ NCRs are formal documentation of quality failures where work does not meet contr
 - **Location/area**: Where the failure occurred
 - **Any referenced activity IDs or WBS codes**
 
-## OUTPUT FORMAT:
-Return a JSON object with the structure:
-{
-  "delayEvents": [
-    {
-      "eventDescription": "Clear description: what failed inspection AND what corrective action is required",
-      "eventCategory": "one of: planning_mobilization, labor_related, materials_equipment, subcontractor_coordination, quality_rework, site_management_safety, utility_infrastructure, other (most NCRs = quality_rework)",
-      "eventDate": "YYYY-MM-DD (the NCR date)",
-      "impactDurationHours": null (only include if explicitly stated in the NCR — DO NOT estimate for NCRs),
-      "impactedWindowStart": "HH:MM clock time the impact began, ONLY if explicitly stated" or null,
-      "impactedWindowEnd": "HH:MM clock time the impact ended, ONLY if explicitly stated" or null,
-      "durationBasis": "document_stated if a duration was explicitly written, otherwise null — NEVER 'estimated' for NCRs",
-      "sourceReference": "NCR-XXX or DSC XXX AND section reference",
-      "extractedFromCode": "NCR_XXX (the NCR number)",
-      "confidenceScore": 0.85-1.0 (NCRs are high confidence),
-      "delayEventConfidence": 0.85-1.0 (NCRs document definite failures),
-      "responsibilityConfirmed": true/false,
-      "reworkDescription": "specific corrective action required",
-      "matchedActivityId": "activity ID if matched via tool" or null,
-      "matchedActivityDescription": "description of matched activity" or null,
-      "matchedActivityWbs": "WBS code of matched activity" or null,
-      "matchConfidence": 0.0-1.0 if matched or null,
-      "matchReasoning": "why this activity matches the NCR" or null
-    }
-  ],
-  "workActivities": []
-}
+${renderDelayEventOutputFormatBlock({
+  eventDate: '"YYYY-MM-DD (the NCR date)"',
+  impactDurationHours: 'null (only include if explicitly stated in the NCR — DO NOT estimate for NCRs)',
+  impactedWindowStart: '"HH:MM clock time the impact began, ONLY if explicitly stated" or null',
+  impactedWindowEnd: '"HH:MM clock time the impact ended, ONLY if explicitly stated" or null',
+  durationBasis: "document_stated if a duration was explicitly written, otherwise null — NEVER 'estimated' or 'bounded_by_next_entry' for NCRs",
+  fallbackEstimateHours: 'omit/null — NCRs never use bounded_by_next_entry',
+  sourceReference: '"NCR-XXX or DSC XXX AND section reference"',
+  extractedFromCode: '"NCR_XXX (the NCR number)"',
+  confidenceScore: '0.85-1.0 (NCRs are high confidence)',
+  delayEventConfidence: '0.85-1.0 (NCRs document definite failures)',
+  reworkDescription: '"specific corrective action required"',
+})}
 
 ## MATCHING RULES FOR NCRs:
 - NCRs rarely contain activity IDs — if you find any activity IDs or WBS codes, use the get_schedule_activities tool to look them up
