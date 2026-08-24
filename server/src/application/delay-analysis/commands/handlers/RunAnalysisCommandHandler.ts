@@ -599,6 +599,7 @@ export class RunAnalysisCommandHandler {
             rawWindowStart: deduped.event.impactedWindowStart,
             rawWindowEnd: deduped.event.impactedWindowEnd,
             rawImpactDurationHours: normalizeImpactDuration(deduped.event.impactDurationHours),
+            rawFallbackEstimateHours: normalizeImpactDuration(deduped.event.fallbackEstimateHours ?? null),
             eventStartDate: deduped.event.eventDate,
           });
 

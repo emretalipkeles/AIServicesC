@@ -38,6 +38,7 @@ interface ExtractedEventRaw {
   impactedWindowStart?: string;
   impactedWindowEnd?: string;
   durationBasis?: string;
+  fallbackEstimateHours?: number;
   sourceReference?: string;
   source?: string;
   extractedFromCode?: string;
@@ -425,6 +426,9 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
     const impactedWindowStart = normalizeClockTime(item.impactedWindowStart);
     const impactedWindowEnd = normalizeClockTime(item.impactedWindowEnd);
     const durationBasis = normalizeDurationBasis(item.durationBasis);
+    const fallbackEstimateHours = typeof item.fallbackEstimateHours === 'number'
+      ? item.fallbackEstimateHours
+      : this.parseNumber(item.fallbackEstimateHours);
 
     return {
       eventDescription: String(item.eventDescription || item.description || ''),
@@ -434,6 +438,7 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
       impactedWindowStart,
       impactedWindowEnd,
       durationBasis,
+      fallbackEstimateHours,
       sourceReference: String(item.sourceReference || item.source || ''),
       extractedFromCode: String(item.extractedFromCode || item.code || 'GENERAL'),
       confidenceScore: this.parseConfidenceScore(item.confidenceScore, baseConfidence),

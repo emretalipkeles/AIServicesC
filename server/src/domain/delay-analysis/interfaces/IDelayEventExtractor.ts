@@ -13,6 +13,12 @@ export interface ExtractedDelayEvent {
   impactedWindowEnd?: string | null;
   /** How impactDurationHours was derived. */
   durationBasis?: DurationBasis | null;
+  /**
+   * Independent duration estimate (ignoring the next-entry window) to fall back on if a
+   * 'bounded_by_next_entry' claim is rejected server-side. Only meaningful when durationBasis
+   * is 'bounded_by_next_entry'; null/absent otherwise.
+   */
+  fallbackEstimateHours?: number | null;
   sourceReference: string;
   extractedFromCode: string;
   confidenceScore?: number;

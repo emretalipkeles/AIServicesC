@@ -118,6 +118,12 @@ export interface DurationProvenanceInput {
   rawWindowEnd: unknown;
   rawImpactDurationHours: number | null;
   eventStartDate: Date | null;
+  /**
+   * Independent estimate the model gave alongside a 'bounded_by_next_entry' claim, to use
+   * if that claim is rejected. This is NOT derived from the rejected window, so it does not
+   * inherit the implausibility that got the claim rejected in the first place.
+   */
+  rawFallbackEstimateHours?: number | null;
 }
 
 export interface DurationProvenanceResult {
@@ -140,32 +146,43 @@ export interface DurationProvenanceResult {
  * Mirrors the same checks as resolveDurationBasis (incomplete window / non-increasing window /
  * span over the cap) so the two never disagree about *why* a claim failed.
  */
-function describeBoundedClaimRejection(windowStart: string | null, windowEnd: string | null): string {
+function describeBoundedClaimRejection(
+  windowStart: string | null,
+  windowEnd: string | null,
+  resolvedDurationHours: number | null,
+  usedFallbackEstimate: boolean
+): string {
+  const resolution = usedFallbackEstimate
+    ? `the claim was rejected and the duration fell back to the model's independent estimate of ${resolvedDurationHours}h`
+    : `the claim was rejected and the duration was capped at ${resolvedDurationHours ?? MAX_BOUNDED_WINDOW_HOURS}h`;
+
   const startMatch = windowStart?.match(/^(\d{2}):(\d{2})$/);
   const endMatch = windowEnd?.match(/^(\d{2}):(\d{2})$/);
 
   if (!startMatch || !endMatch) {
-    return `AI estimate: the source claimed this event's duration was bounded by the next narrative entry, but the impacted time window was incomplete, so the claim was rejected and the duration capped at ${MAX_BOUNDED_WINDOW_HOURS}h.`;
+    return `AI estimate: the source claimed this event's duration was bounded by the next narrative entry, but the impacted time window was incomplete, so ${resolution}.`;
   }
 
   const startMinutes = parseInt(startMatch[1], 10) * 60 + parseInt(startMatch[2], 10);
   const endMinutes = parseInt(endMatch[1], 10) * 60 + parseInt(endMatch[2], 10);
   if (endMinutes <= startMinutes) {
-    return `AI estimate: the source claimed this event's duration was bounded by the next narrative entry (${windowStart}\u2013${windowEnd}), but the window did not increase (or crossed midnight), so the claim was rejected and the duration capped at ${MAX_BOUNDED_WINDOW_HOURS}h.`;
+    return `AI estimate: the source claimed this event's duration was bounded by the next narrative entry (${windowStart}\u2013${windowEnd}), but the window did not increase (or crossed midnight), so ${resolution}.`;
   }
 
   const spanHours = Math.round(((endMinutes - startMinutes) / 60) * 100) / 100;
-  return `AI estimate: the source claimed this event's duration was bounded by the next narrative entry (${windowStart}\u2013${windowEnd}, ${spanHours}h), which exceeds the ${MAX_BOUNDED_WINDOW_HOURS}h credibility cap for a "next entry" gap, so the claim was rejected and the duration capped at ${MAX_BOUNDED_WINDOW_HOURS}h.`;
+  return `AI estimate: the source claimed this event's duration was bounded by the next narrative entry (${windowStart}\u2013${windowEnd}, ${spanHours}h), which exceeds the ${MAX_BOUNDED_WINDOW_HOURS}h credibility cap for a "next entry" gap, so ${resolution}.`;
 }
 
 /**
  * Single entry point combining normalization, the 'bounded_by_next_entry' evidence guard, and
  * finish-date derivation, so a rejected bounded claim cannot leak into persisted data as a
  * disguised estimate. When a claim is rejected (incomplete window, non-increasing window, or a
- * span over MAX_BOUNDED_WINDOW_HOURS), the unsubstantiated window is cleared — it is not
- * evidence for whatever basis the event falls back to — and the reported duration is capped at
- * MAX_BOUNDED_WINDOW_HOURS, since the only support offered for a larger figure was the rejected
- * gap. eventFinishDate is always derived from the (possibly cleared) window, never the raw one.
+ * span over MAX_BOUNDED_WINDOW_HOURS), the unsubstantiated window is cleared — it is not evidence
+ * for whatever basis the event falls back to — and the reported duration falls back to the
+ * model's independent fallbackEstimateHours when supplied (since the rejected window's own span
+ * is not evidence of a smaller, more plausible figure either), or is capped at
+ * MAX_BOUNDED_WINDOW_HOURS otherwise. eventFinishDate is always derived from the (possibly
+ * cleared) window, never the raw one.
  */
 export function resolveDurationProvenance(input: DurationProvenanceInput): DurationProvenanceResult {
   const rawWindowStart = normalizeClockTime(input.rawWindowStart);
@@ -176,11 +193,6 @@ export function resolveDurationProvenance(input: DurationProvenanceInput): Durat
   const resolvedBasis = resolveDurationBasis(rawBasis, rawWindowStart, rawWindowEnd);
   const accepted = resolvedBasis === 'bounded_by_next_entry';
   const rejected = claimedBounded && !accepted;
-
-  // Computed from the raw (pre-clear) window, since that is the claim being explained.
-  const rejectedBoundedClaimNote = rejected
-    ? describeBoundedClaimRejection(rawWindowStart, rawWindowEnd)
-    : null;
 
   const windowStart = rejected ? null : rawWindowStart;
   const windowEnd = rejected ? null : rawWindowEnd;
@@ -194,11 +206,28 @@ export function resolveDurationProvenance(input: DurationProvenanceInput): Durat
     ? computeSameDaySpanHours(windowStart, windowEnd)
     : null;
 
+  // On rejection, prefer the model's independent fallback estimate over the rejected window's
+  // own (implausible) span — that span is precisely the number that just failed the credibility
+  // check, so reusing it (even capped) would still report inflated-looking figures for delays
+  // that are plausibly much shorter. Only when no fallback was supplied do we fall back to
+  // capping the raw claim, as a safety net for older/malformed extraction responses.
+  const fallbackEstimate = typeof input.rawFallbackEstimateHours === 'number' && Number.isFinite(input.rawFallbackEstimateHours)
+    ? Math.max(0, input.rawFallbackEstimateHours)
+    : null;
+  const usedFallbackEstimate = rejected && fallbackEstimate !== null;
+
   const impactDurationHours = accepted && boundedSpanHours !== null
     ? boundedSpanHours
-    : rejected && input.rawImpactDurationHours != null
-      ? Math.min(input.rawImpactDurationHours, MAX_BOUNDED_WINDOW_HOURS)
+    : rejected
+      ? (fallbackEstimate ?? (input.rawImpactDurationHours != null
+          ? Math.min(input.rawImpactDurationHours, MAX_BOUNDED_WINDOW_HOURS)
+          : null))
       : input.rawImpactDurationHours;
+
+  // Computed from the raw (pre-clear) window, since that is the claim being explained.
+  const rejectedBoundedClaimNote = rejected
+    ? describeBoundedClaimRejection(rawWindowStart, rawWindowEnd, impactDurationHours, usedFallbackEstimate)
+    : null;
 
   return {
     durationBasis: resolvedBasis,

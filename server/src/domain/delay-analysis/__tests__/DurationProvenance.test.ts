@@ -194,4 +194,52 @@ describe('resolveDurationProvenance', () => {
     });
     expect(result.rejectedBoundedClaimNote).toBeNull();
   });
+
+  /**
+   * Regression coverage: a rejected bounded claim used to fall back to
+   * min(rawImpactDurationHours, MAX_BOUNDED_WINDOW_HOURS) — since the model's raw number is
+   * usually just the rejected window's own (implausible) span, this systematically reported the
+   * cap ceiling as if it were a real estimate. The model's independent fallbackEstimateHours
+   * must win instead.
+   */
+  it('uses the independent fallback estimate, not the cap, when an over-cap bounded claim is rejected', () => {
+    const result = resolveDurationProvenance({
+      rawBasis: 'bounded_by_next_entry',
+      rawWindowStart: '07:45',
+      rawWindowEnd: '14:00', // 6.25h — over the cap
+      rawImpactDurationHours: 6.25, // the rejected window's own span, not a real estimate
+      rawFallbackEstimateHours: 0.75,
+      eventStartDate,
+    });
+    expect(result.durationBasis).toBe('estimated');
+    expect(result.impactDurationHours).toBe(0.75);
+    expect(result.impactDurationHours).not.toBe(MAX_BOUNDED_WINDOW_HOURS);
+    expect(result.rejectedBoundedClaimNote).toContain('0.75h');
+    expect(result.rejectedBoundedClaimNote).not.toContain(`capped at`);
+  });
+
+  it('falls back to capping the raw claim when no fallback estimate was supplied', () => {
+    const result = resolveDurationProvenance({
+      rawBasis: 'bounded_by_next_entry',
+      rawWindowStart: '08:00',
+      rawWindowEnd: '16:30',
+      rawImpactDurationHours: 8.5,
+      rawFallbackEstimateHours: null,
+      eventStartDate,
+    });
+    expect(result.impactDurationHours).toBe(MAX_BOUNDED_WINDOW_HOURS);
+    expect(result.rejectedBoundedClaimNote).toContain('capped at');
+  });
+
+  it('ignores a fallback estimate when the bounded claim is accepted', () => {
+    const result = resolveDurationProvenance({
+      rawBasis: 'bounded_by_next_entry',
+      rawWindowStart: '13:00',
+      rawWindowEnd: '15:30',
+      rawImpactDurationHours: 2.5,
+      rawFallbackEstimateHours: 1,
+      eventStartDate,
+    });
+    expect(result.impactDurationHours).toBe(2.5);
+  });
 });

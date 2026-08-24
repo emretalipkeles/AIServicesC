@@ -140,6 +140,12 @@ Do NOT bound against an entry many hours later or on the next day — that gap i
 itself lasted that long. When the next entry is too far away (or there is no next entry), fall back to
 an estimate instead: durationBasis: "estimated".
 
+Whenever you use "bounded_by_next_entry", ALSO set fallbackEstimateHours to your own independent
+estimate of the delay's real length (based on the nature of the event, as if you had no next-entry
+timestamp at all). The server validates your window and, if it rejects the bound as implausible, it
+falls back to fallbackEstimateHours rather than the rejected gap — so this must be a genuine standalone
+estimate (e.g. ~0.5-1h for a rejected concrete truck awaiting redispatch), never a copy of the window span.
+
 **MANDATORY CHECK BEFORE WRITING durationBasis: "estimated":** If the event's own diary entry has a
 timestamp, look at the very next timestamped entry anywhere in the document — it does not need to be
 about the same topic (e.g. "12:00 PM pipe delivered" can close a delay that started at "11:00 AM").
@@ -208,6 +214,7 @@ Return a JSON object with TWO arrays:
       "impactedWindowStart": "HH:MM clock time the impact began, ONLY when the narrative gives a real time" or null,
       "impactedWindowEnd": "HH:MM clock time the impact ended, ONLY when the narrative gives a real time" or null,
       "durationBasis": "one of: timestamp_derived (start/resume times for THIS SAME event), document_stated (explicit duration written), bounded_by_next_entry (event's start time bounded by the NEXT, different narrative entry's timestamp), estimated (inferred with no times/explicit duration)",
+      "fallbackEstimateHours": "REQUIRED whenever durationBasis is 'bounded_by_next_entry', otherwise omit/null. Your independent estimate of the delay's real length, ignoring the next-entry window entirely, for the server to use if it rejects that window as implausible.",
       "sourceReference": "MUST include DSC/NCR number if mentioned (e.g., 'DSC 293: Page 2'). Format: 'DSC XXX' + location",
       "extractedFromCode": "CODE_CIE or IDR_OBSERVATION",
       "confidenceScore": 0.85,

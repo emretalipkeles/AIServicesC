@@ -340,6 +340,7 @@ export class RunSingleDocumentAnalysisCommandHandler {
           rawWindowStart: extracted.impactedWindowStart,
           rawWindowEnd: extracted.impactedWindowEnd,
           rawImpactDurationHours: normalizeImpactDuration(extracted.impactDurationHours),
+          rawFallbackEstimateHours: normalizeImpactDuration(extracted.fallbackEstimateHours ?? null),
           eventStartDate: extracted.eventDate,
         });
         const podReportsForDate = effectivePodEvidence?.reports ?? [];
