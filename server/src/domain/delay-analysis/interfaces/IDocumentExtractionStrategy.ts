@@ -7,6 +7,15 @@ export interface DocumentExtractionContext {
   documentType: ProjectDocumentType;
   skipKnowledgeBase?: boolean;
   fieldMemoContext?: string;
+  /**
+   * True when this prompt is being embedded into the user message of a tool-based
+   * extraction call that already carries a matching *ToolExtractionSystemPromptStrategy
+   * system message (see AIDelayEventExtractorWithTools). Strategies that have a system-prompt
+   * counterpart use this to omit the rules and document-content copy already delivered by the
+   * system message, instead of restating them in different wording. When false/undefined, the
+   * strategy must remain fully self-contained (used standalone by AIDelayEventExtractor).
+   */
+  toolBasedExtraction?: boolean;
 }
 
 /**

@@ -78,16 +78,24 @@ describe('Extraction Strategies', () => {
       expect(result.prompt).toContain('QUICK-REFERENCE CHEAT SHEET');
     });
 
-    it('should include worked examples for IDR documents', () => {
+    it('should always include the core (non-gray) worked examples for IDR documents', () => {
       const result = strategy.buildExtractionPrompt(createContext('idr', 'test content'));
       expect(result.prompt).toContain('CONTRACTOR-CAUSED DELAY EXAMPLES');
       expect(result.prompt).toContain('EVENTS THAT ARE NOT CONTRACTOR-CAUSED DELAYS');
-      expect(result.prompt).toContain('GRAY AREAS REQUIRING VERIFICATION');
     });
 
-    it('should include gray area scenarios for IDR documents', () => {
-      const result = strategy.buildExtractionPrompt(createContext('idr', 'test content'));
+    it('should include gray-area sections for IDR documents when the document raises a gray-area topic', () => {
+      const result = strategy.buildExtractionPrompt(
+        createContext('idr', 'Utility strike encountered near the differing site condition area.')
+      );
+      expect(result.prompt).toContain('GRAY AREAS REQUIRING VERIFICATION');
       expect(result.prompt).toContain('GRAY AREAS & BORDERLINE SCENARIOS');
+    });
+
+    it('should omit gray-area sections for IDR documents with no gray-area topic (knowledge base is scoped to document content)', () => {
+      const result = strategy.buildExtractionPrompt(createContext('idr', 'test content'));
+      expect(result.prompt).not.toContain('GRAY AREAS REQUIRING VERIFICATION');
+      expect(result.prompt).not.toContain('GRAY AREAS & BORDERLINE SCENARIOS');
     });
   });
 
@@ -158,10 +166,17 @@ describe('Extraction Strategies', () => {
       expect(result.delayIsCertain).toBe(false);
     });
 
-    it('should include gray areas but NOT worked examples', () => {
-      const result = strategy.buildExtractionPrompt(createContext('field_memo', 'test content'));
+    it('should include gray areas but NOT worked examples when the document raises a gray-area topic', () => {
+      const result = strategy.buildExtractionPrompt(
+        createContext('field_memo', 'Utility strike encountered near the differing site condition area.')
+      );
       expect(result.prompt).toContain('GRAY AREAS & BORDERLINE SCENARIOS');
       expect(result.prompt).not.toContain('CONTRACTOR-CAUSED DELAY EXAMPLES');
+    });
+
+    it('should omit gray areas when the document raises no gray-area topic (knowledge base is scoped to document content)', () => {
+      const result = strategy.buildExtractionPrompt(createContext('field_memo', 'test content'));
+      expect(result.prompt).not.toContain('GRAY AREAS & BORDERLINE SCENARIOS');
     });
   });
 

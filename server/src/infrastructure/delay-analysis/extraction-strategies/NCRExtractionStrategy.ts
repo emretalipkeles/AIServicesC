@@ -17,7 +17,7 @@ export class NCRExtractionStrategy implements IDocumentExtractionStrategy {
     const truncatedContent = context.documentContent.slice(0, 30000);
     const knowledgeBasePrompt = context.skipKnowledgeBase
       ? ''
-      : this.knowledgePromptBuilder.buildPromptForDocumentType('ncr');
+      : this.knowledgePromptBuilder.buildPromptForDocumentType('ncr', context.documentContent);
 
     const knowledgeBaseSection = knowledgeBasePrompt
       ? `\n${knowledgeBasePrompt}\n`

@@ -17,7 +17,7 @@ export class FieldMemoExtractionStrategy implements IDocumentExtractionStrategy 
     const truncatedContent = context.documentContent.slice(0, 30000);
     const knowledgeBasePrompt = context.skipKnowledgeBase
       ? ''
-      : this.knowledgePromptBuilder.buildPromptForDocumentType('field_memo');
+      : this.knowledgePromptBuilder.buildPromptForDocumentType('field_memo', context.documentContent);
 
     const knowledgeBaseSection = knowledgeBasePrompt
       ? `\n${knowledgeBasePrompt}\n`

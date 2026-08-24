@@ -17,7 +17,7 @@ export class DefaultExtractionStrategy implements IDocumentExtractionStrategy {
     const truncatedContent = context.documentContent.slice(0, 30000);
     const knowledgeBasePrompt = context.skipKnowledgeBase
       ? ''
-      : this.knowledgePromptBuilder.buildPromptForDocumentType('other');
+      : this.knowledgePromptBuilder.buildPromptForDocumentType('other', context.documentContent);
 
     const knowledgeBaseSection = knowledgeBasePrompt
       ? `\n${knowledgeBasePrompt}\n`

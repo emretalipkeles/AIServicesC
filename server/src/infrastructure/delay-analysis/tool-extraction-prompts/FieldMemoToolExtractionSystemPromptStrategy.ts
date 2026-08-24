@@ -2,6 +2,7 @@ import type { IToolExtractionSystemPromptStrategy } from '../../../domain/delay-
 import type { ProjectDocumentType } from '../../../domain/delay-analysis/entities/ProjectDocument';
 import type { DelayKnowledgePromptBuilder } from '../DelayKnowledgePromptBuilder';
 import { renderDelayEventOutputFormatBlock } from '../../../domain/delay-analysis/DelayEventExtractionContract';
+import { FIELD_MEMO_DURATION_DEFAULTS_PROMPT_TEXT } from '../FieldMemoDurationDefaults';
 
 export class FieldMemoToolExtractionSystemPromptStrategy implements IToolExtractionSystemPromptStrategy {
   readonly documentType: ProjectDocumentType = 'field_memo';
@@ -9,8 +10,8 @@ export class FieldMemoToolExtractionSystemPromptStrategy implements IToolExtract
 
   constructor(private readonly knowledgePromptBuilder: DelayKnowledgePromptBuilder) {}
 
-  buildSystemPrompt(): string {
-    const knowledgeBaseContent = this.knowledgePromptBuilder.buildPromptForDocumentType('field_memo');
+  buildSystemPrompt(documentContent?: string): string {
+    const knowledgeBaseContent = this.knowledgePromptBuilder.buildPromptForDocumentType('field_memo', documentContent);
 
     return `You are a construction delay analysis expert specializing in Field Memos and project correspondence. Your task is to extract contractor-caused delay events from Field Memo documents and match them to CPM schedule activities.
 
@@ -70,16 +71,10 @@ ${renderDelayEventOutputFormatBlock({
 - Match confidence should reflect how well the schedule activity description aligns with the corrective action
 
 ## DURATION ESTIMATION FOR FIELD MEMOS:
-Field Memos rarely state explicit durations. Estimate based on scope:
-- Fence relocation/modification: 4-8 hours
-- Signage installation: 1-2 hours
-- Clearance corrections (hydrant, sidewalk): 2-4 hours
-- Staging area security/setup: 4-8 hours
-- Environmental cleanup (spill, hazardous waste): 4-16 hours depending on scope
-- Stormwater BMP installation/repair: 2-8 hours
-- Stockpile protection/covering: 1-4 hours
-- Traffic control corrections: 2-4 hours
-- General corrective actions: 2-4 hours minimum
+Field Memos rarely state explicit durations. When one isn't stated, estimate based on scope using
+these defaults (a prompt heuristic, not something you found in the document — never present one of
+these ranges as if the memo itself stated it):
+${FIELD_MEMO_DURATION_DEFAULTS_PROMPT_TEXT}
 
 ## RESPONSIBILITY:
 - Field Memos are directives TO the contractor — the contractor is responsible unless the memo explicitly states otherwise

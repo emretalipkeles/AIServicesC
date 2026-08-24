@@ -9,11 +9,41 @@ import type {
 } from '../../domain/delay-analysis/interfaces/IDelayKnowledgeBase';
 import type { ProjectDocumentType } from '../../domain/delay-analysis/entities/ProjectDocument';
 
+/**
+ * Keyword triggers for knowledge-base sections that only earn their token cost when the
+ * document actually raises the topic they cover. Each list is drawn from the gray-area /
+ * worked-example titles they exist to support (differing site conditions, utility strikes,
+ * tree roots, etc.) — documents with none of these signals are exceedingly unlikely to need
+ * the borderline-case guidance those sections provide.
+ */
+const CONDITIONAL_SECTION_TRIGGERS: Partial<Record<KnowledgeSection, ReadonlyArray<string>>> = {
+  gray_areas: [
+    'dsc', 'differing site condition', 'utility strike', 'tree root', 'compaction',
+    'survey', 'spoil', 'weather', 'force majeure', 'third party', 'third-party',
+    'change order', 'dispute', 'owner-directed', 'owner directed',
+  ],
+  worked_examples_gray: [
+    'dsc', 'differing site condition', 'utility strike', 'tree root', 'compaction',
+    'survey', 'spoil', 'weather', 'force majeure', 'third party', 'third-party',
+    'change order', 'dispute', 'owner-directed', 'owner directed',
+  ],
+};
+
 export class DelayKnowledgePromptBuilder {
   constructor(private readonly knowledgeBase: IDelayKnowledgeBase) {}
 
-  buildPromptForDocumentType(documentType: ProjectDocumentType): string {
-    const sections = this.knowledgeBase.getSectionsForDocumentType(documentType);
+  /**
+   * @param documentContent Optional raw document text. When provided, sections gated by
+   * CONDITIONAL_SECTION_TRIGGERS are only included if the document contains one of their
+   * trigger keywords, instead of unconditionally sending every section the document type
+   * qualifies for. Omitting it preserves the old always-include-everything behavior (used by
+   * the verification agent in bootstrap.ts, which has no single document in view).
+   */
+  buildPromptForDocumentType(documentType: ProjectDocumentType, documentContent?: string): string {
+    const allSectionsForType = this.knowledgeBase.getSectionsForDocumentType(documentType);
+    const sections = documentContent === undefined
+      ? allSectionsForType
+      : this.scopeSectionsToDocument(allSectionsForType, documentContent);
 
     console.log('');
     console.log('╔══════════════════════════════════════════════════════════════════╗');
@@ -50,6 +80,25 @@ export class DelayKnowledgePromptBuilder {
     console.log('');
 
     return prompt;
+  }
+
+  /**
+   * Drops sections gated by CONDITIONAL_SECTION_TRIGGERS when none of their trigger keywords
+   * appear in the document. Sections with no trigger list (the core definitions, categories,
+   * exclusions, decision framework, cheat sheet, and the delay/not-delay worked examples that
+   * apply to every document) are always kept — only the borderline-case guidance is pruned.
+   */
+  private scopeSectionsToDocument(
+    sections: ReadonlyArray<KnowledgeSection>,
+    documentContent: string
+  ): ReadonlyArray<KnowledgeSection> {
+    const haystack = documentContent.toLowerCase();
+
+    return sections.filter((section) => {
+      const triggers = CONDITIONAL_SECTION_TRIGGERS[section];
+      if (!triggers) return true;
+      return triggers.some((keyword) => haystack.includes(keyword));
+    });
   }
 
   buildPromptFromSections(sections: ReadonlyArray<KnowledgeSection>): string {

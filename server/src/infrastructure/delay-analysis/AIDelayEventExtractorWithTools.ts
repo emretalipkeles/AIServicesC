@@ -94,6 +94,7 @@ export class AIDelayEventExtractorWithTools implements IDelayEventExtractor {
       documentId,
       documentType,
       skipKnowledgeBase: true,
+      toolBasedExtraction: true,
     });
 
     const fieldMemoContextBlock = options?.fieldMemoContext
@@ -149,7 +150,7 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
 
     try {
       let messages: OpenAI.ChatCompletionMessageParam[] = [
-        { role: 'system', content: systemPromptStrategy.buildSystemPrompt() },
+        { role: 'system', content: systemPromptStrategy.buildSystemPrompt(documentContent) },
         { role: 'user', content: userPrompt }
       ];
 

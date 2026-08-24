@@ -9,8 +9,8 @@ export class IDRToolExtractionSystemPromptStrategy implements IToolExtractionSys
 
   constructor(private readonly knowledgePromptBuilder: DelayKnowledgePromptBuilder) {}
 
-  buildSystemPrompt(): string {
-    const knowledgeBaseContent = this.knowledgePromptBuilder.buildPromptForDocumentType('idr');
+  buildSystemPrompt(documentContent?: string): string {
+    const knowledgeBaseContent = this.knowledgePromptBuilder.buildPromptForDocumentType('idr', documentContent);
 
     return `You are a construction delay analysis expert. Your task is to extract contractor-caused delay events from construction documents and match them to schedule activities.
 
@@ -32,7 +32,7 @@ abandon the narrative analysis.
 5. **Match each delay to the most relevant activity** from the tool results, where a match is possible. Leave an event unmatched rather than dropping it.
 6. **Output the final JSON** with delay events and their matched activities.
 
-## NARRATIVE ANALYSIS — MANDATORY, NEVER SKIP:
+## NARRATIVE ANALYSIS — MANDATORY, THE ONE RULE THAT MUST NEVER BE SKIPPED:
 
 IDRs record their most important delay information in timestamped prose, NOT in summary form fields.
 The narrative may be labelled "Diary", "Diary - [Inspector Name]", or appear as an unlabelled block of
@@ -63,7 +63,7 @@ never substitute a generic estimate when the times are resolvable.
 - Time formats: 0700, 07:00, 7:00, 7am, 7:00 AM, 0700hrs
 - Example: "0700 - machine not working" ... "0830 - resumed" = 1.5 hours
 
-**MANDATORY CHECK BEFORE YOU MAY WRITE durationBasis: "estimated":** If the event's own entry has a
+**REQUIRED CHECK BEFORE YOU MAY WRITE durationBasis: "estimated":** If the event's own entry has a
 timestamp, look at the very next timestamped entry in the document (any entry, whether or not it
 describes the same topic). If that next entry's timestamp is within a few hours of the event's own
 timestamp, you MUST use durationBasis: "bounded_by_next_entry" with impactedWindowStart = the event's
@@ -106,7 +106,7 @@ ${renderDelayEventOutputFormatBlock({
 (These rules govern which activity an event is attached to. They NEVER govern whether an event exists —
 an event found in the narrative is reported even if no activity can be matched to it, with
 matchedActivityId set to null.)
-- **ABSOLUTE RULE: If you found activity IDs in the "Contractor's Work Activity" table, you MUST ONLY match delay events to those activity IDs.** Do NOT match to any other activity from the schedule database lookup, even if it seems like a better description match. The IDR activities are what the contractor was working on that day — the delay happened during one of those activities.
+- **RULE: If you found activity IDs in the "Contractor's Work Activity" table, you MUST ONLY match delay events to those activity IDs.** Do NOT match to any other activity from the schedule database lookup, even if it seems like a better description match. The IDR activities are what the contractor was working on that day — the delay happened during one of those activities.
 - Use tool results ONLY to verify IDR activity IDs exist in the schedule and to get their full descriptions. Never use tool results to find alternative activities outside the IDR list.
 - **Confidence scoring for IDR-sourced matches (90-100%)**:
   - 99-100%: Delay description clearly matches the activity description — same work type AND same location
@@ -116,7 +116,7 @@ matchedActivityId set to null.)
 - If an activity ID was mentioned in the document but not found in the schedule database, still match to it with a note in matchReasoning
 - Only use the full schedule for matching when ZERO activity IDs are found in the document (non-IDR documents like NCRs or Field Memos)
 
-## CRITICAL - DURATION IS REQUIRED:
+## DURATION IS REQUIRED:
 You MUST provide impactDurationHours for EVERY delay event. Never leave it null or omit it.
 Fractional values are supported and expected — report 0.75 or 1.5 when that is the real figure.
 

@@ -9,8 +9,8 @@ export class NCRToolExtractionSystemPromptStrategy implements IToolExtractionSys
 
   constructor(private readonly knowledgePromptBuilder: DelayKnowledgePromptBuilder) {}
 
-  buildSystemPrompt(): string {
-    const knowledgeBaseContent = this.knowledgePromptBuilder.buildPromptForDocumentType('ncr');
+  buildSystemPrompt(documentContent?: string): string {
+    const knowledgeBaseContent = this.knowledgePromptBuilder.buildPromptForDocumentType('ncr', documentContent);
 
     return `You are a construction delay analysis expert specializing in Non-Conformance Reports (NCRs). Your task is to extract contractor-caused delay events from NCR documents and match them to CPM schedule activities.
 

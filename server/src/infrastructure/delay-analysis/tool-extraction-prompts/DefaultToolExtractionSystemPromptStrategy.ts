@@ -9,8 +9,8 @@ export class DefaultToolExtractionSystemPromptStrategy implements IToolExtractio
 
   constructor(private readonly knowledgePromptBuilder: DelayKnowledgePromptBuilder) {}
 
-  buildSystemPrompt(): string {
-    const knowledgeBaseContent = this.knowledgePromptBuilder.buildPromptForDocumentType('other');
+  buildSystemPrompt(documentContent?: string): string {
+    const knowledgeBaseContent = this.knowledgePromptBuilder.buildPromptForDocumentType('other', documentContent);
 
     return `You are a construction delay analysis expert. Your task is to extract contractor-caused delay events from construction documents and match them to CPM schedule activities.
 
