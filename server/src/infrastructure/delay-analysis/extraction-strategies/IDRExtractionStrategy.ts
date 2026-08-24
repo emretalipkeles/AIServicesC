@@ -140,6 +140,13 @@ Do NOT bound against an entry many hours later or on the next day — that gap i
 itself lasted that long. When the next entry is too far away (or there is no next entry), fall back to
 an estimate instead: durationBasis: "estimated".
 
+**MANDATORY CHECK BEFORE WRITING durationBasis: "estimated":** If the event's own diary entry has a
+timestamp, look at the very next timestamped entry anywhere in the document — it does not need to be
+about the same topic (e.g. "12:00 PM pipe delivered" can close a delay that started at "11:00 AM").
+If that next entry is within a few hours, you MUST use "bounded_by_next_entry" instead of "estimated",
+with impactedWindowStart/End set to those two timestamps. Only skip this and use "estimated" when there
+is no next timestamped entry, it is too many hours later, or the event is the day's last diary entry.
+
 **WHAT TO EXTRACT FROM DIARY:**
 1. Work stoppages with timestamps (calculate duration from time gaps)
 2. DSC references mentioned in diary (e.g., "DSC 293", "DSC 295")

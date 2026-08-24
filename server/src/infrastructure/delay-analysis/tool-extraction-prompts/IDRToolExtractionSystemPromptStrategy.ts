@@ -62,6 +62,18 @@ never substitute a generic estimate when the times are resolvable.
 - Time formats: 0700, 07:00, 7:00, 7am, 7:00 AM, 0700hrs
 - Example: "0700 - machine not working" ... "0830 - resumed" = 1.5 hours
 
+**MANDATORY CHECK BEFORE YOU MAY WRITE durationBasis: "estimated":** If the event's own entry has a
+timestamp, look at the very next timestamped entry in the document (any entry, whether or not it
+describes the same topic). If that next entry's timestamp is within a few hours of the event's own
+timestamp, you MUST use durationBasis: "bounded_by_next_entry" with impactedWindowStart = the event's
+own timestamp and impactedWindowEnd = that next entry's timestamp — computing impactDurationHours as
+the difference between them. This applies even when the next entry is a routine, unrelated observation
+(e.g. "12:00 PM pipe delivered"); it does not need to relate to the delay to close the window. Writing
+"estimated" for a timestamped event without first checking for this is a mistake. Only fall back to
+"estimated" when there is no next timestamped entry, or it is too many hours later to be plausible, or
+the event is the last diary entry of the day. See "HOW TO DETERMINE DURATION" below for full priority
+order and worked examples.
+
 **SOURCE REFERENCE — TIMESTAMP REQUIRED:**
 An event taken from a timestamped narrative entry MUST carry that timestamp at the start of its
 sourceReference: "Diary, 1415: excavation stopped due to tree roots" or "Diary 0800-0930: crew idle".
