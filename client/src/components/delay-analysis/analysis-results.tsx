@@ -2,7 +2,8 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, Download, CheckCircle, AlertCircle, Clock, TrendingUp, CalendarRange } from "lucide-react";
+import { BarChart3, Download, CheckCircle, AlertCircle, Clock, TrendingUp, CalendarRange, AlertTriangle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useDelayEvents, type DelayEventDto } from "@/lib/analysis-api";
 import { useProjectDocuments } from "@/lib/project-documents-api";
 import { GlassCard, SectionHeader, StatCard, TableFilter, tableHeaderStyles, tableHeaderCellStyles, TruncatedTextWithTooltip, selectTriggerStyles } from "./ui/premium-components";
@@ -248,6 +249,7 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                             (event.matchReasoning || "").toLowerCase().includes(search) ||
                             (event.podDocumentName || "").toLowerCase().includes(search) ||
                             (event.podUsageNote || "").toLowerCase().includes(search) ||
+                            (event.rejectedBoundedClaimNote || "").toLowerCase().includes(search) ||
                             docName.toLowerCase().includes(search)
                           );
                         })
@@ -336,6 +338,7 @@ export function AnalysisResults({ projectId }: AnalysisResultsProps) {
                                 windowStart={event.impactedWindowStart}
                                 windowEnd={event.impactedWindowEnd}
                                 basis={event.durationBasis}
+                                rejectedBoundedClaimNote={event.rejectedBoundedClaimNote}
                               />
                             </td>
                             <td className="p-2">
@@ -408,11 +411,13 @@ function DurationCell({
   windowStart,
   windowEnd,
   basis,
+  rejectedBoundedClaimNote,
 }: {
   hours: number | null;
   windowStart: string | null;
   windowEnd: string | null;
   basis: string | null;
+  rejectedBoundedClaimNote?: string | null;
 }) {
   const window = formatImpactedWindow(windowStart, windowEnd);
   const hoursLabel = formatDurationHours(hours);
@@ -432,6 +437,34 @@ function DurationCell({
       ) : (
         <span className="text-[11px] text-muted-foreground/60 italic">basis not recorded</span>
       )}
+      {/* A rejected 'bounded_by_next_entry' claim is otherwise invisible: the event just reads
+          "AI estimate" at exactly the cap, so a reviewer has no way to tell a rejected timestamp
+          claim caused it. A click-to-open badge (rather than a hover-only tooltip) makes the
+          explanation discoverable without the reviewer needing to know to hover, and the badge
+          itself — not just its contents — is always visible so the flag can't be missed. */}
+      {rejectedBoundedClaimNote ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "inline-flex items-center gap-1 self-start rounded px-1.5 py-0.5 text-[11px] font-medium",
+                "bg-amber-500/15 text-amber-700 dark:text-amber-400 hover:bg-amber-500/25 transition-colors"
+              )}
+            >
+              <AlertTriangle className="w-3 h-3" />
+              Capped
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="top"
+            align="start"
+            className="w-80 text-sm leading-relaxed bg-zinc-900/95 dark:bg-zinc-800/95 text-white border border-zinc-700/60 backdrop-blur-xl shadow-2xl"
+          >
+            {rejectedBoundedClaimNote}
+          </PopoverContent>
+        </Popover>
+      ) : null}
     </div>
   );
 }

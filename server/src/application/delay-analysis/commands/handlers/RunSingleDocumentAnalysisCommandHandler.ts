@@ -393,6 +393,7 @@ export class RunSingleDocumentAnalysisCommandHandler {
             podCorroborated: false,
             podSourceDocumentId,
             podUsageNote: podCreationUsageNote,
+            ...(provenance.rejectedBoundedClaimNote ? { rejectedBoundedClaimNote: provenance.rejectedBoundedClaimNote } : {}),
           },
           createdAt: now,
           updatedAt: now,

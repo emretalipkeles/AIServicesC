@@ -33,6 +33,8 @@ export interface DelayEventDto {
   podDocumentName: string | null;
   /** Short plain-language note on how POD evidence was actually used for this event/match. */
   podUsageNote: string | null;
+  /** Set when a claimed 'bounded_by_next_entry' duration was rejected and capped; explains why. */
+  rejectedBoundedClaimNote: string | null;
 }
 
 export class ListDelayEventsQueryHandler {
@@ -170,6 +172,9 @@ export class ListDelayEventsQueryHandler {
     const podUsageNote = typeof event.metadata?.podUsageNote === 'string'
       ? event.metadata.podUsageNote
       : null;
+    const rejectedBoundedClaimNote = typeof event.metadata?.rejectedBoundedClaimNote === 'string'
+      ? event.metadata.rejectedBoundedClaimNote
+      : null;
 
     return {
       id: event.id,
@@ -198,6 +203,7 @@ export class ListDelayEventsQueryHandler {
       createdAt: event.createdAt.toISOString(),
       podDocumentName: podSourceDocumentId ? documentFilenameMap.get(podSourceDocumentId) ?? null : null,
       podUsageNote,
+      rejectedBoundedClaimNote,
     };
   }
 }

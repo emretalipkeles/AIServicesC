@@ -126,6 +126,36 @@ export interface DurationProvenanceResult {
   windowEnd: string | null;
   impactDurationHours: number | null;
   eventFinishDate: Date | null;
+  /**
+   * Set only when a 'bounded_by_next_entry' claim was rejected, explaining why the window was
+   * discarded and the duration capped, so a reviewer sees the reasoning behind an "AI estimate"
+   * that happens to land at exactly MAX_BOUNDED_WINDOW_HOURS instead of assuming it was guessed
+   * from nothing. Null whenever no bounded claim was made or the claim was accepted.
+   */
+  rejectedBoundedClaimNote: string | null;
+}
+
+/**
+ * Explains why a claimed 'bounded_by_next_entry' basis was rejected, in reviewer-facing prose.
+ * Mirrors the same checks as resolveDurationBasis (incomplete window / non-increasing window /
+ * span over the cap) so the two never disagree about *why* a claim failed.
+ */
+function describeBoundedClaimRejection(windowStart: string | null, windowEnd: string | null): string {
+  const startMatch = windowStart?.match(/^(\d{2}):(\d{2})$/);
+  const endMatch = windowEnd?.match(/^(\d{2}):(\d{2})$/);
+
+  if (!startMatch || !endMatch) {
+    return `AI estimate: the source claimed this event's duration was bounded by the next narrative entry, but the impacted time window was incomplete, so the claim was rejected and the duration capped at ${MAX_BOUNDED_WINDOW_HOURS}h.`;
+  }
+
+  const startMinutes = parseInt(startMatch[1], 10) * 60 + parseInt(startMatch[2], 10);
+  const endMinutes = parseInt(endMatch[1], 10) * 60 + parseInt(endMatch[2], 10);
+  if (endMinutes <= startMinutes) {
+    return `AI estimate: the source claimed this event's duration was bounded by the next narrative entry (${windowStart}\u2013${windowEnd}), but the window did not increase (or crossed midnight), so the claim was rejected and the duration capped at ${MAX_BOUNDED_WINDOW_HOURS}h.`;
+  }
+
+  const spanHours = Math.round(((endMinutes - startMinutes) / 60) * 100) / 100;
+  return `AI estimate: the source claimed this event's duration was bounded by the next narrative entry (${windowStart}\u2013${windowEnd}, ${spanHours}h), which exceeds the ${MAX_BOUNDED_WINDOW_HOURS}h credibility cap for a "next entry" gap, so the claim was rejected and the duration capped at ${MAX_BOUNDED_WINDOW_HOURS}h.`;
 }
 
 /**
@@ -146,6 +176,11 @@ export function resolveDurationProvenance(input: DurationProvenanceInput): Durat
   const resolvedBasis = resolveDurationBasis(rawBasis, rawWindowStart, rawWindowEnd);
   const accepted = resolvedBasis === 'bounded_by_next_entry';
   const rejected = claimedBounded && !accepted;
+
+  // Computed from the raw (pre-clear) window, since that is the claim being explained.
+  const rejectedBoundedClaimNote = rejected
+    ? describeBoundedClaimRejection(rawWindowStart, rawWindowEnd)
+    : null;
 
   const windowStart = rejected ? null : rawWindowStart;
   const windowEnd = rejected ? null : rawWindowEnd;
@@ -171,6 +206,7 @@ export function resolveDurationProvenance(input: DurationProvenanceInput): Durat
     windowEnd,
     impactDurationHours,
     eventFinishDate: deriveEventFinishDate(input.eventStartDate, windowStart, windowEnd),
+    rejectedBoundedClaimNote,
   };
 }
 

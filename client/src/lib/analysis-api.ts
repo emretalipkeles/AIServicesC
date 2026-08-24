@@ -27,6 +27,8 @@ export interface DelayEventDto {
   podDocumentName: string | null;
   /** Short plain-language note on how POD evidence was actually used for this event/match. */
   podUsageNote: string | null;
+  /** Set when a claimed 'bounded_by_next_entry' duration was rejected and capped; explains why. */
+  rejectedBoundedClaimNote: string | null;
 }
 
 export interface AnalysisResult {

@@ -26,6 +26,8 @@ interface DelayEventData {
   podDocumentName?: string | null;
   /** Short plain-language note on how POD evidence was actually used for this event/match. */
   podUsageNote?: string | null;
+  /** Set when a claimed 'bounded_by_next_entry' duration was rejected and capped; explains why. */
+  rejectedBoundedClaimNote?: string | null;
 }
 
 const categoryColors: Record<string, { bg: string; text: string }> = {
@@ -130,6 +132,7 @@ export async function exportDelayEventsToExcel(
     { header: 'Delay Duration estimate (hrs)', key: 'duration', width: 22 },
     { header: 'Impacted Window', key: 'impactedWindow', width: 20 },
     { header: 'Duration Basis', key: 'durationBasis', width: 18 },
+    { header: 'Duration Cap Note', key: 'durationCapNote', width: 45 },
     { header: 'Source Type', key: 'sourceType', width: 14 },
     { header: 'Source Document', key: 'sourceDoc', width: 30 },
     { header: 'POD Document', key: 'podDoc', width: 26 },
@@ -175,6 +178,7 @@ export async function exportDelayEventsToExcel(
       duration: event.impactDurationHours || null,
       impactedWindow: formatImpactedWindow(event.impactedWindowStart, event.impactedWindowEnd) || '',
       durationBasis: formatDurationBasis(event.durationBasis) || '',
+      durationCapNote: event.rejectedBoundedClaimNote || '',
       sourceType: formatSourceDocumentType(event.sourceDocumentType),
       sourceDoc: event.sourceDocumentId && documentNameMap ? documentNameMap.get(event.sourceDocumentId) || '' : '',
       podDoc: event.podDocumentName || '',

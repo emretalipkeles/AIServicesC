@@ -122,6 +122,9 @@ describe('resolveDurationProvenance', () => {
     expect(result.windowEnd).toBeNull();
     expect(result.impactDurationHours).toBe(MAX_BOUNDED_WINDOW_HOURS);
     expect(result.eventFinishDate).toBeNull();
+    expect(result.rejectedBoundedClaimNote).toContain('08:00');
+    expect(result.rejectedBoundedClaimNote).toContain('16:30');
+    expect(result.rejectedBoundedClaimNote).toContain(`${MAX_BOUNDED_WINDOW_HOURS}h`);
   });
 
   it('clears the window when a bounded claim is rejected for an incomplete window', () => {
@@ -137,6 +140,19 @@ describe('resolveDurationProvenance', () => {
     expect(result.windowEnd).toBeNull();
     expect(result.impactDurationHours).toBe(3);
     expect(result.eventFinishDate).toBeNull();
+    expect(result.rejectedBoundedClaimNote).toContain('incomplete');
+  });
+
+  it('explains a rejection caused by a non-increasing window', () => {
+    const result = resolveDurationProvenance({
+      rawBasis: 'bounded_by_next_entry',
+      rawWindowStart: '15:30',
+      rawWindowEnd: '13:00',
+      rawImpactDurationHours: 3,
+      eventStartDate,
+    });
+    expect(result.durationBasis).toBe('estimated');
+    expect(result.rejectedBoundedClaimNote).toContain('did not increase');
   });
 
   it('does not cap a legitimately large document_stated or estimated duration', () => {
@@ -149,6 +165,7 @@ describe('resolveDurationProvenance', () => {
     });
     expect(result.durationBasis).toBe('estimated');
     expect(result.impactDurationHours).toBe(10);
+    expect(result.rejectedBoundedClaimNote).toBeNull();
   });
 
   it('leaves a valid timestamp_derived claim untouched', () => {
@@ -164,5 +181,17 @@ describe('resolveDurationProvenance', () => {
     expect(result.windowEnd).toBe('08:30');
     expect(result.impactDurationHours).toBe(1.5);
     expect(result.eventFinishDate).not.toBeNull();
+    expect(result.rejectedBoundedClaimNote).toBeNull();
+  });
+
+  it('does not set a rejection note for an accepted bounded claim', () => {
+    const result = resolveDurationProvenance({
+      rawBasis: 'bounded_by_next_entry',
+      rawWindowStart: '13:00',
+      rawWindowEnd: '15:30',
+      rawImpactDurationHours: 2.5,
+      eventStartDate,
+    });
+    expect(result.rejectedBoundedClaimNote).toBeNull();
   });
 });

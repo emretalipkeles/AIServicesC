@@ -87,7 +87,8 @@ function normalizeImpactDuration(value: unknown): number | null {
  */
 function buildEventMetadata(
   sourceDocumentIds: string[],
-  podAudit: { podEvidenceAvailable: boolean; podReportCount: number; podSourceDocumentId: string | null } | undefined
+  podAudit: { podEvidenceAvailable: boolean; podReportCount: number; podSourceDocumentId: string | null } | undefined,
+  rejectedBoundedClaimNote?: string | null
 ): Record<string, unknown> | null {
   // `podCorroborated` starts false on every event and is only raised by an actual corroborated
   // match, so "not corroborated" is always distinguishable from "never checked".
@@ -111,6 +112,10 @@ function buildEventMetadata(
 
   if (sourceDocumentIds.length > 1) {
     metadata.allSourceDocumentIds = sourceDocumentIds;
+  }
+
+  if (rejectedBoundedClaimNote) {
+    metadata.rejectedBoundedClaimNote = rejectedBoundedClaimNote;
   }
 
   return metadata;
@@ -626,7 +631,8 @@ export class RunAnalysisCommandHandler {
             verifiedAt: null,
             metadata: buildEventMetadata(
               deduped.sourceDocumentIds,
-              podAuditByDocumentId.get(deduped.primarySourceDocumentId ?? '')
+              podAuditByDocumentId.get(deduped.primarySourceDocumentId ?? ''),
+              provenance.rejectedBoundedClaimNote
             ),
             createdAt: now,
             updatedAt: now,
