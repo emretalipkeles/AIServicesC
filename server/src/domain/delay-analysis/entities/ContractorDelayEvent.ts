@@ -13,8 +13,17 @@ export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'needs_re
 /**
  * How impactDurationHours was actually derived, so downstream UI can distinguish a
  * timestamp-calculated figure from a document-stated figure or an AI estimate.
+ *
+ * 'bounded_by_next_entry' covers the narrative-only case: the event starts at a stated
+ * clock time and the *next* narrative entry (a distinct event/observation) closes the
+ * window, so the duration is calculated rather than guessed, but it is not a stated
+ * start/resume pair for the same event — kept visibly distinct from both.
  */
-export type DurationBasis = 'timestamp_derived' | 'document_stated' | 'estimated';
+export type DurationBasis =
+  | 'timestamp_derived'
+  | 'document_stated'
+  | 'estimated'
+  | 'bounded_by_next_entry';
 
 export interface ContractorDelayEventProps {
   id: string;

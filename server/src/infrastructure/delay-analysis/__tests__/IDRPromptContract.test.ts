@@ -73,4 +73,14 @@ describe('IDR prompt contract', () => {
   it('states that matching rules never decide whether an event exists', () => {
     expect(toolPrompt).toMatch(/NEVER govern whether an event exists/i);
   });
+
+  it.each(prompts)('%s documents bounded_by_next_entry as a distinct basis from timestamp_derived and estimated', (_name, prompt) => {
+    expect(prompt).toMatch(/bounded_by_next_entry/);
+    expect(prompt).toMatch(/NEXT.{0,40}(?:entry|timestamp)/i);
+  });
+
+  it.each(prompts)('%s warns against bounding against an implausibly distant next entry', (_name, prompt) => {
+    expect(prompt).toMatch(/do not|do NOT/i);
+    expect(prompt.toLowerCase()).toMatch(/plausible|many hours|not evidence/);
+  });
 });

@@ -10,12 +10,17 @@ export function formatDurationHours(hours: number | null | undefined): string | 
   return String(parseFloat(hours.toFixed(2)));
 }
 
-export type DurationBasis = "timestamp_derived" | "document_stated" | "estimated";
+export type DurationBasis =
+  | "timestamp_derived"
+  | "document_stated"
+  | "estimated"
+  | "bounded_by_next_entry";
 
 const DURATION_BASIS_LABELS: Record<DurationBasis, string> = {
   timestamp_derived: "From timestamps",
   document_stated: "Stated in document",
   estimated: "AI estimate",
+  bounded_by_next_entry: "Bounded by next entry",
 };
 
 /**

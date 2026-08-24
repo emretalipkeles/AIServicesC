@@ -18,7 +18,7 @@ import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfac
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 import { extractReportDateFromIDR } from '../../../../infrastructure/delay-analysis/ReportDateExtractor';
 import { renderPodDayContext } from '../../../../infrastructure/delay-analysis/PodContextRenderer';
-import { normalizeClockTime, normalizeDurationBasis, deriveEventFinishDate } from '../../../../domain/delay-analysis/DurationProvenance';
+import { resolveDurationProvenance } from '../../../../domain/delay-analysis/DurationProvenance';
 
 const MIN_MATCH_CONFIDENCE_FOR_SKIP = 85;
 
@@ -335,9 +335,13 @@ export class RunSingleDocumentAnalysisCommandHandler {
           preMatchedCount++;
         }
 
-        const windowStart = normalizeClockTime(extracted.impactedWindowStart);
-        const windowEnd = normalizeClockTime(extracted.impactedWindowEnd);
-        const durationBasis = normalizeDurationBasis(extracted.durationBasis);
+        const provenance = resolveDurationProvenance({
+          rawBasis: extracted.durationBasis,
+          rawWindowStart: extracted.impactedWindowStart,
+          rawWindowEnd: extracted.impactedWindowEnd,
+          rawImpactDurationHours: normalizeImpactDuration(extracted.impactDurationHours),
+          eventStartDate: extracted.eventDate,
+        });
         const podReportsForDate = effectivePodEvidence?.reports ?? [];
         // Only attribute a specific POD document at creation time when exactly one report
         // exists for the date — with multiple reports, the actual corroborating report (if any)
@@ -361,11 +365,11 @@ export class RunSingleDocumentAnalysisCommandHandler {
           eventDescription: extracted.eventDescription,
           eventCategory: extracted.eventCategory,
           eventStartDate: extracted.eventDate,
-          eventFinishDate: deriveEventFinishDate(extracted.eventDate, windowStart, windowEnd),
-          impactDurationHours: normalizeImpactDuration(extracted.impactDurationHours),
-          impactedWindowStart: windowStart,
-          impactedWindowEnd: windowEnd,
-          durationBasis,
+          eventFinishDate: provenance.eventFinishDate,
+          impactDurationHours: provenance.impactDurationHours,
+          impactedWindowStart: provenance.windowStart,
+          impactedWindowEnd: provenance.windowEnd,
+          durationBasis: provenance.durationBasis,
           sourceReference: extracted.sourceReference,
           extractedFromCode: extracted.extractedFromCode,
           matchConfidence: hasPreMatch ? (enforcedConfidence ?? Math.round(extracted.matchConfidence! * 100)) : null,

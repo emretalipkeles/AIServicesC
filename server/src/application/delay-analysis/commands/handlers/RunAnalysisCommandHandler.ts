@@ -25,7 +25,7 @@ import { NoOpProgressReporter } from '../../../../domain/delay-analysis/interfac
 import { ContractorDelayEvent } from '../../../../domain/delay-analysis/entities/ContractorDelayEvent';
 import { extractReportDateFromIDR } from '../../../../infrastructure/delay-analysis/ReportDateExtractor';
 import { renderPodDayContext } from '../../../../infrastructure/delay-analysis/PodContextRenderer';
-import { normalizeClockTime, normalizeDurationBasis, deriveEventFinishDate } from '../../../../domain/delay-analysis/DurationProvenance';
+import { resolveDurationProvenance } from '../../../../domain/delay-analysis/DurationProvenance';
 
 class TrackingProgressReporter implements IProgressReporter {
   constructor(
@@ -589,9 +589,13 @@ export class RunAnalysisCommandHandler {
             preMatchedCount++;
           }
 
-          const windowStart = normalizeClockTime(deduped.event.impactedWindowStart);
-          const windowEnd = normalizeClockTime(deduped.event.impactedWindowEnd);
-          const durationBasis = normalizeDurationBasis(deduped.event.durationBasis);
+          const provenance = resolveDurationProvenance({
+            rawBasis: deduped.event.durationBasis,
+            rawWindowStart: deduped.event.impactedWindowStart,
+            rawWindowEnd: deduped.event.impactedWindowEnd,
+            rawImpactDurationHours: normalizeImpactDuration(deduped.event.impactDurationHours),
+            eventStartDate: deduped.event.eventDate,
+          });
 
           const event = new ContractorDelayEvent({
             id: eventId,
@@ -605,11 +609,11 @@ export class RunAnalysisCommandHandler {
             eventDescription: deduped.event.eventDescription,
             eventCategory: deduped.event.eventCategory,
             eventStartDate: deduped.event.eventDate,
-            eventFinishDate: deriveEventFinishDate(deduped.event.eventDate, windowStart, windowEnd),
-            impactDurationHours: normalizeImpactDuration(deduped.event.impactDurationHours),
-            impactedWindowStart: windowStart,
-            impactedWindowEnd: windowEnd,
-            durationBasis,
+            eventFinishDate: provenance.eventFinishDate,
+            impactDurationHours: provenance.impactDurationHours,
+            impactedWindowStart: provenance.windowStart,
+            impactedWindowEnd: provenance.windowEnd,
+            durationBasis: provenance.durationBasis,
             sourceReference: deduped.event.sourceReference,
             extractedFromCode: deduped.event.extractedFromCode,
             matchConfidence: hasPreMatch ? (enforcedConfidence ?? Math.round(deduped.event.matchConfidence! * 100)) : null,

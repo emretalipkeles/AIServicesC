@@ -86,10 +86,14 @@ CRITICAL ANALYSIS REQUIREMENTS:
   * Is the contractor clearly responsible, or is it ambiguous? Check the exclusions list.
   * Can delay duration be determined from the narrative?
 - DURATION ESTIMATION (REQUIRED): You MUST provide impactDurationHours for EVERY delay event.
-  * If explicitly stated (e.g., "1.5 hour"): use that value
-  * If timestamps show start/end: calculate the difference
-  * If waiting on direction: estimate 2-4 hours minimum
-  * If unclear: provide your best estimate (minimum 0.5h) - NEVER leave duration null
+  Determine it in this priority order (highest first):
+  1. Explicitly stated (e.g., "1.5 hour"): use that value → durationBasis: "document_stated"
+  2. Timestamps show start/end of the SAME event: calculate the difference → durationBasis: "timestamp_derived"
+  3. Event starts at a timestamp with no resumption, but the NEXT distinct entry's timestamp is a
+     plausible gap (a few hours at most): calculate the gap → durationBasis: "bounded_by_next_entry"
+  4. Waiting on direction with nothing to bound against: estimate 2-4 hours minimum → durationBasis: "estimated"
+  5. Unclear: provide your best estimate (minimum 0.5h) - NEVER leave duration null → durationBasis: "estimated"
+  See the DIARY / NARRATIVE ANALYSIS section below for the full rules and worked examples for #2 and #3.
 - RESPONSIBILITY VERIFICATION: Analyze the narrative to confirm contractor responsibility
   * Some CODE_CIE entries might be false positives
   * Look for clear contractor-caused issues vs. external factors
@@ -119,11 +123,22 @@ though no form field flags them and no code tags them.
 Inspectors use various formats: 0700, 07:00, 7:00, 7am, 7:00 AM, 7 AM, 0700hrs
 
 **DURATION CALCULATION FROM TIMESTAMPS:**
-When diary entries show work stoppage and resumption, CALCULATE the delay duration:
+When diary entries show work stoppage and resumption OF THE SAME EVENT, CALCULATE the delay duration:
 - Example: "0700 - crew stopped work, machine not running" ... "0830 - crew resumed after repair"
-  → Delay duration = 1.5 hours (from 07:00 to 08:30)
+  → Delay duration = 1.5 hours (from 07:00 to 08:30), durationBasis: "timestamp_derived"
 - Example: "1415 - excavation stopped due to tree roots (DSC 295)" ... "1500 - work resumed"
-  → Delay duration = 0.75 hours (45 minutes)
+  → Delay duration = 0.75 hours (45 minutes), durationBasis: "timestamp_derived"
+
+**WHEN THE NARRATIVE NEVER RETURNS TO THE EVENT — BOUND BY THE NEXT ENTRY:**
+Often the diary never says the stopped work resumed; it simply moves on to the next timestamped
+entry, which describes something else entirely. When that next entry is a plausible amount of time
+later (a few hours at most), treat its timestamp as the point the delay ended and CALCULATE the gap:
+- Example: "1300 - slip-form curb machine broke, stopped work" ... "1530 - exposed water main found
+  (unrelated)" → the curb delay is bounded by the 15:30 entry → Delay duration = 2.5 hours,
+  impactedWindowStart: "13:00", impactedWindowEnd: "15:30", durationBasis: "bounded_by_next_entry"
+Do NOT bound against an entry many hours later or on the next day — that gap is not evidence the delay
+itself lasted that long. When the next entry is too far away (or there is no next entry), fall back to
+an estimate instead: durationBasis: "estimated".
 
 **WHAT TO EXTRACT FROM DIARY:**
 1. Work stoppages with timestamps (calculate duration from time gaps)
@@ -142,10 +157,12 @@ from non-timestamped sections (form fields, discrepancy blocks, attached memos) 
 must instead cite the section they came from.
 
 **DURATION FROM TIMESTAMPS TAKES PRECEDENCE OVER ESTIMATION:**
-When the narrative gives you a stoppage time and a resumption time, you MUST compute the elapsed time
-and report it exactly — including fractions such as 0.75, 1.5, or 2.25. Do NOT round a computed gap to
-a whole number, and do NOT fall back to a generic estimate when the timestamps let you calculate the
-real figure. Only use estimation when the narrative provides no resolvable times.
+When the narrative gives you a stoppage time and a resumption time (timestamp_derived), or a start time
+that is bounded by the next distinct entry's timestamp (bounded_by_next_entry), you MUST compute the
+elapsed time and report it exactly — including fractions such as 0.75, 1.5, or 2.25. Do NOT round a
+computed gap to a whole number, and do NOT fall back to a generic estimate when a timestamp lets you
+calculate the real figure. Only use estimation when the narrative provides no resolvable times, or when
+the next entry is too far away (more than a few hours) to plausibly bound the same delay.
 
 =============================================================================
 DELAY EVENT CONFIDENCE ASSESSMENT
@@ -183,7 +200,7 @@ Return a JSON object with TWO arrays:
       "impactDurationHours": 2.0 (REQUIRED - always provide a number, never null),
       "impactedWindowStart": "HH:MM clock time the impact began, ONLY when the narrative gives a real time" or null,
       "impactedWindowEnd": "HH:MM clock time the impact ended, ONLY when the narrative gives a real time" or null,
-      "durationBasis": "one of: timestamp_derived (calculated from two clock times), document_stated (explicit duration written), estimated (inferred with no times/explicit duration)",
+      "durationBasis": "one of: timestamp_derived (start/resume times for THIS SAME event), document_stated (explicit duration written), bounded_by_next_entry (event's start time bounded by the NEXT, different narrative entry's timestamp), estimated (inferred with no times/explicit duration)",
       "sourceReference": "MUST include DSC/NCR number if mentioned (e.g., 'DSC 293: Page 2'). Format: 'DSC XXX' + location",
       "extractedFromCode": "CODE_CIE or IDR_OBSERVATION",
       "confidenceScore": 0.85,

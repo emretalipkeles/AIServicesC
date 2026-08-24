@@ -88,7 +88,7 @@ Return a JSON object with the structure:
       "impactDurationHours": number (REQUIRED - always estimate hours even if not explicit),
       "impactedWindowStart": "HH:MM clock time the impact began, ONLY when the narrative states or implies a specific start time" or null,
       "impactedWindowEnd": "HH:MM clock time the impact ended, ONLY when the narrative states or implies a specific end time" or null,
-      "durationBasis": "one of: timestamp_derived (calculated from two clock times in the narrative), document_stated (an explicit duration like '1.5 hours' was written), estimated (no times or explicit duration, you inferred a reasonable figure)",
+      "durationBasis": "one of: timestamp_derived (start/resume times stated for THIS SAME event), document_stated (an explicit duration like '1.5 hours' was written), bounded_by_next_entry (event starts at a stated clock time and the NEXT narrative entry — a different event/observation — closes the window), estimated (no times or explicit duration, you inferred a reasonable figure)",
       "sourceReference": "Include DSC/NCR/RFI number if mentioned (e.g., 'DSC 293', 'NCR-045') AND page/section reference",
       "extractedFromCode": "code tag if applicable",
       "confidenceScore": 0.0-1.0,
@@ -125,22 +125,27 @@ You MUST provide impactDurationHours for EVERY delay event. Never leave it null 
 Fractional values are supported and expected — report 0.75 or 1.5 when that is the real figure.
 
 **HOW TO DETERMINE DURATION (in priority order):**
-1. If explicitly stated (e.g., "1.5 hour", "2 hours"): use that value
-2. If timestamps show start/end (e.g., "0700 stopped" ... "0830 resumed"): CALCULATE the difference (1.5h) — this takes precedence over any estimate
-3. If waiting for direction/decision: estimate based on typical response times (often 2-4 hours or more)
-4. If rework/correction needed: estimate based on scope (typically 1-4 hours)
-5. If no clear indication: use reasonable estimate based on the nature of the delay (minimum 0.5h)
+1. If explicitly stated (e.g., "1.5 hour", "2 hours"): use that value → durationBasis: "document_stated"
+2. If the narrative gives a start AND resume/stop time for THIS SAME event (e.g., "0700 stopped" ... "0830 resumed [the same work]"): CALCULATE the difference — this takes precedence over any estimate → durationBasis: "timestamp_derived"
+3. If the event starts at a stated clock time but the narrative never returns to it — the delay is only closed by the NEXT timestamped entry, which describes a DIFFERENT event or observation: treat that next timestamp as the point the delay ended, and CALCULATE the difference → durationBasis: "bounded_by_next_entry". Only use this when the gap to the next entry is a plausible delay length (a few hours at most) — do not bound against an entry many hours or a full shift later; when the gap is implausible, fall back to an estimate instead.
+4. If waiting for direction/decision with no next entry to bound against: estimate based on typical response times (often 2-4 hours or more) → durationBasis: "estimated"
+5. If rework/correction needed: estimate based on scope (typically 1-4 hours) → durationBasis: "estimated"
+6. If no clear indication: use reasonable estimate based on the nature of the delay (minimum 0.5h) → durationBasis: "estimated"
 
 Examples:
 - "CDF removal took 1.5 hours" → impactDurationHours: 1.5, durationBasis: "document_stated"
-- "0800 stopped, 0930 resumed" → impactDurationHours: 1.5, impactedWindowStart: "08:00", impactedWindowEnd: "09:30", durationBasis: "timestamp_derived"
+- "0800 stopped, 0930 resumed" (same event resumes) → impactDurationHours: 1.5, impactedWindowStart: "08:00", impactedWindowEnd: "09:30", durationBasis: "timestamp_derived"
+- "1300 slip-form curb machine broke, had to stop" ... next entry "1530 exposed water main found" (a different, unrelated event) → the curb event is bounded by the 15:30 entry: impactDurationHours: 2.5, impactedWindowStart: "13:00", impactedWindowEnd: "15:30", durationBasis: "bounded_by_next_entry"
+- "1500 exposed water main found" ... next entry is hours later or the next day (e.g. "0730 Offsite" the following morning) — the gap is not a plausible single delay length, so do NOT bound against it → impactDurationHours: reasonable estimate, durationBasis: "estimated"
 - "Waiting on SPU direction" (no resolution noted) → impactDurationHours: 2 (or more based on context), durationBasis: "estimated"
 - "Large roots encountered, excavation stopped" → impactDurationHours: 1 (estimate), durationBasis: "estimated"
 
 ## IMPACTED WINDOW — ONLY WHEN THE NARRATIVE SUPPORTS IT:
 impactedWindowStart/impactedWindowEnd must be null unless the narrative gives you real clock times for
-this specific event. Never invent times to satisfy the field. When durationBasis is "timestamp_derived",
-both window fields MUST be populated with the exact times used for the calculation.`;
+this specific event. Never invent times to satisfy the field. When durationBasis is "timestamp_derived"
+or "bounded_by_next_entry", both window fields MUST be populated with the exact times used for the
+calculation — for "bounded_by_next_entry" that means the event's own start time and the next distinct
+entry's timestamp.`;
   }
 
   buildUserPromptSuffix(): string {

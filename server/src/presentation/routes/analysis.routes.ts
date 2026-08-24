@@ -167,6 +167,7 @@ export function registerAnalysisRoutes(app: Express, container: AppContainer): v
           timestamp_derived: 'From timestamps',
           document_stated: 'Stated in document',
           estimated: 'AI estimate',
+          bounded_by_next_entry: 'Bounded by next entry',
         };
         const formatDurationBasisLabel = (basis: string | null): string =>
           basis ? (durationBasisLabels[basis] ?? '') : '';
