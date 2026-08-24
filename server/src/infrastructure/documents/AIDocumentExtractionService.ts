@@ -209,12 +209,13 @@ Base64 content:
 ${base64Content}`;
 
     try {
+      // temperature is omitted: this always routes to the gpt-5.4 reasoning
+      // deployment, which rejects non-default temperature once reasoning_effort is set.
       const response = await aiClient.chat({
         model: ModelId.gpt54(),
         messages: [AIMessage.user(userMessage)],
         systemPrompt,
         maxTokens: 100000,
-        temperature: 0,
       });
 
       if (response.content.includes('[EXTRACTION_FAILED]')) {

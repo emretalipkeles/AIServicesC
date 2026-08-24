@@ -35,3 +35,18 @@ export class BusinessRuleViolationError extends DomainError {
     super(details ? `${rule}: ${details}` : rule);
   }
 }
+
+/**
+ * Raised when an AI provider stops generating because it hit the completion token
+ * budget (finish_reason === 'length') rather than finishing naturally. On reasoning
+ * models, reasoning tokens are drawn from the same budget as visible output, so this
+ * can happen well before any usable content (or a complete JSON payload) was written.
+ * Callers must surface this as a failure instead of parsing/returning whatever partial
+ * content came back — a short or unparseable event list is otherwise indistinguishable
+ * from a genuine "nothing found" result.
+ */
+export class AIResponseTruncatedError extends DomainError {
+  constructor(context: string, maxTokens: number) {
+    super(`${context}: AI response was truncated (finish_reason=length) at max_completion_tokens=${maxTokens}. Increase the token budget or reduce input size.`);
+  }
+}

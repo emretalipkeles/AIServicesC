@@ -8,8 +8,12 @@ import type {
   TestConnectionResult 
 } from '../../domain/interfaces/IAIClient';
 import type { ModelId } from '../../domain/value-objects/ModelId';
+import { AIResponseTruncatedError } from '../../domain/errors/DomainError';
 
-const DEFAULT_MAX_TOKENS = 4096;
+// gpt-5.4 is a reasoning model: reasoning tokens are drawn from the same
+// max_completion_tokens budget as visible output, so the ceiling has to leave
+// headroom for reasoning overhead on top of whatever content is expected.
+const DEFAULT_MAX_TOKENS = 16000;
 
 export class OpenAIResponsesClient implements IAIClient {
   private readonly client: AzureOpenAI;
@@ -22,14 +26,20 @@ export class OpenAIResponsesClient implements IAIClient {
     const messages = this.buildMessages(options);
 
     const deploymentName = options.model.getAzureDeploymentName();
+    const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
 
     const response = await this.client.chat.completions.create({
       model: deploymentName,
       messages,
-      max_completion_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
+      max_completion_tokens: maxTokens,
+      ...this.reasoningOrTemperature(options),
     });
 
     const choice = response.choices[0];
+
+    if (choice?.finish_reason === 'length') {
+      throw new AIResponseTruncatedError(`OpenAIResponsesClient.chat (${deploymentName})`, maxTokens);
+    }
 
     return {
       content: choice?.message?.content ?? '',
@@ -49,21 +59,30 @@ export class OpenAIResponsesClient implements IAIClient {
 
     try {
       const deploymentName = options.model.getAzureDeploymentName();
+      const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
 
       const stream = await this.client.chat.completions.create({
         model: deploymentName,
         messages,
-        max_completion_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
+        max_completion_tokens: maxTokens,
+        ...this.reasoningOrTemperature(options),
         stream: true,
         stream_options: { include_usage: true },
       });
+
+      let finishReason: string | null = null;
 
       for await (const chunk of stream) {
         if (streamOptions?.abortSignal?.aborted) {
           break;
         }
 
-        const delta = chunk.choices[0]?.delta;
+        const choice = chunk.choices[0];
+        if (choice?.finish_reason) {
+          finishReason = choice.finish_reason;
+        }
+
+        const delta = choice?.delta;
         if (delta?.content) {
           onChunk({
             type: 'content',
@@ -72,6 +91,14 @@ export class OpenAIResponsesClient implements IAIClient {
         }
 
         if (chunk.usage) {
+          if (finishReason === 'length') {
+            onChunk({
+              type: 'error',
+              error: new AIResponseTruncatedError(`OpenAIResponsesClient.streamChat (${deploymentName})`, maxTokens).message,
+            });
+            return;
+          }
+
           onChunk({
             type: 'done',
             inputTokens: chunk.usage.prompt_tokens ?? 0,
@@ -98,7 +125,11 @@ export class OpenAIResponsesClient implements IAIClient {
         model: deploymentName,
         messages: [{ role: 'user', content: 'Hello' }],
         max_completion_tokens: 10,
+        reasoning_effort: model.getReasoningEffort(),
       });
+      // testConnection always exercises the reasoning_effort path deliberately: it
+      // verifies the deployment answers a reasoning-mode request, which is the
+      // default posture for every OpenAI call site that doesn't opt out via temperature.
 
       return {
         success: true,
@@ -119,6 +150,20 @@ export class OpenAIResponsesClient implements IAIClient {
 
   getAuthMethod(): 'api-key' | 'iam' {
     return 'api-key';
+  }
+
+  // reasoning_effort and temperature are mutually exclusive on this reasoning-model
+  // deployment: Azure rejects any non-default temperature once reasoning_effort is
+  // set. Callers that need deterministic output (e.g. structured extraction/matching)
+  // can pass an explicit temperature to opt out of reasoning_effort for that call;
+  // everyone else gets reasoning_effort (driven by ModelId) by default.
+  private reasoningOrTemperature(
+    options: ChatOptions
+  ): { temperature: number } | { reasoning_effort: 'medium' | 'high' } {
+    if (options.temperature !== undefined) {
+      return { temperature: options.temperature };
+    }
+    return { reasoning_effort: options.model.getReasoningEffort() };
   }
 
   private buildMessages(options: ChatOptions): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {

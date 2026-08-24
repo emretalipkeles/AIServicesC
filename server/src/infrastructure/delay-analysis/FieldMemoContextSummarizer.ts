@@ -3,6 +3,7 @@ import type { IProjectDocumentRepository } from '../../domain/delay-analysis/rep
 import type { IAIClient } from '../../domain/interfaces/IAIClient';
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 import { ModelId } from '../../domain/value-objects/ModelId';
+import { AIResponseTruncatedError } from '../../domain/errors/DomainError';
 
 const MAX_FM_CONTENT_LENGTH = 30000;
 const MAX_COMBINED_FM_LENGTH = 60000;
@@ -77,17 +78,22 @@ ${combinedContent}`;
     try {
       console.log(`[FieldMemoContextSummarizer] Summarizing ${filteredMemos.length} field memos for project ${projectId}`);
 
+      // temperature is omitted: this always routes to the gpt-5.4 reasoning
+      // deployment, which rejects non-default temperature once reasoning_effort is set.
       const response = await this.aiClient.chat({
         model: ModelId.gpt54(),
         messages: [AIMessage.user(prompt)],
-        maxTokens: 1500,
-        temperature: 0,
+        maxTokens: 4000,
       });
 
       console.log(`[FieldMemoContextSummarizer] Summary generated (${response.outputTokens} tokens output)`);
 
       return response.content;
     } catch (error) {
+      if (error instanceof AIResponseTruncatedError) {
+        console.error('[FieldMemoContextSummarizer] AI response truncated:', error.message);
+        throw error;
+      }
       console.error('[FieldMemoContextSummarizer] Failed to summarize field memos:', error);
       return null;
     }

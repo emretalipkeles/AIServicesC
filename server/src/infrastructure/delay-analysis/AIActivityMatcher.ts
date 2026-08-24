@@ -5,6 +5,7 @@ import type { IDRWorkActivity } from '../../domain/delay-analysis/interfaces/IDo
 import { AIMessage } from '../../domain/value-objects/AIMessage';
 import { ModelId } from '../../domain/value-objects/ModelId';
 import { rankActivitiesByPodEvidence, findPodCorroboration } from '../../domain/delay-analysis/config/PodCandidateRanker';
+import { AIResponseTruncatedError } from '../../domain/errors/DomainError';
 
 /**
  * Wraps rendered POD context the same way PODExtractionStrategy marks uploaded content as
@@ -246,10 +247,13 @@ export class AIActivityMatcher implements IActivityMatcher {
       .replace('{podContext}', this.buildPodContextBlock(options?.podEvidence));
 
     try {
+      // temperature: 0 opts this call out of reasoning_effort (mutually exclusive on
+      // this deployment) to keep activity matching deterministic and literal — see
+      // .agents/memory/reasoning-model-openai-client.md.
       const response = await this.aiClient.chat({
         model: ModelId.gpt54(),
         messages: [AIMessage.user(prompt)],
-        maxTokens: 500,
+        maxTokens: 4000,
         temperature: 0,
       });
 
@@ -284,6 +288,10 @@ export class AIActivityMatcher implements IActivityMatcher {
       console.log('[AIActivityMatcher] Force-match AI response could not be parsed — will use deterministic fallback');
       return null;
     } catch (error) {
+      if (error instanceof AIResponseTruncatedError) {
+        console.error('[AIActivityMatcher] AI response truncated in force-match:', error.message);
+        throw error;
+      }
       console.error('[AIActivityMatcher] Error in force-match:', error);
       return null;
     }
@@ -343,10 +351,13 @@ export class AIActivityMatcher implements IActivityMatcher {
     try {
       console.log(`[AI] MATCHING: Full schedule match for event: "${eventDescription.substring(0, 80)}..." (${filteredActivities.length} activities)`);
 
+      // temperature: 0 opts this call out of reasoning_effort (mutually exclusive on
+      // this deployment) to keep activity matching deterministic and literal — see
+      // .agents/memory/reasoning-model-openai-client.md.
       const response = await this.aiClient.chat({
         model: ModelId.gpt54(),
         messages: [AIMessage.user(prompt)],
-        maxTokens: 1000,
+        maxTokens: 4000,
         temperature: 0,
       });
 
@@ -377,6 +388,10 @@ export class AIActivityMatcher implements IActivityMatcher {
 
       return result;
     } catch (error) {
+      if (error instanceof AIResponseTruncatedError) {
+        console.error('[AIActivityMatcher] AI response truncated matching activity:', error.message);
+        throw error;
+      }
       console.error('[AIActivityMatcher] Error matching activity:', error);
       return null;
     }

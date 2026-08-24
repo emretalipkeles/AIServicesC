@@ -8,6 +8,7 @@ import { ModelId } from '../../domain/value-objects/ModelId';
 import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
 import { auditNarrativeProvenance } from './NarrativeProvenanceCheck';
 import { normalizeClockTime, normalizeDurationBasis } from '../../domain/delay-analysis/DurationProvenance';
+import { AIResponseTruncatedError } from '../../domain/errors/DomainError';
 
 interface IDRExtractionResponse {
   workActivities?: Array<{
@@ -48,11 +49,13 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
     try {
       console.log(`[AI] EXTRACTION: Starting delay event extraction for "${documentFilename}" (type: ${documentType}, strategy: ${strategy.strategyName})`);
       
+      // temperature is omitted: this always routes to the gpt-5.4 reasoning
+      // deployment, which rejects non-default temperature once reasoning_effort is
+      // set (OpenAIResponsesClient sends reasoning_effort on every request).
       const response = await this.aiClient.chat({
         model: ModelId.gpt54(),
         messages: [AIMessage.user(strategyResult.prompt)],
-        maxTokens: 4000,
-        temperature: 0,
+        maxTokens: 16000,
       });
       
       console.log(`[AI] EXTRACTION: Completed - used ${response.inputTokens} input + ${response.outputTokens} output tokens`);
@@ -102,6 +105,12 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
         workActivities: parseResult.workActivities,
       };
     } catch (error) {
+      if (error instanceof AIResponseTruncatedError) {
+        // Don't let a truncated response degrade into an empty event list that looks
+        // identical to a genuine "no delays found" result — surface it as a failure.
+        console.error('[AIDelayEventExtractor] AI response truncated:', error.message);
+        throw error;
+      }
       console.error('Error extracting delay events:', error);
       return {
         events: [],

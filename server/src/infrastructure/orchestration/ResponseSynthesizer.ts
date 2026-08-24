@@ -66,12 +66,15 @@ ${agentResponsesText}
 
 Please provide a unified, coherent response that addresses the user's question. Consider the conversation history if provided.`;
 
+    // temperature is omitted: this always routes to the gpt-5.4 reasoning
+    // deployment, which rejects non-default temperature once reasoning_effort is set.
+    // maxTokens is sized well above the visible response length because reasoning
+    // tokens are drawn from the same budget before any output is produced.
     const response = await this.aiClient.chat({
       model: ModelId.gpt54(),
       systemPrompt: SYNTHESIS_SYSTEM_PROMPT,
       messages: [AIMessage.user(userPrompt)],
-      maxTokens: 2048,
-      temperature: 0.7,
+      maxTokens: 8000,
     });
 
     return response.content;
@@ -111,19 +114,30 @@ ${agentResponsesText}
 
 Please provide a unified, coherent response that addresses the user's question. Consider the conversation history if provided.`;
 
+    let streamError: string | null = null;
+
+    // temperature is omitted and maxTokens is raised for the same reasoning-model
+    // reasons as synthesize() above.
     await this.aiClient.streamChat(
       {
         model: ModelId.gpt54(),
         systemPrompt: SYNTHESIS_SYSTEM_PROMPT,
         messages: [AIMessage.user(userPrompt)],
-        maxTokens: 2048,
-        temperature: 0.7,
+        maxTokens: 8000,
       },
       (streamChunk) => {
         if (streamChunk.type === 'content' && streamChunk.content) {
           onChunk(streamChunk.content);
+        } else if (streamChunk.type === 'error') {
+          streamError = streamChunk.error ?? 'Unknown streaming error';
         }
       }
     );
+
+    if (streamError) {
+      // Content already emitted via onChunk is necessarily partial/truncated at this
+      // point; surface the failure instead of letting the caller treat it as success.
+      throw new Error(streamError);
+    }
   }
 }

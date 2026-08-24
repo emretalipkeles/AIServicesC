@@ -13,6 +13,7 @@ import { DocumentExtractionStrategyFactory } from './extraction-strategies/Docum
 import { auditNarrativeProvenance } from './NarrativeProvenanceCheck';
 import { normalizeClockTime, normalizeDurationBasis } from '../../domain/delay-analysis/DurationProvenance';
 import { OPENAI_MODELS } from '../../domain/value-objects/ModelId';
+import { AIResponseTruncatedError } from '../../domain/errors/DomainError';
 import type OpenAI from 'openai';
 import type { AzureOpenAI } from 'openai';
 
@@ -189,17 +190,27 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
       while (continueLoop) {
         console.log(`[AI] TOOL-EXTRACTION: Calling OpenAI API with function calling enabled...`);
         
+        // temperature: 0 deliberately opts this call out of reasoning_effort (the two
+        // are mutually exclusive on this deployment) to keep event/duration extraction
+        // deterministic — see the comment above REASONING_EFFORT's old definition.
         const response = await this.openai.chat.completions.create({
           model: getToolExtractionModel(),
           messages,
           tools,
-          max_completion_tokens: 4000,
+          max_completion_tokens: MAX_COMPLETION_TOKENS,
           temperature: 0,
         });
 
         const choice = response.choices[0];
         totalInputTokens += response.usage?.prompt_tokens ?? 0;
         totalOutputTokens += response.usage?.completion_tokens ?? 0;
+
+        if (choice.finish_reason === 'length') {
+          throw new AIResponseTruncatedError(
+            `AIDelayEventExtractorWithTools.extractDelayEventsWithTools (${documentFilename})`,
+            MAX_COMPLETION_TOKENS
+          );
+        }
 
         if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls) {
           messages.push({
@@ -324,6 +335,13 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
         workActivities: parseResult.workActivities,
       };
     } catch (error) {
+      if (error instanceof AIResponseTruncatedError) {
+        // Never let a truncated response degrade into an empty/short event list that
+        // looks identical to a genuine "no delays found" result — surface it as a
+        // failure so the caller records it as a per-document extraction error.
+        console.error('[AIDelayEventExtractorWithTools] AI response truncated:', error.message);
+        throw error;
+      }
       console.error('[AIDelayEventExtractorWithTools] Error extracting delay events:', error);
       return {
         events: [],
@@ -554,3 +572,5 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
     return null;
   }
 }
+
+const MAX_COMPLETION_TOKENS = 16000;

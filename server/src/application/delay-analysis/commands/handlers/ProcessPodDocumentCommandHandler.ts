@@ -48,12 +48,13 @@ export class ProcessPodDocumentCommandHandler {
 
       // Retried because unbounded-concurrency uploads can trip the AI provider's rate
       // limits; a transient 429/5xx should not permanently drop the extraction.
+      // temperature is omitted: this always routes to the gpt-5.4 reasoning
+      // deployment, which rejects non-default temperature once reasoning_effort is set.
       const response = await retryWithBackoff(() =>
         this.aiClient.chat({
           model: ModelId.gpt54(),
           messages: [AIMessage.user(prompt)],
-          maxTokens: 4000,
-          temperature: 0,
+          maxTokens: 16000,
         })
       );
 

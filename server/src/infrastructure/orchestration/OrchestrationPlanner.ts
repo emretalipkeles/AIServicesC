@@ -65,12 +65,13 @@ User's Current Question: ${context.userMessage}
 Analyze which agent(s) should handle this question and create an execution plan. Consider the conversation history if present.`;
 
     try {
+      // temperature is omitted: this always routes to the gpt-5.4 reasoning
+      // deployment, which rejects non-default temperature once reasoning_effort is set.
       const response = await this.aiClient.chat({
         model: ModelId.gpt54(),
         systemPrompt: PLANNING_SYSTEM_PROMPT,
         messages: [AIMessage.user(userPrompt)],
-        maxTokens: 1024,
-        temperature: 0,
+        maxTokens: 4000,
       });
 
       let content = response.content.trim();

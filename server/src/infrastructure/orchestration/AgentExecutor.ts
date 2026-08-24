@@ -122,8 +122,7 @@ export class AgentExecutor implements IAgentExecutor {
         model,
         systemPrompt,
         messages: [AIMessage.user(prompt)],
-        maxTokens: 2048,
-        temperature: 0.7,
+        ...this.chatTuning(model),
       });
 
       return {
@@ -141,6 +140,17 @@ export class AgentExecutor implements IAgentExecutor {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+  }
+
+  // gpt-5.4/gpt-5.4-high are reasoning models: Azure rejects any non-default temperature
+  // once reasoning_effort is set, and reasoning tokens are drawn from the same budget as
+  // visible output, so the ceiling needs headroom beyond a plain chat reply. Bedrock models
+  // are unaffected, so temperature is preserved for them.
+  private chatTuning(model: ModelId): { maxTokens: number; temperature?: number } {
+    if (model.isOpenAI()) {
+      return { maxTokens: 8000 };
+    }
+    return { maxTokens: 2048, temperature: 0.7 };
   }
 
   async executeStream(
@@ -203,22 +213,36 @@ export class AgentExecutor implements IAgentExecutor {
       }
 
       let fullResponse = '';
+      let streamError: string | null = null;
 
       await aiClient.streamChat(
         {
           model,
           systemPrompt,
           messages: [AIMessage.user(prompt)],
-          maxTokens: 2048,
-          temperature: 0.7,
+          ...this.chatTuning(model),
         },
         (streamChunk) => {
           if (streamChunk.type === 'content' && streamChunk.content) {
             fullResponse += streamChunk.content;
             onChunk(streamChunk.content);
+          } else if (streamChunk.type === 'error') {
+            streamError = streamChunk.error ?? 'Unknown streaming error';
           }
         }
       );
+
+      if (streamError) {
+        // Any content already emitted via onChunk is necessarily partial/truncated;
+        // report failure instead of letting the caller treat it as a success.
+        return {
+          agentId: step.agentId,
+          agentName: step.agentName,
+          response: fullResponse,
+          success: false,
+          error: streamError,
+        };
+      }
 
       return {
         agentId: step.agentId,
@@ -286,8 +310,7 @@ export class AgentExecutor implements IAgentExecutor {
         model,
         systemPrompt,
         messages: [AIMessage.user(step.refinedPrompt)],
-        maxTokens: 2048,
-        temperature: 0.7,
+        ...this.chatTuning(model),
       });
 
       return {
@@ -358,22 +381,34 @@ export class AgentExecutor implements IAgentExecutor {
       }
 
       let fullResponse = '';
+      let streamError: string | null = null;
 
       await aiClient.streamChat(
         {
           model,
           systemPrompt,
           messages: [AIMessage.user(step.refinedPrompt)],
-          maxTokens: 2048,
-          temperature: 0.7,
+          ...this.chatTuning(model),
         },
         (streamChunk) => {
           if (streamChunk.type === 'content' && streamChunk.content) {
             fullResponse += streamChunk.content;
             onChunk(streamChunk.content);
+          } else if (streamChunk.type === 'error') {
+            streamError = streamChunk.error ?? 'Unknown streaming error';
           }
         }
       );
+
+      if (streamError) {
+        return {
+          agentId: step.agentId,
+          agentName: step.agentName,
+          response: fullResponse,
+          success: false,
+          error: streamError,
+        };
+      }
 
       return {
         agentId: step.agentId,

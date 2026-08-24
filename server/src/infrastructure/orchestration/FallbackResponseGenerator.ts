@@ -56,19 +56,32 @@ ${agentList}
 
 Please respond to the user based on the conversation context. If the user is referencing something from the conversation history (like a recent package upload or previous action), acknowledge that context and respond appropriately. Be friendly and add a bit of personality!`;
 
+    let streamError: string | null = null;
+
+    // temperature is omitted: this always routes to the gpt-5.4 reasoning deployment,
+    // which rejects non-default temperature once reasoning_effort is set. maxTokens is
+    // raised well above the expected reply length because reasoning tokens are drawn
+    // from the same budget before any output is produced.
     await this.aiClient.streamChat(
       {
         model: ModelId.gpt54(),
         systemPrompt: FALLBACK_SYSTEM_PROMPT,
         messages: [AIMessage.user(userPrompt)],
-        maxTokens: 512,
-        temperature: 0.7,
+        maxTokens: 4000,
       },
       (chunk: StreamChunk) => {
         if (chunk.type === 'content' && chunk.content) {
           onChunk(chunk.content);
+        } else if (chunk.type === 'error') {
+          streamError = chunk.error ?? 'Unknown streaming error';
         }
       }
     );
+
+    if (streamError) {
+      // Content already emitted via onChunk is necessarily partial/truncated at this
+      // point; surface the failure instead of letting the caller treat it as success.
+      throw new Error(streamError);
+    }
   }
 }

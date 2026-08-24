@@ -1,6 +1,16 @@
 import type { AzureOpenAI } from 'openai';
 import type OpenAI from 'openai';
 import type { IToolUseClient, ToolUseRequest, ToolUseResponse, ToolCallBlock, TokenUsageInfo } from '../../../domain/delay-analysis/interfaces/IToolUseClient';
+import { AIResponseTruncatedError } from '../../../domain/errors/DomainError';
+import { ModelId } from '../../../domain/value-objects/ModelId';
+
+// This client always talks to the gpt-5.4 reasoning deployment (agent verification
+// loop), so its reasoning effort is fixed at the model's default ('medium').
+const REASONING_EFFORT = ModelId.gpt54().getReasoningEffort();
+
+// Reasoning tokens are drawn from the same max_completion_tokens budget as visible
+// output/tool-call text, so this has to leave headroom beyond just the final answer.
+const MAX_COMPLETION_TOKENS = 16000;
 
 export class OpenAIToolUseClient implements IToolUseClient {
   private readonly openai: AzureOpenAI;
@@ -42,23 +52,30 @@ export class OpenAIToolUseClient implements IToolUseClient {
       };
     });
 
+    // temperature is intentionally omitted: Azure rejects any non-default temperature
+    // once reasoning_effort is set on a reasoning-model deployment like gpt-5.4.
     const response = await this.openai.chat.completions.create({
       model: this.model,
       messages: openaiMessages,
       tools: openaiTools.length > 0 ? openaiTools : undefined,
       stream: true,
       stream_options: { include_usage: true },
-      max_completion_tokens: 4000,
-      temperature: 0.3,
+      max_completion_tokens: MAX_COMPLETION_TOKENS,
+      reasoning_effort: REASONING_EFFORT,
     });
 
     let accumulatedText = '';
     const toolCalls: Array<{ id: string; function: { name: string; arguments: string } }> = [];
     let currentToolCall: { id: string; function: { name: string; arguments: string } } | null = null;
     let tokenUsage: TokenUsageInfo | undefined;
+    let finishReason: string | null = null;
 
     for await (const chunk of response) {
-      const delta = chunk.choices[0]?.delta;
+      const choice = chunk.choices[0];
+      const delta = choice?.delta;
+      if (choice?.finish_reason) {
+        finishReason = choice.finish_reason;
+      }
 
       if (delta?.content) {
         accumulatedText += delta.content;
@@ -91,6 +108,10 @@ export class OpenAIToolUseClient implements IToolUseClient {
           totalTokens: chunk.usage.total_tokens ?? 0,
         };
       }
+    }
+
+    if (finishReason === 'length') {
+      throw new AIResponseTruncatedError(`OpenAIToolUseClient.chatWithTools (${this.model})`, MAX_COMPLETION_TOKENS);
     }
 
     if (currentToolCall) {

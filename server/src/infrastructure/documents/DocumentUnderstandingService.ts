@@ -218,12 +218,13 @@ Keep your responses brief but informative. Focus on what's important for later r
 
     try {
       const response = await this.retryWithTimeout(
+        // temperature is omitted: this always routes to the gpt-5.4 reasoning
+        // deployment, which rejects non-default temperature once reasoning_effort is set.
         () => aiClient.chat({
           model: ModelId.gpt54(),
           messages: conversationHistory,
           systemPrompt,
-          maxTokens: 500,
-          temperature: 0.3,
+          maxTokens: 2000,
         }),
         this.AI_CALL_TIMEOUT_MS,
         `Chunk ${currentIndex + 1}/${totalChunks} processing`
@@ -289,12 +290,13 @@ If the document is short, create fewer but complete chunks. Focus on semantic me
 
     try {
       const response = await this.retryWithTimeout(
+        // temperature is omitted: this always routes to the gpt-5.4 reasoning
+        // deployment, which rejects non-default temperature once reasoning_effort is set.
         () => aiClient.chat({
           model: ModelId.gpt54(),
           messages: [AIMessage.user(chunkingPrompt)],
           systemPrompt: 'You are a document chunking specialist. Output valid JSON only.',
-          maxTokens: 8000,
-          temperature: 0.2,
+          maxTokens: 16000,
         }),
         60000, // 60 seconds for chunk generation (larger output)
         'Optimized chunk generation'
@@ -363,12 +365,13 @@ Summary:`;
 
     try {
       const response = await this.retryWithTimeout(
+        // temperature is omitted: this always routes to the gpt-5.4 reasoning
+        // deployment, which rejects non-default temperature once reasoning_effort is set.
         () => aiClient.chat({
           model: ModelId.gpt54(),
           messages: [AIMessage.user(summaryPrompt)],
           systemPrompt: 'Provide a brief, informative summary.',
-          maxTokens: 200,
-          temperature: 0.3,
+          maxTokens: 1000,
         }),
         this.AI_CALL_TIMEOUT_MS,
         'Summary generation'
