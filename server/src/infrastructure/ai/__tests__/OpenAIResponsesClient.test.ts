@@ -31,7 +31,7 @@ describe('OpenAIResponsesClient.chat', () => {
     expect(requestBody).not.toHaveProperty('temperature');
   });
 
-  it('sends an explicit temperature instead of reasoning_effort when the caller opts out', async () => {
+  it('translates an explicit temperature into reasoning_effort: none instead of forwarding it, since the deployment rejects any non-default temperature outright', async () => {
     const create = vi.fn().mockResolvedValue({
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: { prompt_tokens: 10, completion_tokens: 5 },
@@ -46,8 +46,8 @@ describe('OpenAIResponsesClient.chat', () => {
     });
 
     const requestBody = create.mock.calls[0][0];
-    expect(requestBody.temperature).toBe(0);
-    expect(requestBody).not.toHaveProperty('reasoning_effort');
+    expect(requestBody.reasoning_effort).toBe('none');
+    expect(requestBody).not.toHaveProperty('temperature');
   });
 
   it('uses medium reasoning effort for the base gpt-5.4 model', async () => {

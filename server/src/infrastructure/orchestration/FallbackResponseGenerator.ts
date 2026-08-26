@@ -58,10 +58,12 @@ Please respond to the user based on the conversation context. If the user is ref
 
     let streamError: string | null = null;
 
-    // temperature is omitted: this always routes to the gpt-5.4 reasoning deployment,
-    // which rejects non-default temperature once reasoning_effort is set. maxTokens is
-    // raised well above the expected reply length because reasoning tokens are drawn
-    // from the same budget before any output is produced.
+    // temperature is omitted: gpt-5.6-terra rejects any non-default temperature
+    // outright, confirmed live and independent of whether reasoning_effort is set, so
+    // determinism comes from reasoning_effort instead. maxTokens is raised well above
+    // the expected reply length because reasoning tokens are drawn from the same
+    // budget before any output is produced. See
+    // .agents/memory/reasoning-model-openai-client.md.
     await this.aiClient.streamChat(
       {
         model: ModelId.gpt54(),

@@ -48,8 +48,10 @@ export class ProcessPodDocumentCommandHandler {
 
       // Retried because unbounded-concurrency uploads can trip the AI provider's rate
       // limits; a transient 429/5xx should not permanently drop the extraction.
-      // temperature is omitted: this always routes to the gpt-5.4 reasoning
-      // deployment, which rejects non-default temperature once reasoning_effort is set.
+      // temperature is omitted: gpt-5.6-terra rejects any non-default temperature
+      // outright, confirmed live and independent of whether reasoning_effort is set, so
+      // determinism comes from reasoning_effort instead. See
+      // .agents/memory/reasoning-model-openai-client.md.
       const response = await retryWithBackoff(() =>
         this.aiClient.chat({
           model: ModelId.gpt54(),

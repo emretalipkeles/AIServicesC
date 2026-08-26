@@ -218,8 +218,10 @@ Keep your responses brief but informative. Focus on what's important for later r
 
     try {
       const response = await this.retryWithTimeout(
-        // temperature is omitted: this always routes to the gpt-5.4 reasoning
-        // deployment, which rejects non-default temperature once reasoning_effort is set.
+        // temperature is omitted: gpt-5.6-terra rejects any non-default temperature
+        // outright, confirmed live and independent of whether reasoning_effort is set, so
+        // determinism comes from reasoning_effort instead. See
+        // .agents/memory/reasoning-model-openai-client.md.
         () => aiClient.chat({
           model: ModelId.gpt54(),
           messages: conversationHistory,
@@ -290,8 +292,10 @@ If the document is short, create fewer but complete chunks. Focus on semantic me
 
     try {
       const response = await this.retryWithTimeout(
-        // temperature is omitted: this always routes to the gpt-5.4 reasoning
-        // deployment, which rejects non-default temperature once reasoning_effort is set.
+        // temperature is omitted: gpt-5.6-terra rejects any non-default temperature
+        // outright, confirmed live and independent of whether reasoning_effort is set, so
+        // determinism comes from reasoning_effort instead. See
+        // .agents/memory/reasoning-model-openai-client.md.
         () => aiClient.chat({
           model: ModelId.gpt54(),
           messages: [AIMessage.user(chunkingPrompt)],
@@ -365,8 +369,10 @@ Summary:`;
 
     try {
       const response = await this.retryWithTimeout(
-        // temperature is omitted: this always routes to the gpt-5.4 reasoning
-        // deployment, which rejects non-default temperature once reasoning_effort is set.
+        // temperature is omitted: gpt-5.6-terra rejects any non-default temperature
+        // outright, confirmed live and independent of whether reasoning_effort is set, so
+        // determinism comes from reasoning_effort instead. See
+        // .agents/memory/reasoning-model-openai-client.md.
         () => aiClient.chat({
           model: ModelId.gpt54(),
           messages: [AIMessage.user(summaryPrompt)],

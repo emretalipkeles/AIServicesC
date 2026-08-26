@@ -8,14 +8,15 @@ export interface ChatOptions {
   /**
    * Sampling temperature. Always honored by the Bedrock clients.
    *
-   * On the OpenAI path, reasoning_effort and temperature are mutually exclusive:
-   * Azure rejects any non-default temperature once reasoning_effort is set on a
-   * reasoning-model deployment. OpenAIResponsesClient resolves this by treating an
-   * explicit temperature as an opt-out of reasoning_effort for that call — use this
-   * only where deterministic, literal output matters more than reasoning depth (e.g.
-   * structured extraction/matching). Omit temperature to get reasoning_effort
-   * (driven by ModelId.getReasoningEffort()), which is the default for every other
-   * OpenAI call site.
+   * On the OpenAI path, the gpt-5.6-terra deployment rejects any non-default
+   * temperature outright (confirmed live: this happens even with no reasoning_effort
+   * set at all, so it is not conditional on reasoning_effort as gpt-5.4 was).
+   * OpenAIResponsesClient never forwards a literal temperature value to this
+   * deployment — instead it treats an explicit `temperature` here as a request for
+   * deterministic, literal output (e.g. structured extraction/matching) and maps it
+   * to `reasoning_effort: 'none'`, which is confirmed to spend zero reasoning tokens.
+   * Omit temperature to get reasoning_effort driven by ModelId.getReasoningEffort(),
+   * which is the default for every other OpenAI call site.
    */
   temperature?: number;
   systemPrompt?: string;

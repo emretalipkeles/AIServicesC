@@ -65,8 +65,10 @@ User's Current Question: ${context.userMessage}
 Analyze which agent(s) should handle this question and create an execution plan. Consider the conversation history if present.`;
 
     try {
-      // temperature is omitted: this always routes to the gpt-5.4 reasoning
-      // deployment, which rejects non-default temperature once reasoning_effort is set.
+      // temperature is omitted: gpt-5.6-terra rejects any non-default temperature
+      // outright, confirmed live and independent of whether reasoning_effort is set, so
+      // determinism comes from reasoning_effort instead. See
+      // .agents/memory/reasoning-model-openai-client.md.
       const response = await this.aiClient.chat({
         model: ModelId.gpt54(),
         systemPrompt: PLANNING_SYSTEM_PROMPT,

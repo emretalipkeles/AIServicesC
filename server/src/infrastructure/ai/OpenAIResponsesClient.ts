@@ -10,9 +10,13 @@ import type {
 import type { ModelId } from '../../domain/value-objects/ModelId';
 import { AIResponseTruncatedError } from '../../domain/errors/DomainError';
 
-// gpt-5.4 is a reasoning model: reasoning tokens are drawn from the same
-// max_completion_tokens budget as visible output, so the ceiling has to leave
-// headroom for reasoning overhead on top of whatever content is expected.
+// gpt-5.6-terra (and legacy gpt-5.4) is a reasoning model: whenever reasoning_effort
+// is 'low'/'medium'/'high'/'xhigh', reasoning tokens are drawn from the same
+// max_completion_tokens budget as visible output, so the ceiling has to leave headroom
+// for reasoning overhead on top of whatever content is expected. Confirmed live against
+// the gpt-5.6-terra deployment: reasoning_effort: 'none' is the one value that spends
+// zero reasoning tokens (see reasoningOrTemperature below) — everything else still
+// shares the budget as before.
 const DEFAULT_MAX_TOKENS = 16000;
 
 export class OpenAIResponsesClient implements IAIClient {
@@ -152,16 +156,24 @@ export class OpenAIResponsesClient implements IAIClient {
     return 'api-key';
   }
 
-  // reasoning_effort and temperature are mutually exclusive on this reasoning-model
-  // deployment: Azure rejects any non-default temperature once reasoning_effort is
-  // set. Callers that need deterministic output (e.g. structured extraction/matching)
-  // can pass an explicit temperature to opt out of reasoning_effort for that call;
-  // everyone else gets reasoning_effort (driven by ModelId) by default.
+  // Confirmed live against the gpt-5.6-terra deployment: this is NOT the "mutually
+  // exclusive with reasoning_effort" behavior gpt-5.4 had. gpt-5.6-terra rejects any
+  // non-default temperature outright — even with no reasoning_effort passed at all
+  // ("Unsupported value: 'temperature' does not support 0 with this model. Only the
+  // default (1) value is supported."). There is no way to pass a real temperature
+  // value through to this deployment.
+  //
+  // Callers still express "I need deterministic, literal output" the same way they
+  // always have — by passing an explicit `temperature` in ChatOptions — but this
+  // client now translates that intent into `reasoning_effort: 'none'` instead of
+  // forwarding the raw value, since 'none' is confirmed to spend zero reasoning
+  // tokens and produce the same low-variance behavior temperature: 0 used to. Callers
+  // that omit temperature get reasoning_effort driven by ModelId as before.
   private reasoningOrTemperature(
     options: ChatOptions
-  ): { temperature: number } | { reasoning_effort: 'medium' | 'high' } {
+  ): { reasoning_effort: 'none' } | { reasoning_effort: 'medium' | 'high' } {
     if (options.temperature !== undefined) {
-      return { temperature: options.temperature };
+      return { reasoning_effort: 'none' };
     }
     return { reasoning_effort: options.model.getReasoningEffort() };
   }

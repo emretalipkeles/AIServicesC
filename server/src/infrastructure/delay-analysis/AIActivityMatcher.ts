@@ -247,8 +247,11 @@ export class AIActivityMatcher implements IActivityMatcher {
       .replace('{podContext}', this.buildPodContextBlock(options?.podEvidence));
 
     try {
-      // temperature: 0 opts this call out of reasoning_effort (mutually exclusive on
-      // this deployment) to keep activity matching deterministic and literal — see
+      // temperature: 0 keeps activity matching deterministic and literal. On the
+      // gpt-5.6-terra deployment OpenAIResponsesClient never forwards this literal
+      // value (any non-default temperature is rejected outright) — it translates an
+      // explicit temperature into reasoning_effort: 'none' instead, which is
+      // confirmed to behave the same way. See
       // .agents/memory/reasoning-model-openai-client.md.
       const response = await this.aiClient.chat({
         model: ModelId.gpt54(),
@@ -351,8 +354,11 @@ export class AIActivityMatcher implements IActivityMatcher {
     try {
       console.log(`[AI] MATCHING: Full schedule match for event: "${eventDescription.substring(0, 80)}..." (${filteredActivities.length} activities)`);
 
-      // temperature: 0 opts this call out of reasoning_effort (mutually exclusive on
-      // this deployment) to keep activity matching deterministic and literal — see
+      // temperature: 0 keeps activity matching deterministic and literal. On the
+      // gpt-5.6-terra deployment OpenAIResponsesClient never forwards this literal
+      // value (any non-default temperature is rejected outright) — it translates an
+      // explicit temperature into reasoning_effort: 'none' instead, which is
+      // confirmed to behave the same way. See
       // .agents/memory/reasoning-model-openai-client.md.
       const response = await this.aiClient.chat({
         model: ModelId.gpt54(),

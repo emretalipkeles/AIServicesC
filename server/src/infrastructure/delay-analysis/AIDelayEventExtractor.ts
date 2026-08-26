@@ -45,9 +45,10 @@ export class AIDelayEventExtractor implements IDelayEventExtractor {
     try {
       console.log(`[AI] EXTRACTION: Starting delay event extraction for "${documentFilename}" (type: ${documentType}, strategy: ${strategy.strategyName})`);
       
-      // temperature is omitted: this always routes to the gpt-5.4 reasoning
-      // deployment, which rejects non-default temperature once reasoning_effort is
-      // set (OpenAIResponsesClient sends reasoning_effort on every request).
+      // temperature is omitted: gpt-5.6-terra rejects any non-default temperature
+      // outright, confirmed live and independent of whether reasoning_effort is set
+      // (OpenAIResponsesClient sends reasoning_effort on every request that doesn't
+      // opt out). See .agents/memory/reasoning-model-openai-client.md.
       const response = await this.aiClient.chat({
         model: ModelId.gpt54(),
         messages: [AIMessage.user(strategyResult.prompt)],

@@ -327,7 +327,7 @@ export function createAppContainer(): AppContainer {
   const extractionService = new AIDocumentExtractionService(bedrockClientProvider);
   const understandingService = new DocumentUnderstandingService(bedrockClientProvider, sessionRepository);
 
-  // Try OpenAI first (gpt-5.4), then fall back to Bedrock
+  // Try OpenAI first (gpt-5.6-terra), then fall back to Bedrock
   let aiClient = aiClientFactory.getClientForModel(ModelId.gpt54());
   if (!aiClient) {
     aiClient = bedrockClientProvider.getClient();

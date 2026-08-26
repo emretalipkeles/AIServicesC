@@ -1,0 +1,33 @@
+[AIDelayEventExtractorWithTools] Error extracting delay events: BadRequestError: 400 Unsupported value: 'temperature' does not support 0 with this model. Only the default (1) value is supported.
+    at Function.generate (/home/runner/workspace/node_modules/openai/src/core/error.ts:72:14)
+    at AzureOpenAI.makeStatusError (/home/runner/workspace/node_modules/openai/src/client.ts:478:28)
+    at AzureOpenAI.makeRequest (/home/runner/workspace/node_modules/openai/src/client.ts:728:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async AIDelayEventExtractorWithTools.extractDelayEventsWithTools (/home/runner/workspace/server/src/infrastructure/delay-analysis/AIDelayEventExtractorWithTools.ts:176:26)
+    at async RunAnalysisCommandHandler.executeInternal (/home/runner/workspace/server/src/application/delay-analysis/commands/handlers/RunAnalysisCommandHandler.ts:455:38)
+    at async RunAnalysisCommandHandler.execute (/home/runner/workspace/server/src/application/delay-analysis/commands/handlers/RunAnalysisCommandHandler.ts:313:22)
+    at async <anonymous> (/home/runner/workspace/server/src/presentation/routes/analysis.routes.ts:406:9) {
+  status: 400,
+  headers: Headers {
+    'content-length': '245',
+    'content-type': 'application/json',
+    date: 'Wed, 26 Aug 2026 18:31:22 GMT',
+    server: 'istio-envoy',
+    'x-ms-rai-invoked': 'true',
+    'x-request-id': 'b2b281b8-b4fb-499d-89b7-c2817114caac',
+    'apim-request-id': '7dcef574-6dd6-47f4-98a3-1c31aed37c0a',
+    'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
+    'x-content-type-options': 'nosniff',
+    'x-ms-region': 'East US'
+  },
+  requestID: 'b2b281b8-b4fb-499d-89b7-c2817114caac',
+  error: {
+    message: "Unsupported value: 'temperature' does not support 0 with this model. Only the default (1) value is supported.",
+    type: 'invalid_request_error',
+    param: 'temperature',
+    code: 'unsupported_value'
+  },
+  code: 'unsupported_value',
+  param: 'temperature',
+  type: 'invalid_request_error'
+}

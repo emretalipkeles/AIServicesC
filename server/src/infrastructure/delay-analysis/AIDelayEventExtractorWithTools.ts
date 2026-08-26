@@ -12,7 +12,7 @@ import type { IToolExtractionSystemPromptStrategyFactory } from '../../domain/de
 import { DocumentExtractionStrategyFactory } from './extraction-strategies/DocumentExtractionStrategyFactory';
 import { auditNarrativeProvenance } from './NarrativeProvenanceCheck';
 import { normalizeClockTime, normalizeDurationBasis } from '../../domain/delay-analysis/DurationProvenance';
-import { OPENAI_MODELS } from '../../domain/value-objects/ModelId';
+import { OPENAI_MODELS, ModelId } from '../../domain/value-objects/ModelId';
 import { AIResponseTruncatedError, AIResponseSchemaViolationError } from '../../domain/errors/DomainError';
 import {
   buildDelayExtractionJsonSchema,
@@ -137,21 +137,38 @@ ${strategyResult.prompt}
 
 ${systemPromptStrategy.buildUserPromptSuffix()}`;
 
-    const tools: OpenAI.ChatCompletionTool[] = [
+    // Responses API tool shape is flat (type/name/description/parameters), unlike
+    // Chat Completions' nested { type, function: {...} }.
+    const tools: OpenAI.Responses.Tool[] = [
       {
         type: 'function',
-        function: {
-          name: this.toolExecutor.toolName,
-          description: this.toolExecutor.getToolDefinition().description,
-          parameters: this.toolExecutor.getToolDefinition().parameters as OpenAI.FunctionParameters,
-        }
+        name: this.toolExecutor.toolName,
+        description: this.toolExecutor.getToolDefinition().description,
+        parameters: this.toolExecutor.getToolDefinition().parameters as Record<string, unknown>,
+        strict: false,
       }
     ];
 
     try {
-      let messages: OpenAI.ChatCompletionMessageParam[] = [
-        { role: 'system', content: systemPromptStrategy.buildSystemPrompt(documentContent) },
-        { role: 'user', content: userPrompt }
+      // This call goes through the Responses API rather than Chat Completions
+      // specifically because gpt-5.6-terra rejects any reasoning_effort other than
+      // 'none' on /v1/chat/completions whenever `tools` is attached ("Function tools
+      // with reasoning_effort are not supported ... use /v1/responses or set
+      // reasoning_effort to 'none'", confirmed live). The Responses API supports
+      // `tools` + a real reasoning effort together, which is what lets this run at
+      // 'medium' instead of being stuck at zero reasoning depth. See
+      // .agents/memory/reasoning-model-openai-client.md.
+      //
+      // temperature is intentionally omitted: gpt-5.6-terra rejects any non-default
+      // temperature outright, independent of reasoning_effort.
+      //
+      // Effort is hardcoded to the model default ('medium') for now; making it
+      // request-configurable (mirroring the existing chat-assistant UI toggle) is
+      // tracked separately.
+      const reasoningEffort = ModelId.defaultOpenAI().getReasoningEffort();
+      const instructions = systemPromptStrategy.buildSystemPrompt(documentContent);
+      let input: OpenAI.Responses.ResponseInputItem[] = [
+        { role: 'user', content: userPrompt },
       ];
 
       let continueLoop = true;
@@ -169,19 +186,17 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
       
       while (continueLoop) {
         console.log(`[AI] TOOL-EXTRACTION: Calling OpenAI API with function calling enabled...`);
-        
-        // temperature: 0 deliberately opts this call out of reasoning_effort (the two
-        // are mutually exclusive on this deployment) to keep event/duration extraction
-        // deterministic — see the comment above REASONING_EFFORT's old definition.
-        const response = await this.openai.chat.completions.create({
+
+        const response = await this.openai.responses.create({
           model: getToolExtractionModel(),
-          messages,
+          instructions,
+          input,
           tools,
-          max_completion_tokens: MAX_COMPLETION_TOKENS,
-          temperature: 0,
-          response_format: {
-            type: 'json_schema',
-            json_schema: {
+          max_output_tokens: MAX_COMPLETION_TOKENS,
+          reasoning: { effort: reasoningEffort },
+          text: {
+            format: {
+              type: 'json_schema',
               name: 'delay_event_extraction',
               strict: true,
               schema: buildDelayExtractionJsonSchema(),
@@ -189,32 +204,31 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
           },
         });
 
-        const choice = response.choices[0];
-        totalInputTokens += response.usage?.prompt_tokens ?? 0;
-        totalOutputTokens += response.usage?.completion_tokens ?? 0;
+        totalInputTokens += response.usage?.input_tokens ?? 0;
+        totalOutputTokens += response.usage?.output_tokens ?? 0;
 
-        if (choice.finish_reason === 'length') {
+        if (response.incomplete_details?.reason === 'max_output_tokens') {
           throw new AIResponseTruncatedError(
             `AIDelayEventExtractorWithTools.extractDelayEventsWithTools (${documentFilename})`,
             MAX_COMPLETION_TOKENS
           );
         }
 
-        if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls) {
-          messages.push({
-            role: 'assistant',
-            content: choice.message.content,
-            tool_calls: choice.message.tool_calls,
-          });
+        const functionCalls = response.output.filter(
+          (item): item is OpenAI.Responses.ResponseFunctionToolCall => item.type === 'function_call'
+        );
 
-          for (const toolCall of choice.message.tool_calls) {
-            if (toolCall.type !== 'function') continue;
-            
-            console.log(`[AI] TOOL-EXTRACTION: AI requested tool call: ${toolCall.function.name}`);
-            
+        if (functionCalls.length > 0) {
+          // Echo the model's own output items back as input so it has continuity
+          // into the next turn, then append this turn's tool results.
+          input = [...input, ...response.output];
+
+          for (const toolCall of functionCalls) {
+            console.log(`[AI] TOOL-EXTRACTION: AI requested tool call: ${toolCall.name}`);
+
             let args: Record<string, unknown> = {};
             try {
-              args = JSON.parse(toolCall.function.arguments);
+              args = JSON.parse(toolCall.arguments);
             } catch {
               console.error('[AIDelayEventExtractorWithTools] Failed to parse tool arguments');
               args = { activity_ids: [] };
@@ -255,14 +269,14 @@ ${systemPromptStrategy.buildUserPromptSuffix()}`;
               notFound: toolResult.notFound,
             };
 
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolCall.id,
-              content: JSON.stringify(toolResultContent),
+            input.push({
+              type: 'function_call_output',
+              call_id: toolCall.call_id,
+              output: JSON.stringify(toolResultContent),
             });
           }
         } else {
-          finalContent = choice.message.content || '';
+          finalContent = response.output_text || '';
           continueLoop = false;
         }
       }

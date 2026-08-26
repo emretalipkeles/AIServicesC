@@ -142,8 +142,9 @@ export class AgentExecutor implements IAgentExecutor {
     }
   }
 
-  // gpt-5.4/gpt-5.4-high are reasoning models: Azure rejects any non-default temperature
-  // once reasoning_effort is set, and reasoning tokens are drawn from the same budget as
+  // gpt-5.6-terra (and legacy gpt-5.4) are reasoning models: Azure rejects any non-default
+  // temperature outright on this deployment (confirmed live, independent of whether
+  // reasoning_effort is set), and reasoning tokens are drawn from the same budget as
   // visible output, so the ceiling needs headroom beyond a plain chat reply. Bedrock models
   // are unaffected, so temperature is preserved for them.
   private chatTuning(model: ModelId): { maxTokens: number; temperature?: number } {
