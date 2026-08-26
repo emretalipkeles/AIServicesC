@@ -1,9 +1,12 @@
+import type { ReasoningEffort } from '../../value-objects/ModelId';
+
 export interface AgentLoopInput {
   projectId: string;
   tenantId: string;
   userMessage: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   systemPrompt: string;
+  reasoningEffort?: ReasoningEffort;
 }
 
 export interface AgentLoopTokenUsage {

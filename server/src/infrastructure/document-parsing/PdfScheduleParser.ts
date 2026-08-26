@@ -217,7 +217,7 @@ Fields:
 
 Return ONLY the JSON array, no other text.`;
 
-    const modelId = new ModelId('gpt-5.4');
+    const modelId = ModelId.defaultOpenAI();
 
     const response = await this.aiClient.chat({
       model: modelId,

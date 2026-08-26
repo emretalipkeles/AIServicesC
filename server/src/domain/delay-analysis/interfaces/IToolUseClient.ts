@@ -1,4 +1,5 @@
 import type { ToolDefinition } from './ITool';
+import type { ReasoningEffort } from '../../value-objects/ModelId';
 
 export interface ToolUseMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -15,6 +16,7 @@ export interface ToolUseRequest {
   messages: ToolUseMessage[];
   tools: ToolDefinition[];
   onTextChunk?: (chunk: string) => void;
+  reasoningEffort?: ReasoningEffort;
 }
 
 export interface ToolCallBlock {

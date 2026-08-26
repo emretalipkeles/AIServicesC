@@ -101,11 +101,14 @@ interface AIChatPanelProps {
   onCollapse?: () => void;
 }
 
+type ReasoningEffort = "medium" | "high";
+
 export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
   const tabContext = useOptionalTabContext();
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>("medium");
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -167,6 +170,7 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
         projectId: tabContext?.activeDelayAnalysisProjectId || '',
         message: inputValue,
         conversationHistory,
+        reasoningEffort,
       };
 
       console.log('[AIChatPanel] Sending message with conversationId:', conversationId);
@@ -407,6 +411,24 @@ export function AIChatPanel({ onCollapse }: AIChatPanelProps = {}) {
           </div>
         </div>
         <div className="flex-shrink-0 flex items-center gap-1">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setReasoningEffort((prev) => (prev === "medium" ? "high" : "medium"))}
+                  className="flex items-center gap-1 px-2 h-7 rounded-md text-[11px] font-medium border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                  data-testid="button-reasoning-effort"
+                  aria-label="Toggle reasoning effort"
+                >
+                  <Brain className="w-3 h-3" />
+                  {reasoningEffort === "high" ? "High" : "Medium"}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Reasoning effort: {reasoningEffort === "high" ? "High (more thorough, slower)" : "Medium (default)"}. Click to switch.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button variant="ghost" size="icon" data-testid="button-chat-options">
             <MoreHorizontal className="w-4 h-4" />
           </Button>

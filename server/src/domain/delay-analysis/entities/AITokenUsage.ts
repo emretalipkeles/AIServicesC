@@ -55,11 +55,13 @@ export class AITokenUsage {
 
   static calculateCost(model: string, inputTokens: number, outputTokens: number): number {
     const pricing: Record<string, { input: number; output: number }> = {
+      'gpt-5.6-terra': { input: 0.00175, output: 0.014 },
+      'gpt-5.6-terra-high': { input: 0.00175, output: 0.014 },
       'gpt-5.4': { input: 0.00175, output: 0.014 },
       'gpt-5.4-high': { input: 0.00175, output: 0.014 },
     };
 
-    const modelPricing = pricing[model] || pricing['gpt-5.4'];
+    const modelPricing = pricing[model] || pricing['gpt-5.6-terra'];
     const inputCost = (inputTokens / 1000) * modelPricing.input;
     const outputCost = (outputTokens / 1000) * modelPricing.output;
     

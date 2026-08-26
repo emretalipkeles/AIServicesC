@@ -9,6 +9,8 @@ export const BEDROCK_MODELS = {
 } as const;
 
 export const OPENAI_MODELS = {
+  'gpt-5.6-terra': 'gpt-5.6-terra',
+  'gpt-5.6-terra-high': 'gpt-5.6-terra',
   'gpt-5.4': 'gpt-5.4',
   'gpt-5.4-high': 'gpt-5.4',
 } as const;
@@ -47,7 +49,7 @@ export class ModelId {
   }
 
   private detectReasoningEffort(modelName: ModelName): ReasoningEffort {
-    if (modelName === 'gpt-5.4-high' || modelName === 'claude-opus-4-5') {
+    if (modelName === 'gpt-5.4-high' || modelName === 'gpt-5.6-terra-high' || modelName === 'claude-opus-4-5') {
       return 'high';
     }
     return 'medium';
@@ -57,6 +59,8 @@ export class ModelId {
     return new ModelId(name);
   }
 
+  // Old model names stay resolvable so existing stored agent configs and historical
+  // token-usage rows continue to work after a default model upgrade.
   private static readonly LEGACY_MODEL_ALIASES: Record<string, ModelName> = {
     'gpt-5.2': 'gpt-5.4',
     'gpt-5.2-high': 'gpt-5.4-high',
@@ -84,6 +88,19 @@ export class ModelId {
 
   static gpt54High(): ModelId {
     return new ModelId('gpt-5.4-high');
+  }
+
+  static gpt56Terra(): ModelId {
+    return new ModelId('gpt-5.6-terra');
+  }
+
+  static gpt56TerraHigh(): ModelId {
+    return new ModelId('gpt-5.6-terra-high');
+  }
+
+  /** Current default OpenAI model for new work; legacy gpt-5.4 names remain resolvable. */
+  static defaultOpenAI(): ModelId {
+    return ModelId.gpt56Terra();
   }
 
   getValue(): string {

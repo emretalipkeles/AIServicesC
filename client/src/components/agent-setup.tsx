@@ -40,8 +40,10 @@ import { useToast } from "@/hooks/use-toast";
 const MODEL_OPTIONS = [
   { value: "claude-sonnet-4-5", label: "Claude Sonnet 4.5", provider: "Bedrock" },
   { value: "claude-opus-4-5", label: "Claude Opus 4.5", provider: "Bedrock" },
-  { value: "gpt-5.4", label: "GPT-5.4", provider: "OpenAI" },
-  { value: "gpt-5.4-high", label: "GPT-5.4 High Reasoning", provider: "OpenAI" },
+  { value: "gpt-5.6-terra", label: "GPT-5.6 Terra", provider: "OpenAI" },
+  { value: "gpt-5.6-terra-high", label: "GPT-5.6 Terra High Reasoning", provider: "OpenAI" },
+  { value: "gpt-5.4", label: "GPT-5.4 (legacy)", provider: "OpenAI" },
+  { value: "gpt-5.4-high", label: "GPT-5.4 High Reasoning (legacy)", provider: "OpenAI" },
 ] as const;
 
 interface Agent {

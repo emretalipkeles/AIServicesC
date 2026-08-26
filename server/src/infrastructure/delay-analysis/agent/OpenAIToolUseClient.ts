@@ -1,145 +1,170 @@
 import type { AzureOpenAI } from 'openai';
 import type OpenAI from 'openai';
-import type { IToolUseClient, ToolUseRequest, ToolUseResponse, ToolCallBlock, TokenUsageInfo } from '../../../domain/delay-analysis/interfaces/IToolUseClient';
+import type { IToolUseClient, ToolUseRequest, ToolUseResponse, ToolUseMessage, ToolCallBlock, TokenUsageInfo } from '../../../domain/delay-analysis/interfaces/IToolUseClient';
 import { AIResponseTruncatedError } from '../../../domain/errors/DomainError';
 import { ModelId } from '../../../domain/value-objects/ModelId';
 
-// This client always talks to the gpt-5.4 reasoning deployment (agent verification
-// loop), so its reasoning effort is fixed at the model's default ('medium').
-const REASONING_EFFORT = ModelId.gpt54().getReasoningEffort();
+// The Chat Completions endpoint rejects function tools combined with reasoning_effort
+// on gpt-5.6-terra ("Function tools with reasoning_effort are not supported ... use
+// /v1/responses instead"), so this client talks to the Responses API, which supports
+// both together. Reasoning effort defaults to the model's default ('medium') but can
+// be overridden per request (e.g. a user raising it to 'high' for one conversation).
+const DEFAULT_REASONING_EFFORT = ModelId.defaultOpenAI().getReasoningEffort();
 
-// Reasoning tokens are drawn from the same max_completion_tokens budget as visible
+// Reasoning tokens are drawn from the same max_output_tokens budget as visible
 // output/tool-call text, so this has to leave headroom beyond just the final answer.
-const MAX_COMPLETION_TOKENS = 16000;
+const MAX_OUTPUT_TOKENS = 16000;
+
+type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
 
 export class OpenAIToolUseClient implements IToolUseClient {
   private readonly openai: AzureOpenAI;
   private readonly model: string;
 
-  constructor(client: AzureOpenAI, model: string = 'gpt-5.4') {
+  constructor(client: AzureOpenAI, model: string = ModelId.defaultOpenAI().getValue()) {
     this.openai = client;
     this.model = model;
   }
 
   async chatWithTools(request: ToolUseRequest): Promise<ToolUseResponse> {
-    const openaiTools: OpenAI.ChatCompletionTool[] = request.tools.map(tool => ({
+    const openaiTools: OpenAI.Responses.Tool[] = request.tools.map(tool => ({
       type: 'function' as const,
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters,
-      },
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+      strict: false,
     }));
 
-    const openaiMessages: OpenAI.ChatCompletionMessageParam[] = request.messages.map(msg => {
-      if (msg.role === 'tool') {
-        return {
-          role: 'tool' as const,
-          tool_call_id: msg.tool_call_id!,
-          content: msg.content || '',
-        };
-      }
-      if (msg.role === 'assistant' && msg.tool_calls) {
-        return {
-          role: 'assistant' as const,
-          content: msg.content || null,
-          tool_calls: msg.tool_calls,
-        };
-      }
-      return {
-        role: msg.role as 'system' | 'user' | 'assistant',
-        content: msg.content || '',
-      };
-    });
+    const { instructions, input } = this.buildResponsesInput(request.messages);
+    const reasoningEffort = request.reasoningEffort ?? DEFAULT_REASONING_EFFORT;
 
     // temperature is intentionally omitted: Azure rejects any non-default temperature
-    // once reasoning_effort is set on a reasoning-model deployment like gpt-5.4.
-    const response = await this.openai.chat.completions.create({
+    // once reasoning is set on a reasoning-model deployment like gpt-5.6-terra.
+    const stream = await this.openai.responses.create({
       model: this.model,
-      messages: openaiMessages,
+      instructions,
+      input,
       tools: openaiTools.length > 0 ? openaiTools : undefined,
       stream: true,
-      stream_options: { include_usage: true },
-      max_completion_tokens: MAX_COMPLETION_TOKENS,
-      reasoning_effort: REASONING_EFFORT,
+      max_output_tokens: MAX_OUTPUT_TOKENS,
+      reasoning: { effort: reasoningEffort },
     });
 
     let accumulatedText = '';
-    const toolCalls: Array<{ id: string; function: { name: string; arguments: string } }> = [];
-    let currentToolCall: { id: string; function: { name: string; arguments: string } } | null = null;
+    const toolCalls: ToolCallBlock[] = [];
     let tokenUsage: TokenUsageInfo | undefined;
-    let finishReason: string | null = null;
+    let incomplete = false;
 
-    for await (const chunk of response) {
-      const choice = chunk.choices[0];
-      const delta = choice?.delta;
-      if (choice?.finish_reason) {
-        finishReason = choice.finish_reason;
-      }
-
-      if (delta?.content) {
-        accumulatedText += delta.content;
-        if (request.onTextChunk) {
-          request.onTextChunk(delta.content);
+    for await (const event of stream) {
+      switch (event.type) {
+        case 'response.output_text.delta': {
+          accumulatedText += event.delta;
+          if (request.onTextChunk) {
+            request.onTextChunk(event.delta);
+          }
+          break;
         }
-      }
-
-      if (delta?.tool_calls) {
-        for (const tc of delta.tool_calls) {
-          if (tc.id) {
-            if (currentToolCall) {
-              toolCalls.push(currentToolCall);
+        case 'response.output_item.done': {
+          const item = event.item;
+          if (item.type === 'function_call') {
+            let args: Record<string, unknown> = {};
+            try {
+              args = JSON.parse(item.arguments || '{}');
+            } catch {
+              console.warn(`[OpenAIToolUseClient] Failed to parse tool args for ${item.name}: ${item.arguments}`);
+              args = {};
             }
-            currentToolCall = {
-              id: tc.id,
-              function: { name: tc.function?.name || '', arguments: '' },
+            toolCalls.push({
+              id: item.call_id,
+              name: item.name,
+              arguments: args,
+            });
+          }
+          break;
+        }
+        case 'response.incomplete': {
+          incomplete = event.response.incomplete_details?.reason === 'max_output_tokens';
+          if (event.response.usage) {
+            tokenUsage = {
+              inputTokens: event.response.usage.input_tokens ?? 0,
+              outputTokens: event.response.usage.output_tokens ?? 0,
+              totalTokens: event.response.usage.total_tokens ?? 0,
             };
           }
-          if (currentToolCall && tc.function?.arguments) {
-            currentToolCall.function.arguments += tc.function.arguments;
-          }
+          break;
         }
-      }
-
-      if (chunk.usage) {
-        tokenUsage = {
-          inputTokens: chunk.usage.prompt_tokens ?? 0,
-          outputTokens: chunk.usage.completion_tokens ?? 0,
-          totalTokens: chunk.usage.total_tokens ?? 0,
-        };
+        case 'response.completed': {
+          if (event.response.usage) {
+            tokenUsage = {
+              inputTokens: event.response.usage.input_tokens ?? 0,
+              outputTokens: event.response.usage.output_tokens ?? 0,
+              totalTokens: event.response.usage.total_tokens ?? 0,
+            };
+          }
+          break;
+        }
+        case 'response.failed': {
+          const errorMessage = event.response.error?.message || 'OpenAI Responses API request failed';
+          throw new Error(errorMessage);
+        }
+        default:
+          break;
       }
     }
 
-    if (finishReason === 'length') {
-      throw new AIResponseTruncatedError(`OpenAIToolUseClient.chatWithTools (${this.model})`, MAX_COMPLETION_TOKENS);
+    if (incomplete) {
+      throw new AIResponseTruncatedError(`OpenAIToolUseClient.chatWithTools (${this.model})`, MAX_OUTPUT_TOKENS);
     }
-
-    if (currentToolCall) {
-      toolCalls.push(currentToolCall);
-    }
-
-    const parsedToolCalls: ToolCallBlock[] = toolCalls.map(tc => {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(tc.function.arguments);
-      } catch {
-        console.warn(`[OpenAIToolUseClient] Failed to parse tool args for ${tc.function.name}: ${tc.function.arguments}`);
-        args = {};
-      }
-      return {
-        id: tc.id,
-        name: tc.function.name,
-        arguments: args,
-      };
-    });
-
-    const hasToolCalls = parsedToolCalls.length > 0;
 
     return {
       textContent: accumulatedText,
-      toolCalls: parsedToolCalls,
-      stopReason: hasToolCalls ? 'tool_use' : 'end_turn',
+      toolCalls,
+      stopReason: toolCalls.length > 0 ? 'tool_use' : 'end_turn',
       tokenUsage,
     };
+  }
+
+  // Converts the chat-completions-shaped conversation history used throughout the
+  // agent loop into Responses API input items. The single leading system message
+  // becomes `instructions`; assistant tool calls and tool results become
+  // `function_call` / `function_call_output` items rather than message content.
+  private buildResponsesInput(messages: ToolUseMessage[]): { instructions?: string; input: ResponseInputItem[] } {
+    let instructions: string | undefined;
+    const input: ResponseInputItem[] = [];
+
+    for (const msg of messages) {
+      if (msg.role === 'system') {
+        instructions = instructions ? `${instructions}\n\n${msg.content ?? ''}` : (msg.content ?? '');
+        continue;
+      }
+
+      if (msg.role === 'tool') {
+        input.push({
+          type: 'function_call_output',
+          call_id: msg.tool_call_id!,
+          output: msg.content || '',
+        });
+        continue;
+      }
+
+      if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+        if (msg.content) {
+          input.push({ role: 'assistant', content: msg.content });
+        }
+        for (const tc of msg.tool_calls) {
+          input.push({
+            type: 'function_call',
+            call_id: tc.id,
+            name: tc.function.name,
+            arguments: tc.function.arguments,
+          });
+        }
+        continue;
+      }
+
+      input.push({ role: msg.role as 'user' | 'assistant', content: msg.content || '' });
+    }
+
+    return { instructions, input };
   }
 }

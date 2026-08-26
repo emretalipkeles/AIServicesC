@@ -26,7 +26,7 @@ import type { AzureOpenAI } from 'openai';
 function getToolExtractionModel(): string {
   const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;
   if (deployment) return deployment;
-  return OPENAI_MODELS['gpt-5.4'];
+  return OPENAI_MODELS['gpt-5.6-terra'];
 }
 
 export interface ExtractionWithToolsOptions extends ExtractionOptions {

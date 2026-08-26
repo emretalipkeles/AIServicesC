@@ -2,6 +2,7 @@ import type { IAgentLoop, AgentLoopInput, AgentLoopResult, AgentLoopEvent, Agent
 import type { IToolRegistry } from '../../../domain/delay-analysis/interfaces/IToolRegistry';
 import type { IToolUseClient, ToolUseMessage } from '../../../domain/delay-analysis/interfaces/IToolUseClient';
 import type { ToolExecutionContext } from '../../../domain/delay-analysis/interfaces/ITool';
+import { ModelId } from '../../../domain/value-objects/ModelId';
 
 const MAX_ITERATIONS = 15;
 
@@ -9,7 +10,7 @@ export class ReactAgentLoop implements IAgentLoop {
   constructor(
     private readonly toolRegistry: IToolRegistry,
     private readonly toolUseClient: IToolUseClient,
-    private readonly modelName: string = 'gpt-5.4'
+    private readonly modelName: string = ModelId.defaultOpenAI().getValue()
   ) {}
 
   async run(
@@ -64,6 +65,7 @@ export class ReactAgentLoop implements IAgentLoop {
           onTextChunk: (chunk) => {
             onEvent({ type: 'response_chunk', content: chunk });
           },
+          reasoningEffort: input.reasoningEffort,
         });
 
         if (response.tokenUsage) {

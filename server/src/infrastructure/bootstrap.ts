@@ -214,7 +214,7 @@ function createAgentLoop(
   toolRegistry.register(new AgentGetActivityDetailsTool(getActivitiesByIdsHandler));
   toolRegistry.register(new AgentListDelayEventsTool(contractorDelayEventRepository));
 
-  const agentModel = azureSettings.deployment || 'gpt-5.4';
+  const agentModel = azureSettings.deployment || ModelId.defaultOpenAI().getValue();
   const azureClient = createAzureOpenAIClient(azureSettings);
   const toolUseClient = new OpenAIToolUseClient(azureClient, agentModel);
   const loop = new ReactAgentLoop(toolRegistry, toolUseClient, agentModel);

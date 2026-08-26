@@ -2,6 +2,7 @@ import type { Express, Request, Response } from 'express';
 import type { AppContainer } from '../../infrastructure/bootstrap';
 import type { AgentLoopEvent, AgentLoopResult } from '../../domain/delay-analysis/interfaces/IAgentLoop';
 import { AITokenUsage } from '../../domain/delay-analysis/entities/AITokenUsage';
+import { ModelId } from '../../domain/value-objects/ModelId';
 import { z } from 'zod';
 
 const agentLoopBodySchema = z.object({
@@ -11,6 +12,7 @@ const agentLoopBodySchema = z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string().min(1),
   })).optional().default([]),
+  reasoningEffort: z.enum(['medium', 'high']).optional().default('medium'),
 });
 
 const DEFAULT_TENANT_ID = 'default';
@@ -77,13 +79,14 @@ export function registerAgentLoopRoutes(app: Express, container: AppContainer): 
             userMessage: body.message,
             conversationHistory: body.conversationHistory,
             systemPrompt,
+            reasoningEffort: body.reasoningEffort,
           },
           onEvent
         );
 
         if (result.tokenUsage && result.tokenUsage.totalTokens > 0 && projectId) {
           try {
-            const model = result.model || 'gpt-5.4';
+            const model = result.model || ModelId.defaultOpenAI().getValue();
             const cost = AITokenUsage.calculateCost(
               model,
               result.tokenUsage.inputTokens,
