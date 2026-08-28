@@ -5,7 +5,7 @@ export interface Tab {
   id: string;
   label: string;
   icon: LucideIcon;
-  type: "static" | "delay-analysis";
+  type: "static" | "delay-analysis" | "as-build-schedule";
   delayAnalysisProjectId?: string;
 }
 

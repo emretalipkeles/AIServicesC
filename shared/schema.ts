@@ -263,6 +263,43 @@ export const insertDelayAnalysisProjectSchema = createInsertSchema(delayAnalysis
 export type InsertDelayAnalysisProject = z.infer<typeof insertDelayAnalysisProjectSchema>;
 export type DelayAnalysisProject = typeof delayAnalysisProjects.$inferSelect;
 
+const xerBytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+export const xerUploads = pgTable("xer_uploads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  filename: text("filename").notNull(),
+  contentType: text("content_type").notNull(),
+  detectedVersion: text("detected_version"),
+  fileData: xerBytea("file_data").notNull(),
+  parseError: text("parse_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const xerRuns = pgTable("xer_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  uploadId: varchar("upload_id").notNull().references(() => xerUploads.id, { onDelete: "cascade" }),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  outcome: text("outcome").notNull(),
+  detectedVersion: text("detected_version"),
+  diffReport: jsonb("diff_report"),
+  outputData: xerBytea("output_data"),
+  errorMessage: text("error_message"),
+  originalSha256: text("original_sha256"),
+  outputSha256: text("output_sha256"),
+  structuralSummary: jsonb("structural_summary"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type XerUploadRow = typeof xerUploads.$inferSelect;
+export type XerRunRow = typeof xerRuns.$inferSelect;
+
 export const projectDocuments = pgTable("project_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),

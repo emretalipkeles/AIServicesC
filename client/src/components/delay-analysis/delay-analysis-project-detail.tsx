@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useTabContext } from "@/contexts/tab-context";
 import { 
   ArrowLeft, Save, Calendar, Upload, BarChart3, Activity, 
-  AlertCircle, Loader2, CheckCircle2, FolderOpen
+  AlertCircle, Loader2, CheckCircle2, FolderOpen, Building2
 } from "lucide-react";
 import { DocumentUpload } from "./document-upload";
 import { ScheduleUpload } from "./schedule-upload";
@@ -25,7 +26,7 @@ interface DelayAnalysisProjectDetailProps {
   onBack: () => void;
 }
 
-const tabs = [
+const baseTabs = [
   { value: "schedule", label: "Schedule", icon: Calendar },
   { value: "documents", label: "Documents", icon: Upload },
   { value: "delays", label: "Delay Events", icon: Activity },
@@ -58,6 +59,7 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
   }, [allDelayEvents, filterInitialized]);
   const updateProject = useUpdateProject();
   const { toast } = useToast();
+  const { addTab } = useTabContext();
   const { scheduleUpload, documentUpload, analysis } = useUploadState(projectId);
   
   const [isEditing, setIsEditing] = useState(false);
@@ -90,6 +92,17 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
       });
       setIsEditing(true);
     }
+  };
+
+  const openAsBuildSchedule = () => {
+    if (!project) return;
+    addTab({
+      id: `as-build-${projectId}`,
+      label: `As Build Schedule - ${project.name}`,
+      icon: Building2,
+      type: "as-build-schedule",
+      delayAnalysisProjectId: projectId,
+    });
   };
 
   const completedDocs = documents.filter(d => d.status === 'completed').length;
@@ -130,7 +143,6 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
     { label: "Activities", value: activities.length, icon: Calendar },
     { label: "Delay Events", value: allDelayEvents.length, icon: Activity },
   ];
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-muted/30 via-background to-background">
       <div className="w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -201,13 +213,25 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
               }}
               onBack={onBack}
               actions={
-                <Button 
-                  variant="outline" 
-                  onClick={startEditing}
-                  className="bg-background/50 hover:bg-background"
-                >
-                  Edit Details
-                </Button>
+                <div className="flex flex-col items-stretch gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={startEditing}
+                    className="bg-background/50 hover:bg-background"
+                  >
+                    Edit Details
+                  </Button>
+                  {project.status === "completed" && (
+                    <Button
+                      variant="outline"
+                      onClick={openAsBuildSchedule}
+                      className="bg-background/50 hover:bg-background gap-2"
+                    >
+                      <Building2 className="w-4 h-4" />
+                      As Build Schedule
+                    </Button>
+                  )}
+                </div>
               }
               stats={heroStats}
             />
@@ -220,7 +244,7 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
                 className="w-full"
               >
                 <PremiumTabs 
-                  tabs={tabs} 
+                  tabs={baseTabs} 
                   value={activeTab} 
                   onChange={setActiveTab}
                   uploadIndicators={[

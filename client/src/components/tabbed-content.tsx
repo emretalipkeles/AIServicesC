@@ -5,6 +5,7 @@ import { JourneyDashboard } from "./journey-dashboard";
 import { AgentSetup } from "./agent-setup";
 import { DelayAnalysis } from "./delay-analysis";
 import { UserManagement } from "./user-management";
+import { AsBuildSchedule } from "./delay-analysis/as-build-schedule";
 import { ThemeToggle } from "./theme-toggle";
 import { SettingsMenu } from "./settings-menu";
 import { AddMenu } from "./add-menu";
@@ -79,6 +80,9 @@ export function TabbedContent() {
     }
     if (tab.id === "user-management") {
       return <UserManagement />;
+    }
+    if ("type" in tab && tab.type === "as-build-schedule" && tab.delayAnalysisProjectId) {
+      return <AsBuildSchedule projectId={tab.delayAnalysisProjectId} />;
     }
     return null;
   };

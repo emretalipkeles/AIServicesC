@@ -12,6 +12,7 @@ import { registerProjectDocumentRoutes } from "./project-document.routes";
 import { registerScheduleActivityRoutes } from "./schedule-activity.routes";
 import { registerAnalysisRoutes } from "./analysis.routes";
 import { registerAgentLoopRoutes } from "./agent-loop.routes";
+import { registerXerRoundTripRoutes } from "./xer-round-trip.routes";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -30,6 +31,7 @@ export async function registerRoutes(
   registerScheduleActivityRoutes(app, container);
   registerAnalysisRoutes(app, container);
   registerAgentLoopRoutes(app, container);
+  registerXerRoundTripRoutes(app, container);
 
   return httpServer;
 }

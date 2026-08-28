@@ -131,6 +131,9 @@ import type { IPostParseDocumentHandlerFactory } from "../domain/delay-analysis/
 import { UploadDocumentsCommandHandler } from "../application/delay-analysis/commands/handlers/UploadDocumentsCommandHandler";
 import { UploadScheduleCommandHandler } from "../application/delay-analysis/commands/handlers/UploadScheduleCommandHandler";
 import { StartupReconciliationService } from "./delay-analysis/StartupReconciliationService";
+import { DrizzleXerRepository } from "./database/repositories/delay-analysis/DrizzleXerRepository";
+import type { IXerRepository } from "../domain/delay-analysis/repositories/IXerRepository";
+import { XerRoundTripService } from "../application/delay-analysis/xer/XerRoundTripService";
 
 export interface AppContainer {
   commandBus: ICommandBus;
@@ -151,6 +154,7 @@ export interface AppContainer {
     aiTokenUsage: IAITokenUsageRepository;
     podReport: IPodReportRepository;
     diaryReport: IDiaryReportRepository;
+    xer: IXerRepository;
   };
   
   services: {
@@ -174,6 +178,10 @@ export interface AppContainer {
     uploadDocumentsHandler: UploadDocumentsCommandHandler;
     uploadScheduleHandler: UploadScheduleCommandHandler;
     startupReconciliationService: StartupReconciliationService;
+  };
+
+  xer: {
+    roundTripService: XerRoundTripService;
   };
 
   agentLoop: {
@@ -314,6 +322,7 @@ export function createAppContainer(): AppContainer {
   const documentParserFactory = new DocumentParserFactory();
   const podReportRepository = new DrizzlePodReportRepository();
   const diaryReportRepository = new DrizzleDiaryReportRepository();
+  const xerRepository = new DrizzleXerRepository();
 
   const getActivitiesByIdsHandler = new GetActivitiesByIdsQueryHandler(scheduleActivityRepository);
   const scheduleActivitiesTool = new GetScheduleActivitiesTool(getActivitiesByIdsHandler);
@@ -452,6 +461,10 @@ export function createAppContainer(): AppContainer {
   const getDelayAnalysisProjectHandler = new GetDelayAnalysisProjectQueryHandler(delayAnalysisProjectRepository);
   const listDelayAnalysisProjectsHandler = new ListDelayAnalysisProjectsQueryHandler(delayAnalysisProjectRepository);
   const getTokenUsageByRunIdHandler = new GetTokenUsageByRunIdQueryHandler(aiTokenUsageRepository);
+  const xerRoundTripService = new XerRoundTripService(
+    delayAnalysisProjectRepository,
+    xerRepository,
+  );
 
   commandBus.register('CreateAgentCommand', createAgentHandler);
   commandBus.register('UpdateAgentCommand', updateAgentHandler);
@@ -493,6 +506,7 @@ export function createAppContainer(): AppContainer {
       aiTokenUsage: aiTokenUsageRepository,
       podReport: podReportRepository,
       diaryReport: diaryReportRepository,
+      xer: xerRepository,
     },
     services: {
       isAIConfigured: bedrockClientProvider.isConfigured(),
@@ -514,6 +528,9 @@ export function createAppContainer(): AppContainer {
       uploadDocumentsHandler,
       uploadScheduleHandler,
       startupReconciliationService,
+    },
+    xer: {
+      roundTripService: xerRoundTripService,
     },
     agentLoop: createAgentLoop(projectDocumentRepository, contractorDelayEventRepository, getActivitiesByIdsHandler),
     auth: createAuthSection(),

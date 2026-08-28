@@ -13,3 +13,4 @@
 - [System-prompt vs user-message prompt duplication](tool-extraction-prompt-dedup.md) — tool-based extractors send a system prompt AND a strategy-built user prompt; state each rule once via a `toolBasedExtraction` context flag, not near-identical wording in both.
 - [Content-scoped knowledge-base injection](delay-kb-content-scoping.md) — DelayKnowledgePromptBuilder now prunes gray-area/borderline KB sections by document-content keyword triggers instead of always sending every section for a document type.
 - [IDR extraction live-verification methodology](idr-extraction-live-verification.md) — safe read-only pattern to re-run real extraction against live Azure without touching baseline rows; expect ~±20% run-to-run variance, judge shifts by consistency not single runs.
+- [XER fixture version semantics](xer-fixture-version-semantics.md) — schedule-update sequence numbers are not ERMHDR versions; preserve the header value and never synthesize version diversity.
