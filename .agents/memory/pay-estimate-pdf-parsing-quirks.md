@@ -21,18 +21,39 @@ matching `^Change Orders`. When a document's final-estimate variant drops the co
 entirely, fall back to the item table's own "SUBTOTAL: Base Bid + Additive Bid" line.
 
 ## Wrapped-description line scrambling
-`pdftotext -layout` can split a single data row's item+code onto its own short line (with a stray
-unrelated token) while the description+numbers land on the next unprefixed line — fixable with a
-narrow "stitch the next line" heuristic gated on the current line failing full parsing. A harder,
-unfixed variant: two *consecutive* items' wrapped descriptions interleave across 3 output lines,
-shuffling words between them. This second variant caused ~1-3.5%+ discrepancies in a meaningful
-fraction of documents in this series and was not resolved — only detected and flagged per-period.
+`pdftotext -layout` can split a single data row's item+code onto its own short line (with stray
+leaked word(s) from the *previous* row's own overflow) while the real description+numbers land on
+a later, unprefixed, indented line — fixable with a "stitch itemNo+code onto a later line, discard
+the leaked words" heuristic gated on the current line failing full parsing. Two variants occur: a
+2-line case (numbers on the very next line) and a harder 3-line case (one pure-noise line with no
+numeric tokens in between, then the real description+numbers on the line after that). Handle both:
+try the current line whole, then try stitching +1 line, then try stitching +2 lines (discarding the
+middle line entirely as noise). Discard the leaked tokens on the itemNo+code line too, rather than
+folding them into the description.
 
-**Why:** column layout is fixed-width but multi-line item descriptions don't reliably preserve
-row boundaries when extracted as plain text.
+**Why:** column layout is fixed-width but multi-line item descriptions don't reliably preserve row
+boundaries when extracted as plain text; the amount of leaked/noise text on the itemNo+code line
+varies a lot (from 0 stray tokens to over a dozen), so a tight upper bound on that line's token
+count actively rejects valid stitches — widen it and let strict full-row validation on the final
+assembled line be the real safety net against false positives, not a token-count guard.
 
 **How to apply:** always validate summed item totals against a document's own printed total before
 trusting bulk output; don't assume 100% row recovery from `pdftotext -layout` on this kind of form.
+
+
+## Structural section boundaries apply per format, not just per parser
+A document series with both PDF and spreadsheet variants of the "same" report can hide the same
+structural trap in each format under a different shape. Here, the PDF item table and the xlsx
+sheet both have a "Change Orders" section further down that reuses original bid items' numbers for
+quantity revisions — summing past that section boundary silently double-counts against the cover
+total in either format, just under a differently-shaped section marker.
+
+**Why:** a fix for one format's parser (stopping at the PDF's `Change Orders` line) doesn't
+automatically cover a structurally-identical trap in another format's parser (the xlsx sheet had
+its own separate row-scanning loop with no equivalent cutoff).
+
+**How to apply:** when a document series has multiple source formats, re-verify every
+structural/section-boundary assumption independently in each format's parser.
 
 ## Template drift across a long document series
 Early documents in a multi-year series may use a materially different table layout (fewer

@@ -165,14 +165,18 @@ function peNumberFromFilename(filename: string): number {
 
 // Repairs a rare row-splitting artifact seen in some documents (e.g. PE14's Additive Bid
 // section): pdftotext's -layout heuristic occasionally buckets a data row's own item-number+code
-// prefix onto one output line (plus a stray unrelated token, itself leaked from an adjacent row's
-// own split) while the row's description and all 9 trailing fields land on the very next,
-// unprefixed, indented line. Detected narrowly (a short 2-4 token line starting with a valid item
-// number that fails full parsing) and repaired by re-parsing itemNo+code+nextLine as one row --
-// this never fires on a normal single-line row, so it can't corrupt otherwise-good parses.
+// prefix onto one output line (plus stray unrelated word(s), themselves leaked from an adjacent
+// row's own split) while the row's description and all 9 trailing fields land on the very next,
+// unprefixed, indented line. Detected narrowly (a short line starting with a valid item number
+// that fails full parsing) and repaired by re-parsing itemNo+code+nextLine as one row -- the
+// itemNo+code prefix check plus the strict full-row validation on the combined string mean this
+// never fires on a normal single-line row, so it can't corrupt otherwise-good parses. The leaked
+// word(s) on lineA are discarded rather than folded into the description: they belong to the
+// previous row's own wrapped text, not this one (see the 3-line variant below), and keeping them
+// out only costs description cosmetics, never the numeric fields validation actually checks.
 function tryStitchedPair(lineA: string, lineB: string): ParsedItem | null {
   const tokensA = lineA.trim().split(/\s+/);
-  if (tokensA.length < 2 || tokensA.length > 4) return null;
+  if (tokensA.length < 2 || tokensA.length > 20) return null;
   if (!/^\d{1,4}$/.test(tokensA[0])) return null;
   const code = tokensA[1];
   if (!/^[0-9a-zA-Z]{3,10}$/.test(code)) return null;
@@ -181,6 +185,24 @@ function tryStitchedPair(lineA: string, lineB: string): ParsedItem | null {
   // Don't stitch onto a line that is already a complete, independent data row.
   if (/^\d{1,4}$/.test(tokensB[0]) && tokensB.length >= 11) return null;
   const combined = `${tokensA[0]} ${code} ${lineB.trim()}`;
+  return parseDataLine(combined);
+}
+
+function tryStitchedTriple(lineA: string, lineB: string, lineC: string): ParsedItem | null {
+  const tokensA = lineA.trim().split(/\s+/);
+  if (tokensA.length < 2 || tokensA.length > 20) return null;
+  if (!/^\d{1,4}$/.test(tokensA[0])) return null;
+  const code = tokensA[1];
+  if (!/^[0-9a-zA-Z]{3,10}$/.test(code)) return null;
+
+  const tokensB = lineB.trim().split(/\s+/);
+  if (tokensB.length === 0) return null;
+  // Line B must be pure noise: no numeric-looking tokens (i.e. it can't itself be contributing
+  // to a real row's trailing fields), and not the start of what could be another item's row.
+  if (/^\d{1,4}$/.test(tokensB[0])) return null;
+  if (tokensB.some((t) => NUMERIC_TOKEN_RE.test(t))) return null;
+
+  const combined = `${tokensA[0]} ${code} ${lineC.trim()}`;
   return parseDataLine(combined);
 }
 
@@ -476,17 +498,21 @@ async function parsePdfPe(filePath: string, catalog: Map<number, CatalogEntry>):
       if (/^Change Orders(\s|$)/.test(lines[i])) break;
 
       let parsed = parseDataLine(lines[i]);
-      let consumedNext = false;
+      let linesConsumed = 0;
       if (!parsed && i + 1 < lines.length) {
         parsed = tryStitchedPair(lines[i], lines[i + 1]);
-        if (parsed) consumedNext = true;
+        if (parsed) linesConsumed = 1;
+      }
+      if (!parsed && i + 2 < lines.length) {
+        parsed = tryStitchedTriple(lines[i], lines[i + 1], lines[i + 2]);
+        if (parsed) linesConsumed = 2;
       }
       if (parsed) {
         // Same item can appear once per printed page (header/footer reprints, not real
         // duplicates) only if content is identical; keep the first.
         const key = `${parsed.itemNo}:${parsed.bidCode}`;
         if (!itemsByKey.has(key)) itemsByKey.set(key, parsed);
-        if (consumedNext) i++;
+        i += linesConsumed;
       }
     }
     items = Array.from(itemsByKey.values());
@@ -552,6 +578,11 @@ function parseXlsxPe(filePath: string): ParsedPe {
   if (headerRowIdx >= 0) {
     for (let r = headerRowIdx + 1; r < ccRows.length; r++) {
       const row = ccRows[r];
+      // Mirrors the PDF path's "Change Orders" cutoff: this sheet has its own "Change Orders"
+      // section further down, whose rows reuse the original bid items' numbers for quantity
+      // revisions -- without stopping here those would double-count against the "Contract Bid
+      // Item Work" (Base + Additive Bid only) validation total, same as in the PDF documents.
+      if (String(row[0]).trim() === 'Change Orders') break;
       const itemNoRaw = String(row[0] ?? '').trim();
       if (!/^\d{1,4}$/.test(itemNoRaw)) continue; // section headers ("Base Bid", etc.) or blanks
       const description = String(row[2] ?? '').trim();
