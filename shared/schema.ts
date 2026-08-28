@@ -616,13 +616,18 @@ export const bidItemLaborEstimates = pgTable("bid_item_labor_estimates", {
 export type BidItemLaborEstimateRow = typeof bidItemLaborEstimates.$inferSelect;
 export type InsertBidItemLaborEstimateRow = typeof bidItemLaborEstimates.$inferInsert;
 
-// Flattened rows from the contractor's original HeavyBid "Direct Cost Report" (HCSS) estimate
-// export. subActivityCode (e.g. "14.01") uses the same decimal cost-code scheme already seen in
+// Flattened rows from the contractor's original HeavyBid "Direct Cost Report" (HCSS) estimate.
+// subActivityCode (e.g. "14.01") uses the same decimal cost-code scheme already seen in
 // podTaskLines.costCode -- verified against real data -- and is the crosswalk key connecting POD
-// crew/location/date rows to bid items. The source report's merged-cell layout is inconsistent
-// row-to-row, so per-resource cost bucket (labor vs material vs equipment vs subcontract) is not
-// reliably separable; only unitCost and a single lineTotal are parsed with confidence. rawText
-// preserves the full row for any future re-parse attempt.
+// crew/location/date rows to bid items.
+//
+// Parsed from the PDF export of this report (scripts/stage-bid-cost-data-pdf.ts), not the xlsx
+// export: the xlsx's merged-cell layout scrambles column boundaries row-to-row (only ~58% of the
+// report's own grand total was recoverable from it), while the PDF carries real per-character x/y
+// coordinates that let each numeric token be assigned to its true column via nearest-anchor
+// matching against the report's fixed header positions. This recovers the full labor/material/
+// matl-exp/equipment/subcontract cost breakdown, validated against the report's own printed
+// "Report Totals" line. rawText preserves the full reconstructed row for any future re-parse.
 export const bidItemCostEstimateLines = pgTable("bid_item_cost_estimate_lines", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
@@ -639,6 +644,11 @@ export const bidItemCostEstimateLines = pgTable("bid_item_cost_estimate_lines", 
   quantity: numeric("quantity"),
   unit: text("unit"),
   unitCost: numeric("unit_cost"),
+  laborCost: numeric("labor_cost"),
+  materialCost: numeric("material_cost"),
+  matlExpCost: numeric("matl_exp_cost"),
+  equipmentCost: numeric("equipment_cost"),
+  subcontractCost: numeric("subcontract_cost"),
   lineTotal: numeric("line_total"),
   lineKind: varchar("line_kind").notNull(),
   rowIndex: integer("row_index").notNull(),
