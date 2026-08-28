@@ -15,6 +15,10 @@
  * Unit Price, Quantity to Date, Percent Complete, Total Amount to Date, Previous Amount,
  * Quantity this Estimate, Amount Due this Estimate.
  *
+ * Four early documents (PE05, PE06, PE08, PE13) use a visibly older item-table template instead
+ * ("Template C-20L", a wide per-FCR quantity-tracking matrix rather than the later dollar-ledger
+ * table) -- see parseOldFormatItems() below for that template's own coordinate-based parser.
+ *
  * Validates each PE's summed item-level amounts against that PE's own printed
  * "Contract Bid Item Work" cover-sheet total (both cumulative and this-period figures).
  *
@@ -26,26 +30,33 @@ import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import XLSX from 'xlsx';
+import * as pdfjsNamespace from 'pdfjs-dist/legacy/build/pdf.mjs';
+const pdfjs: any = pdfjsNamespace;
 import { db } from '../server/src/infrastructure/database';
 import { delayAnalysisProjects, bidItemProgressEstimates, payEstimatePeriods } from '../shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 
 const PAY_ESTIMATES_DIR = 'attached_assets/pay_estimiates';
 
-// These documents return zero (or effectively zero) usable item rows and are excluded from
-// bid_item_progress_estimates entirely. Each still gets a row in pay_estimate_periods with
-// status='unrecoverable' and an explanatory note, so downstream features (e.g. Measured Mile)
-// can tell users the period exists but its detail is missing, rather than silently having a gap.
+// This document returns zero usable item rows and is excluded from bid_item_progress_estimates
+// entirely. It still gets a row in pay_estimate_periods with status='unrecoverable' and an
+// explanatory note, so downstream features (e.g. Measured Mile) can tell users the period exists
+// but its detail is missing, rather than silently having a gap.
 //
 // - PE33: rasterized/flattened PDF with no recoverable text layer at all (confirmed via both
 //   pdftotext and pdfjs-dist -- fewer than 25 characters extractable across 48 pages). No OCR
 //   is attempted: financial figures are too risky to guess at from OCR.
-// - PE05, PE06, PE08, PE13: early-project documents that use a visibly different, older item
-//   table layout (fewer columns, some rows with no dollar figures at all) than every later PE.
-//   This isn't a parsing bug to patch -- it's a distinct template that would need its own
-//   from-scratch parser, which hasn't been built.
-const UNRECOVERABLE_FILES = new Set([
-  '2019-069_PE33_Fully signed_rev.pdf',
+const UNRECOVERABLE_FILES = new Set(['2019-069_PE33_Fully signed_rev.pdf']);
+
+// PE05, PE06, PE08, PE13: early-project documents whose item table is "Template C-20L", a wide
+// per-Field-Change-Request (FCR) quantity matrix (Bid Item / Description / GRAND TOTAL / one
+// column per FCR / PE #NN Total) rather than the later per-item dollar ledger -- no bid code,
+// unit price, or dollar columns at all, just cumulative-to-date and this-period *quantities*.
+// Parsed with pdfjs-dist coordinate extraction (see parseOldFormatItems) and priced against the
+// bid-item catalog (bid code / unit price / contract quantity) recovered from this same
+// project's other, standard-format PEs, since those are fixed contract terms that don't vary
+// by period.
+const OLD_FORMAT_FILES = new Set([
   '2019-069_PE05_Fully Signed.pdf',
   '2019-069_PE06_Fully Signed.pdf',
   '2019-069_PE08_Fully Signed.pdf',
@@ -173,7 +184,260 @@ function tryStitchedPair(lineA: string, lineB: string): ParsedItem | null {
   return parseDataLine(combined);
 }
 
-function parsePdfPe(filePath: string): ParsedPe {
+// Fixed contract terms (bid code, unit, unit price, contract quantity) for one bid item, as
+// recovered from this project's other, standard-format PEs. These never change period to period,
+// which is what lets us price the old-format documents' quantity-only matrix (see
+// parseOldFormatItems) even though that template never prints a dollar figure.
+interface CatalogEntry {
+  bidCode: string | null;
+  description: string;
+  units: string | null;
+  unitPrice: number | null;
+  contractQuantity: number | null;
+}
+
+// PE47 is the one xlsx-sourced period; its "C@C" sheet parse (see parseXlsxPe) has a handful of
+// unit-price/contract-quantity mismatches against every PDF-sourced period for the same item
+// (traced to that sheet's own column quirks, not a real contract revision), so it's excluded as a
+// catalog source. Every other period, and PE1 in particular, covers all ~671 distinct item
+// numbers across the whole 57-document series (confirmed via direct query), so the earliest
+// available non-PE47 period per item is used as that item's canonical catalog entry.
+async function buildItemCatalog(projectId: string): Promise<Map<number, CatalogEntry>> {
+  const rows = await db
+    .select()
+    .from(bidItemProgressEstimates)
+    .where(eq(bidItemProgressEstimates.projectId, projectId))
+    .orderBy(asc(bidItemProgressEstimates.peNumber));
+
+  const catalog = new Map<number, CatalogEntry>();
+  for (const row of rows) {
+    if (row.peNumber === 47) continue;
+    if (row.itemNo === null) continue;
+    if (catalog.has(row.itemNo)) continue; // rows are in ascending peNumber order; keep the first
+    catalog.set(row.itemNo, {
+      bidCode: row.bidCode,
+      description: row.description ?? '',
+      units: row.units,
+      unitPrice: row.unitPrice !== null ? Number(row.unitPrice) : null,
+      contractQuantity: row.contractQuantity !== null ? Number(row.contractQuantity) : null,
+    });
+  }
+  return catalog;
+}
+
+interface OldFormatToken {
+  x: number;
+  y: number;
+  str: string;
+}
+
+interface OldFormatPageAnchors {
+  grandX: number;
+  peX: number;
+  fcrXs: number[];
+}
+
+interface OldFormatPage {
+  anchors: OldFormatPageAnchors;
+  rows: { y: number; tokens: OldFormatToken[] }[];
+}
+
+// A "Template C-20L" header row is one whose tokens are entirely made up of known column labels
+// (the "GRAND"/"TOTAL"/"PE #NN"/"Total"/"FCR #NNN" quantity-matrix headers, the "Bid Item" /
+// "Description" item-table headers, or the cover-block furniture printed above the table) --
+// never real item data, even on continuation pages where it reprints without a "Base Bid" marker.
+function isOldFormatHeaderRow(tokens: OldFormatToken[]): boolean {
+  const rowText = tokens.map((t) => t.str).join(' ');
+  if (/^(Project:|Contractor|PW #|Fed Aid #:|All Funding Sources)/.test(rowText)) return true;
+  if (/^Bid Item|^Description$/.test(rowText)) return true;
+  return tokens.every(
+    (t) => t.str === 'GRAND' || t.str === 'TOTAL' || t.str === 'Total' || /^PE #\d+$/.test(t.str) || /^FCR/.test(t.str),
+  );
+}
+
+// Extracts, per page, the "Bid Item Tracking" quantity-matrix pages (identified by having both a
+// "GRAND"(TOTAL) column and a "Bid Item"/"Add BI#" item column -- present on every matrix page,
+// including continuations) along with that page's own column x-anchors. Anchors are recomputed
+// per page rather than once per document because the number of FCR (Field Change Request) columns
+// between the two quantity columns varies page to page, shifting the right-hand "PE #NN Total"
+// column's x-position along with it.
+async function extractOldFormatPages(filePath: string): Promise<OldFormatPage[]> {
+  const doc = await pdfjs.getDocument({ url: filePath, useSystemFonts: true }).promise;
+  const pages: OldFormatPage[] = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const content = await page.getTextContent();
+    const items: OldFormatToken[] = (content.items as any[])
+      .map((it) => ({ x: Math.round(it.transform[4]), y: Math.round(it.transform[5]), str: String(it.str) }))
+      .filter((it) => it.str.trim());
+    const fullText = items.map((it) => it.str).join(' ');
+    if (!/GRAND/.test(fullText) || !/Bid Item|Add BI#/.test(fullText)) continue;
+
+    const byY = new Map<number, OldFormatToken[]>();
+    for (const it of items) {
+      if (!byY.has(it.y)) byY.set(it.y, []);
+      byY.get(it.y)!.push(it);
+    }
+    const rows = Array.from(byY.entries())
+      .map(([y, tokens]) => ({ y, tokens: tokens.sort((a, b) => a.x - b.x) }))
+      .sort((a, b) => b.y - a.y);
+
+    let grandX: number | null = null;
+    let peX: number | null = null;
+    const fcrXs: number[] = [];
+    for (const row of rows) {
+      for (const t of row.tokens) {
+        if ((t.str === 'GRAND' || t.str === 'TOTAL') && grandX === null) grandX = t.x;
+        if (/^PE #\d+$/.test(t.str)) peX = t.x;
+        if (t.str === 'Total' && peX !== null && Math.abs(t.x - peX) < 15) peX = t.x;
+        if (/^FCR/.test(t.str)) fcrXs.push(t.x);
+      }
+    }
+    if (grandX === null || peX === null) continue; // header not found on this page; skip defensively
+    pages.push({ anchors: { grandX, peX, fcrXs }, rows });
+  }
+  return pages;
+}
+
+// Parses the Template C-20L quantity matrix into per-item cumulative-to-date and this-period
+// quantities. Only Base Bid + Additive Bid items are included (matching the standard-format
+// parser's own "Contract Bid Item Work" scope) -- reading stops the moment a Change Order ("CO
+// #N") section starts, since those are reported separately and would double-count against the
+// cover-sheet total this is validated against.
+//
+// An item's row can wrap across multiple physical text lines (long descriptions), and its GRAND
+// TOTAL / PE #NN Total values can land on a different physical line than its item-number line --
+// so rows are accumulated per item (from its item-number line up to, but not including, the next
+// item's) rather than parsed one line at a time. Each numeric token is assigned to the nearest of
+// that page's known column anchors (GRAND TOTAL, PE #NN Total, or one of the FCR columns in
+// between); FCR-column values are per-field-change-request deltas, not needed here, and are
+// discarded once classified.
+function parseOldFormatItemRows(pages: OldFormatPage[]): { itemNo: number; description: string; quantityToDate: number | null; quantityThisEstimate: number | null }[] {
+  const items: { itemNo: number; description: string; quantityToDate: number | null; quantityThisEstimate: number | null }[] = [];
+  let current: { itemNo: number; descParts: string[]; grand: number | null; pe: number | null } | null = null;
+  let active = false;
+  let stopped = false;
+
+  const finalize = () => {
+    if (current) {
+      items.push({
+        itemNo: current.itemNo,
+        description: current.descParts.join(' ').replace(/\s+/g, ' ').trim(),
+        quantityToDate: current.grand,
+        quantityThisEstimate: current.pe,
+      });
+      current = null;
+    }
+  };
+
+  for (const page of pages) {
+    if (stopped) break;
+    const columnAnchors: { key: 'grand' | 'pe' | 'fcr'; x: number }[] = [
+      { key: 'grand', x: page.anchors.grandX },
+      { key: 'pe', x: page.anchors.peX },
+      ...page.anchors.fcrXs.map((x) => ({ key: 'fcr' as const, x })),
+    ];
+    const classify = (x: number): 'grand' | 'pe' | 'fcr' => {
+      let best = columnAnchors[0];
+      let bestDist = Math.abs(x - best.x);
+      for (const a of columnAnchors.slice(1)) {
+        const d = Math.abs(x - a.x);
+        if (d < bestDist) {
+          best = a;
+          bestDist = d;
+        }
+      }
+      return best.key;
+    };
+
+    for (const row of page.rows) {
+      if (isOldFormatHeaderRow(row.tokens)) continue;
+      const rowText = row.tokens.map((t) => t.str).join(' ');
+      if (/^CO #\d/.test(rowText)) {
+        stopped = true;
+        break;
+      }
+      if (rowText === 'Base Bid' || /^Add BI#/.test(rowText)) {
+        active = true;
+        continue;
+      }
+      if (!active) continue;
+
+      const tokens = row.tokens;
+      const firstTok = tokens[0];
+      const startsNewItem = /^\d{1,4}$/.test(firstTok.str) && firstTok.x < 32;
+      if (startsNewItem) {
+        finalize();
+        current = { itemNo: parseInt(firstTok.str, 10), descParts: [], grand: null, pe: null };
+      }
+      if (!current) continue; // stray furniture row before any item has started
+
+      for (let i = startsNewItem ? 1 : 0; i < tokens.length; i++) {
+        const t = tokens[i];
+        const num = parseNumber(t.str);
+        if (num === null) {
+          current.descParts.push(t.str);
+        } else {
+          const bucket = classify(t.x);
+          if (bucket === 'grand') current.grand = num;
+          else if (bucket === 'pe') current.pe = num;
+        }
+      }
+    }
+  }
+  finalize();
+  return items;
+}
+
+// Prices the Template C-20L quantity matrix's raw itemNo/quantity rows against this project's
+// bid-item catalog (see buildItemCatalog): quantities are printed in this template, but bid code,
+// unit price, units, and contract quantity are not, so they're carried over from the item's fixed
+// contract terms elsewhere in the series. An item absent from the catalog (shouldn't happen -- see
+// buildItemCatalog's coverage note) is kept with null priced fields rather than dropped, so a gap
+// stays visible in validation instead of silently under-counting the period's total.
+function priceOldFormatItems(
+  rawItems: { itemNo: number; description: string; quantityToDate: number | null; quantityThisEstimate: number | null }[],
+  catalog: Map<number, CatalogEntry>,
+): ParsedItem[] {
+  return rawItems.map((raw) => {
+    const cat = catalog.get(raw.itemNo);
+    const unitPrice = cat?.unitPrice ?? null;
+    const contractQuantity = cat?.contractQuantity ?? null;
+    const quantityToDate = raw.quantityToDate;
+    const quantityThisEstimate = raw.quantityThisEstimate;
+    const totalAmountToDate = quantityToDate !== null && unitPrice !== null ? quantityToDate * unitPrice : null;
+    const amountDueThisEstimate =
+      quantityThisEstimate !== null && unitPrice !== null ? quantityThisEstimate * unitPrice : null;
+    const previousAmount =
+      totalAmountToDate !== null && amountDueThisEstimate !== null ? totalAmountToDate - amountDueThisEstimate : null;
+    const percentComplete =
+      quantityToDate !== null && contractQuantity !== null && contractQuantity !== 0
+        ? (quantityToDate / contractQuantity) * 100
+        : null;
+    return {
+      itemNo: raw.itemNo,
+      bidCode: cat?.bidCode ?? '',
+      description: cat?.description || raw.description,
+      units: cat?.units ?? null,
+      unitPrice,
+      contractQuantity,
+      quantityToDate,
+      percentComplete,
+      totalAmountToDate,
+      previousAmount,
+      quantityThisEstimate,
+      amountDueThisEstimate,
+    };
+  });
+}
+
+async function parseOldFormatItems(filePath: string, catalog: Map<number, CatalogEntry>): Promise<ParsedItem[]> {
+  const pages = await extractOldFormatPages(filePath);
+  const rawItems = parseOldFormatItemRows(pages);
+  return priceOldFormatItems(rawItems, catalog);
+}
+
+async function parsePdfPe(filePath: string, catalog: Map<number, CatalogEntry>): Promise<ParsedPe> {
   const text = execFileSync('pdftotext', ['-layout', filePath, '-'], {
     maxBuffer: 1024 * 1024 * 200,
     encoding: 'utf8',
@@ -196,8 +460,13 @@ function parsePdfPe(filePath: string): ParsedPe {
   }
 
   const filename = path.basename(filePath);
-  const itemsByKey = new Map<string, ParsedItem>();
-  if (!UNRECOVERABLE_FILES.has(filename)) {
+  let items: ParsedItem[];
+  if (OLD_FORMAT_FILES.has(filename)) {
+    items = await parseOldFormatItems(filePath, catalog);
+  } else if (UNRECOVERABLE_FILES.has(filename)) {
+    items = [];
+  } else {
+    const itemsByKey = new Map<string, ParsedItem>();
     const lines = text.split('\n');
     for (let i = 0; i < lines.length; i++) {
       // "Contract Bid Item Work" (Base + Additive) excludes Change Orders entirely, which are
@@ -220,6 +489,7 @@ function parsePdfPe(filePath: string): ParsedPe {
         if (consumedNext) i++;
       }
     }
+    items = Array.from(itemsByKey.values());
   }
 
   return {
@@ -229,7 +499,7 @@ function parsePdfPe(filePath: string): ParsedPe {
     periodEnd: normalizeDate(periodMatch?.[2]),
     contractBidItemWorkToDate: bidItemWorkMatch ? parseNumber(bidItemWorkMatch[1]) : null,
     contractBidItemWorkThisPeriod: bidItemWorkMatch ? parseNumber(bidItemWorkMatch[3]) : null,
-    items: Array.from(itemsByKey.values()),
+    items,
     sourceFile: filePath,
   };
 }
@@ -315,8 +585,8 @@ function parseXlsxPe(filePath: string): ParsedPe {
   };
 }
 
-async function parsePe(filePath: string): Promise<ParsedPe> {
-  return filePath.toLowerCase().endsWith('.xlsx') ? parseXlsxPe(filePath) : await parsePdfPe(filePath);
+async function parsePe(filePath: string, catalog: Map<number, CatalogEntry>): Promise<ParsedPe> {
+  return filePath.toLowerCase().endsWith('.xlsx') ? parseXlsxPe(filePath) : await parsePdfPe(filePath, catalog);
 }
 
 async function stagePayEstimates(projectId: string, dryRun: boolean) {
@@ -329,10 +599,16 @@ async function stagePayEstimates(projectId: string, dryRun: boolean) {
     throw new Error(`No pay estimate files found in ${PAY_ESTIMATES_DIR}`);
   }
 
+  // The old-format documents (see OLD_FORMAT_FILES) need a bid-item catalog -- built from this
+  // project's already-staged, standard-format PEs -- to price their quantity-only matrix. Built
+  // from the database's current state, before this run's delete+reinsert below, so it reflects
+  // the last successful staging run regardless of file processing order.
+  const catalog = await buildItemCatalog(projectId);
+
   const parsedPes: ParsedPe[] = [];
   for (const file of files) {
     process.stdout.write(`Parsing ${path.basename(file)}... `);
-    const parsed = await parsePe(file);
+    const parsed = await parsePe(file, catalog);
     parsedPes.push(parsed);
 
     const summedToDate = parsed.items.reduce((s, i) => s + (i.totalAmountToDate ?? 0), 0);
@@ -379,10 +655,7 @@ async function stagePayEstimates(projectId: string, dryRun: boolean) {
 
     if (UNRECOVERABLE_FILES.has(filename)) {
       status = 'unrecoverable';
-      notes =
-        filename.includes('PE33')
-          ? 'Rasterized/flattened PDF with no recoverable text layer; item detail could not be extracted.'
-          : 'Early-project document uses a different, older item table layout; not yet supported by the parser.';
+      notes = 'Rasterized/flattened PDF with no recoverable text layer; item detail could not be extracted.';
     } else if (pe.contractBidItemWorkToDate === null) {
       status = 'unvalidated';
       notes = 'No printed cover-sheet total found in this document to validate against.';
@@ -393,7 +666,10 @@ async function stagePayEstimates(projectId: string, dryRun: boolean) {
         status = 'exact';
       } else if (deltaPct !== null && deltaPct <= 3.5) {
         status = 'minor_discrepancy';
-        notes = `Summed item total is off from the printed cover-sheet total by $${delta.toFixed(2)} (${deltaPct.toFixed(2)}%), likely due to a small number of items with descriptions that wrap unpredictably across lines in the source PDF.`;
+        const likelyCause = OLD_FORMAT_FILES.has(filename)
+          ? "likely due to this document's older item-table layout, where dollar figures are derived from quantities read off a separate matrix and priced against this project's other periods' bid-item catalog rather than printed directly"
+          : 'likely due to a small number of items with descriptions that wrap unpredictably across lines in the source PDF';
+        notes = `Summed item total is off from the printed cover-sheet total by $${delta.toFixed(2)} (${deltaPct.toFixed(2)}%), ${likelyCause}.`;
       } else {
         status = 'significant_discrepancy';
         notes = `Summed item total is off from the printed cover-sheet total by $${delta.toFixed(2)} (${deltaPct !== null ? deltaPct.toFixed(2) + '%' : 'n/a'}).`;

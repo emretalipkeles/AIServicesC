@@ -46,3 +46,26 @@ image-only document, in the same nominal "Progress Estimate Detail" series.
 
 **How to apply:** when a document in a long series returns zero/near-zero parsed rows, check
 whether it's a different template era before debugging the shared parser.
+
+## Recovering an older quantity-only template via a catalog built from the rest of the series
+The 4 early-era documents above turned out to use "Template C-20L": a wide, per-Field-Change-
+-Request quantity matrix (Bid Item / Description / GRAND TOTAL / one column per FCR / PE #NN
+Total) with no bid code, unit price, or dollar columns at all — only cumulative-to-date and
+this-period *quantities*. `pdftotext -layout` mangles this because the FCR column count (and
+therefore the right-hand column's x-position) varies page to page; pdfjs-dist coordinate
+extraction with per-page anchor detection (locate that page's own "GRAND"/"TOTAL" and "PE #NN"/
+"Total" header token x-positions, plus every "FCR #" header token as extra disambiguating anchors)
+and nearest-anchor classification of each numeric token is required, same pattern as
+`pdf-visual-order-extraction.md`. Since bid code/unit price/contract quantity are fixed contract
+terms that don't vary by period, they can be recovered by building an itemNo -> catalog map from
+this same project's *other*, standard-format, already-parsed periods (excluding any period known
+to have its own parsing quirks) rather than needing to appear in the old template at all.
+
+**Why:** this let 4 previously-"unrecoverable" periods reach the same "validate summed items
+against printed cover total" pipeline as the rest of the series, with no schema or downstream
+changes — they came out at 0.01%-2.6% discrepancy, within the series' existing minor-discrepancy
+norm.
+
+**How to apply:** when a long document series has one item-table era with no dollar/price columns,
+don't treat it as unrecoverable — check whether the missing fields are fixed contract terms
+obtainable from the *rest of the series* instead of the document itself.
