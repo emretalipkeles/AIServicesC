@@ -823,3 +823,82 @@ export const inspectorDailyReports = pgTable("inspector_daily_reports", {
 
 export type InspectorDailyReportRow = typeof inspectorDailyReports.$inferSelect;
 export type InsertInspectorDailyReportRow = typeof inspectorDailyReports.$inferInsert;
+
+// One row per line-item in the "Employee Job Detail Report by Earn Code & Pay Date" (677-page
+// payroll PDF, staged via scripts/stage-payroll-job-hours.ts). This is the actual man-hours
+// charged to job 211 -- the missing term for a measured (not crew-count-proxy) productivity
+// factor: base-contract hours = total job hours - force-account hours (forceAccountTransactions).
+//
+// The source only prints a PAY date, never a work date (title: "...by Earn Code & Pay Date").
+// Certified weekly payroll typically lags the work it pays for by up to about two weeks, so each
+// row also carries an estimated work-date window computed from that assumption -- this offset is
+// data (estimatedWorkDateStart/End, assumedOffsetMinDays/MaxDays), not just a code comment, per
+// the task's explicit requirement not to silently treat pay date as work date.
+export const payrollJobLaborEntries = pgTable("payroll_job_labor_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  employeeNumber: text("employee_number").notNull(), // e.g. "1017" -- the report's own employee code
+  employeeRaw: text("employee_raw").notNull(), // pseudonymized, verbatim (may include stray continuation fragments the report itself wraps onto a second line)
+  earnCode: text("earn_code").notNull(), // REG, OT, DT, HOL, VAC, PSST, ADJ, FRNG, PRSNL, KOS, LUNCH, REIMB, RETRO, WAPFM, KOSHW, PRO, BRVMT
+  tradeRaw: text("trade_raw").notNull(),
+  tradeCode: text("trade_code"), // parsed prefix before " - " when it looks like a clean code; null when pseudonymization mangled it
+  tradeLabel: text("trade_label"), // parsed suffix after " - "
+  tradeCategory: text("trade_category"), // 'direct' | 'indirect', null when unresolved (see tradeResolved)
+  tradeResolved: boolean("trade_resolved").notNull().default(false), // false = raw trade text matched no known craft/indirect keyword; flagged, not guessed
+  marker: text("marker"), // '*' = non-hourly quantity, '#' = premium time (per the report's own legend); null for ordinary rows
+  amount: numeric("amount").notNull(),
+  hours: numeric("hours"), // null for non-hourly rows (ADJ, some REIMB/FRNG) -- excluded from hour totals, never coerced to 0
+  payDateRaw: text("pay_date_raw").notNull(), // as printed, MM/DD/YYYY
+  payDate: text("pay_date"), // normalized ISO; null if unparseable
+  // Estimated actual work-date window, derived from payDate under a documented 1-14 day certified
+  // weekly-payroll lag assumption -- not a measured value. See assumedOffset*Days.
+  estimatedWorkDateStart: text("estimated_work_date_start"),
+  estimatedWorkDateEnd: text("estimated_work_date_end"),
+  assumedOffsetMinDays: integer("assumed_offset_min_days").notNull().default(1),
+  assumedOffsetMaxDays: integer("assumed_offset_max_days").notNull().default(14),
+  pageNo: integer("page_no").notNull(), // provenance: page of the source PDF this row was read from
+  quarantined: boolean("quarantined").notNull().default(false),
+  quarantineReason: text("quarantine_reason"),
+  sourceFile: text("source_file").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  projectIdx: index("payroll_job_labor_entries_project_idx").on(table.projectId),
+  payDateIdx: index("payroll_job_labor_entries_pay_date_idx").on(table.payDate),
+  employeeIdx: index("payroll_job_labor_entries_employee_idx").on(table.employeeNumber),
+  tradeCategoryIdx: index("payroll_job_labor_entries_trade_category_idx").on(table.tradeCategory),
+}));
+
+export type PayrollJobLaborEntryRow = typeof payrollJobLaborEntries.$inferSelect;
+export type InsertPayrollJobLaborEntryRow = typeof payrollJobLaborEntries.$inferInsert;
+
+// Reconciliation of parsed detail rows against the report's own printed subtotals -- the
+// pay-estimate precedent applied here. One row per employee (the only sub-total granularity the
+// source actually prints; there is no printed monthly subtotal, so month-level rollups are
+// computed on the fly from payrollJobLaborEntries and are not separately reconciled here), plus
+// one synthetic row with employeeNumber = '__REPORT_TOTAL__' for the document's single grand
+// total ("Job 211 Subtotal:" / "Report Totals:").
+export const payrollReconciliation = pgTable("payroll_reconciliation", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  employeeNumber: text("employee_number").notNull(),
+  printedAmountSubtotal: numeric("printed_amount_subtotal"),
+  printedHoursSubtotal: numeric("printed_hours_subtotal"),
+  computedAmountSubtotal: numeric("computed_amount_subtotal").notNull(),
+  computedHoursSubtotal: numeric("computed_hours_subtotal").notNull(),
+  amountDelta: numeric("amount_delta"),
+  hoursDelta: numeric("hours_delta"),
+  hoursDeltaPct: numeric("hours_delta_pct"),
+  status: text("status").notNull(), // 'exact' | 'minor_discrepancy' | 'significant_discrepancy' | 'unvalidated' | 'unparseable'
+  notes: text("notes"),
+  pageNo: integer("page_no"), // page the printed subtotal appeared on
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  projectIdx: index("payroll_reconciliation_project_idx").on(table.projectId),
+  employeeIdx: index("payroll_reconciliation_employee_idx").on(table.employeeNumber),
+  statusIdx: index("payroll_reconciliation_status_idx").on(table.status),
+}));
+
+export type PayrollReconciliationRow = typeof payrollReconciliation.$inferSelect;
+export type InsertPayrollReconciliationRow = typeof payrollReconciliation.$inferInsert;
