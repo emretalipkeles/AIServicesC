@@ -27,17 +27,30 @@ import * as fs from 'fs';
 import * as path from 'path';
 import XLSX from 'xlsx';
 import { db } from '../server/src/infrastructure/database';
-import { delayAnalysisProjects, bidItemProgressEstimates } from '../shared/schema';
+import { delayAnalysisProjects, bidItemProgressEstimates, payEstimatePeriods } from '../shared/schema';
 import { eq } from 'drizzle-orm';
 
 const PAY_ESTIMATES_DIR = 'attached_assets/pay_estimiates';
 
-// One document (PE33) is a rasterized/flattened PDF with no recoverable text layer at all
-// (confirmed via both pdftotext and pdfjs-dist -- fewer than 25 characters extractable across
-// the whole 48-page file). No OCR is attempted: financial figures are too risky to guess at
-// from OCR. This period's item-level detail is simply absent from the staged time series;
-// PE32 and PE34 still bound it on either side.
-const UNRECOVERABLE_FILES = new Set(['2019-069_PE33_Fully signed_rev.pdf']);
+// These documents return zero (or effectively zero) usable item rows and are excluded from
+// bid_item_progress_estimates entirely. Each still gets a row in pay_estimate_periods with
+// status='unrecoverable' and an explanatory note, so downstream features (e.g. Measured Mile)
+// can tell users the period exists but its detail is missing, rather than silently having a gap.
+//
+// - PE33: rasterized/flattened PDF with no recoverable text layer at all (confirmed via both
+//   pdftotext and pdfjs-dist -- fewer than 25 characters extractable across 48 pages). No OCR
+//   is attempted: financial figures are too risky to guess at from OCR.
+// - PE05, PE06, PE08, PE13: early-project documents that use a visibly different, older item
+//   table layout (fewer columns, some rows with no dollar figures at all) than every later PE.
+//   This isn't a parsing bug to patch -- it's a distinct template that would need its own
+//   from-scratch parser, which hasn't been built.
+const UNRECOVERABLE_FILES = new Set([
+  '2019-069_PE33_Fully signed_rev.pdf',
+  '2019-069_PE05_Fully Signed.pdf',
+  '2019-069_PE06_Fully Signed.pdf',
+  '2019-069_PE08_Fully Signed.pdf',
+  '2019-069_PE13_Fully Signed.pdf',
+]);
 
 interface ParsedItem {
   itemNo: number;
@@ -344,15 +357,71 @@ async function stagePayEstimates(projectId: string, dryRun: boolean) {
     if (!seenPeNumbers.has(n)) console.warn(`WARNING: missing PE number ${n}`);
   }
 
-  const exact = parsedPes.filter((pe) => {
-    const s = pe.items.reduce((s2, i) => s2 + (i.totalAmountToDate ?? 0), 0);
-    return pe.contractBidItemWorkToDate !== null && Math.abs(s - pe.contractBidItemWorkToDate) < 1;
-  }).length;
-  const noValidationTotal = parsedPes.filter((pe) => pe.contractBidItemWorkToDate === null).length;
-  const mismatched = parsedPes.length - exact - noValidationTotal;
+  const toStr = (n: number | null) => (n !== null ? String(n) : null);
+
+  type PeriodStatus = 'exact' | 'minor_discrepancy' | 'significant_discrepancy' | 'unvalidated' | 'unrecoverable';
+  const periodRows: (typeof payEstimatePeriods.$inferInsert)[] = [];
+  const statusCounts: Record<PeriodStatus, number> = {
+    exact: 0,
+    minor_discrepancy: 0,
+    significant_discrepancy: 0,
+    unvalidated: 0,
+    unrecoverable: 0,
+  };
+
+  for (const pe of parsedPes) {
+    const summedToDate = pe.items.reduce((s, i) => s + (i.totalAmountToDate ?? 0), 0);
+    const filename = path.basename(pe.sourceFile);
+    let status: PeriodStatus;
+    let notes: string | null = null;
+    let delta: number | null = null;
+    let deltaPct: number | null = null;
+
+    if (UNRECOVERABLE_FILES.has(filename)) {
+      status = 'unrecoverable';
+      notes =
+        filename.includes('PE33')
+          ? 'Rasterized/flattened PDF with no recoverable text layer; item detail could not be extracted.'
+          : 'Early-project document uses a different, older item table layout; not yet supported by the parser.';
+    } else if (pe.contractBidItemWorkToDate === null) {
+      status = 'unvalidated';
+      notes = 'No printed cover-sheet total found in this document to validate against.';
+    } else {
+      delta = Math.abs(summedToDate - pe.contractBidItemWorkToDate);
+      deltaPct = pe.contractBidItemWorkToDate !== 0 ? (delta / pe.contractBidItemWorkToDate) * 100 : null;
+      if (delta < 1) {
+        status = 'exact';
+      } else if (deltaPct !== null && deltaPct <= 3.5) {
+        status = 'minor_discrepancy';
+        notes = `Summed item total is off from the printed cover-sheet total by $${delta.toFixed(2)} (${deltaPct.toFixed(2)}%), likely due to a small number of items with descriptions that wrap unpredictably across lines in the source PDF.`;
+      } else {
+        status = 'significant_discrepancy';
+        notes = `Summed item total is off from the printed cover-sheet total by $${delta.toFixed(2)} (${deltaPct !== null ? deltaPct.toFixed(2) + '%' : 'n/a'}).`;
+      }
+    }
+    statusCounts[status]++;
+
+    periodRows.push({
+      projectId,
+      peNumber: pe.peNumber,
+      sourceFile: pe.sourceFile,
+      cutoffDate: pe.cutoffDate,
+      periodStart: pe.periodStart,
+      periodEnd: pe.periodEnd,
+      itemCount: pe.items.length,
+      printedToDateTotal: toStr(pe.contractBidItemWorkToDate),
+      summedToDateTotal: toStr(pe.items.length > 0 ? summedToDate : null),
+      toDateDelta: toStr(delta),
+      toDateDeltaPct: toStr(deltaPct),
+      status,
+      notes,
+    });
+  }
+
   console.log(
-    `\nValidation summary: ${exact}/${parsedPes.length} match printed totals exactly (<$1), ` +
-      `${mismatched} have a discrepancy, ${noValidationTotal} have no printed total to check against.`,
+    `\nValidation summary: ${statusCounts.exact} exact, ${statusCounts.minor_discrepancy} minor discrepancy (<=3.5%), ` +
+      `${statusCounts.significant_discrepancy} significant discrepancy (>3.5%), ${statusCounts.unvalidated} unvalidated (no printed total), ` +
+      `${statusCounts.unrecoverable} unrecoverable (skipped) out of ${parsedPes.length}.`,
   );
 
   if (dryRun) {
@@ -360,7 +429,6 @@ async function stagePayEstimates(projectId: string, dryRun: boolean) {
     return { inserted: 0, peCount: parsedPes.length };
   }
 
-  const toStr = (n: number | null) => (n !== null ? String(n) : null);
   const inserts: (typeof bidItemProgressEstimates.$inferInsert)[] = [];
   for (const pe of parsedPes) {
     for (const item of pe.items) {
@@ -388,11 +456,15 @@ async function stagePayEstimates(projectId: string, dryRun: boolean) {
   }
 
   await db.delete(bidItemProgressEstimates).where(eq(bidItemProgressEstimates.projectId, projectId));
+  await db.delete(payEstimatePeriods).where(eq(payEstimatePeriods.projectId, projectId));
   for (let i = 0; i < inserts.length; i += 200) {
     await db.insert(bidItemProgressEstimates).values(inserts.slice(i, i + 200));
   }
+  for (let i = 0; i < periodRows.length; i += 200) {
+    await db.insert(payEstimatePeriods).values(periodRows.slice(i, i + 200));
+  }
 
-  console.log(`\nInserted ${inserts.length} rows across ${parsedPes.length} pay estimates.`);
+  console.log(`\nInserted ${inserts.length} item rows and ${periodRows.length} period records across ${parsedPes.length} pay estimates.`);
   return { inserted: inserts.length, peCount: parsedPes.length };
 }
 

@@ -707,3 +707,32 @@ export const bidItemProgressEstimates = pgTable("bid_item_progress_estimates", {
 
 export type BidItemProgressEstimateRow = typeof bidItemProgressEstimates.$inferSelect;
 export type InsertBidItemProgressEstimateRow = typeof bidItemProgressEstimates.$inferInsert;
+
+// One row per pay-estimate period (1-57), including periods whose item detail could not be
+// recovered at all. This is the data-quality record for the Measured Mile analysis to surface
+// to users: which periods are fully trustworthy, which have a small known discrepancy against
+// the document's own printed cover total, and which are missing outright (and why).
+export const payEstimatePeriods = pgTable("pay_estimate_periods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  peNumber: integer("pe_number").notNull(),
+  sourceFile: text("source_file").notNull(),
+  cutoffDate: text("cutoff_date"),
+  periodStart: text("period_start"),
+  periodEnd: text("period_end"),
+  itemCount: integer("item_count").notNull().default(0),
+  printedToDateTotal: numeric("printed_to_date_total"),
+  summedToDateTotal: numeric("summed_to_date_total"),
+  toDateDelta: numeric("to_date_delta"),
+  toDateDeltaPct: numeric("to_date_delta_pct"),
+  status: text("status").notNull(), // 'exact' | 'minor_discrepancy' | 'significant_discrepancy' | 'unvalidated' | 'unrecoverable'
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  projectIdx: index("pay_estimate_periods_project_idx").on(table.projectId),
+  peNumberIdx: index("pay_estimate_periods_pe_number_idx").on(table.peNumber),
+}));
+
+export type PayEstimatePeriodRow = typeof payEstimatePeriods.$inferSelect;
+export type InsertPayEstimatePeriodRow = typeof payEstimatePeriods.$inferInsert;
