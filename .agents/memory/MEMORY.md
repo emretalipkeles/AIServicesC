@@ -16,3 +16,4 @@
 - [XER fixture version semantics](xer-fixture-version-semantics.md) — schedule-update sequence numbers are not ERMHDR versions; preserve the header value and never synthesize version diversity.
 - [SDOT pay-estimate PDF parsing quirks](pay-estimate-pdf-parsing-quirks.md) — Change Orders schedule double-counts item numbers; wrapped descriptions scramble across lines; template layout drifts across a multi-year document series.
 - [Per-period data-quality flagging pattern](per-period-data-quality-flagging.md) — when bulk-staging a long document series with inconsistent extraction fidelity, give every period a status+delta+notes record instead of silently loading or all-or-nothing rejecting.
+- [Azure claims-investigation database](azure-claims-database.md) — a second DB (separate from the app's own) holds measured labor hours, force-account costs, and owner daily reports for this job; `pg.Pool` mis-parses its keyword/value connection string.

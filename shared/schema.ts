@@ -736,3 +736,90 @@ export const payEstimatePeriods = pgTable("pay_estimate_periods", {
 
 export type PayEstimatePeriodRow = typeof payEstimatePeriods.$inferSelect;
 export type InsertPayEstimatePeriodRow = typeof payEstimatePeriods.$inferInsert;
+
+// Measured labor hours staged from the separate Azure claims-investigation database (see
+// scripts/stage-labor-hours.ts), which holds real force-account cost detail and owner-inspector
+// daily reports for this same job -- data that does not exist anywhere in this app's own schema.
+// Staged (not queried live) so the app keeps one data source, matching the pay-estimate pattern.
+//
+// Every row here is force-account (changed/extra work), never base-contract production: it is
+// the wrong denominator for a productivity factor but the right numerator for measuring
+// disruption intensity (how many hours got diverted into extra work in a period).
+//
+// txnId is the source system's own transaction id, already deduplicated across every source
+// document copy that carried it (see the source's own extraction_basis note) -- do not
+// multiply by any copy count. Unique per project so re-running the staging script is idempotent.
+export const forceAccountTransactions = pgTable("force_account_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  txnId: text("txn_id").notNull(),
+  txnType: text("txn_type").notNull(), // e.g. FORCE_ACCOUNT_LABOR, FORCE_ACCOUNT_PRIME_EQUIPMENT, FORCE_ACCOUNT_EQUIPMENT
+  txnDateRaw: text("txn_date_raw").notNull(),
+  // Normalized ISO date, null when the source's free-text date could not be parsed at all.
+  txnDate: text("txn_date"),
+  resource: text("resource"), // pseudonymized PERSON-xxxx for labor, equipment unit/name for equipment
+  classification: text("classification"), // raw source string, e.g. "JW | STRAIGHT_TIME"
+  craft: text("craft"), // parsed portion before "|"; null when classification has no craft segment
+  timeBasis: text("time_basis"), // STRAIGHT_TIME | OVERTIME | DOUBLE_TIME, parsed from classification
+  quantity: numeric("quantity"), // hours
+  unit: text("unit"),
+  rate: numeric("rate"),
+  amount: numeric("amount"),
+  costCode: text("cost_code"),
+  faNo: text("fa_no"),
+  workDescription: text("work_description"),
+  vendorOrSub: text("vendor_or_sub"),
+  sourceDocId: text("source_doc_id"),
+  locator: text("locator"),
+  verbatimLine: text("verbatim_line"),
+  // True when txnDateRaw failed to parse, or parsed outside this job's plausible date range
+  // (2020-2027) -- e.g. 3 known source rows land in 2002/2014. Kept and flagged rather than
+  // dropped, matching the per-record data-quality pattern used for pay-estimate periods.
+  quarantined: boolean("quarantined").notNull().default(false),
+  quarantineReason: text("quarantine_reason"),
+  sourceSystem: text("source_system").notNull().default("azure_claims_db:cost_transaction"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  projectIdx: index("force_account_transactions_project_idx").on(table.projectId),
+  txnDateIdx: index("force_account_transactions_txn_date_idx").on(table.txnDate),
+  txnTypeIdx: index("force_account_transactions_txn_type_idx").on(table.txnType),
+  projectTxnIdx: index("force_account_transactions_project_txn_idx").on(table.projectId, table.txnId),
+}));
+
+export type ForceAccountTransactionRow = typeof forceAccountTransactions.$inferSelect;
+export type InsertForceAccountTransactionRow = typeof forceAccountTransactions.$inferInsert;
+
+// Owner-inspector daily reports staged from the Azure claims database, independent of the
+// contractor's own POD records (podReports/podSections/etc.). crewCount is the one directly
+// comparable figure to POD's crew-member-count proxy, recorded here by the other side of the
+// job -- agreement between the two is what makes the crew-count productivity proxy defensible.
+export const inspectorDailyReports = pgTable("inspector_daily_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  azureDrId: text("azure_dr_id").notNull(), // source dr_id, for idempotent re-staging
+  reportDate: text("report_date"),
+  // Source's own confidence label for reportDate (e.g. "FORM AND RUNNING HEADER AGREE" vs
+  // "DATE_WITNESSES_DISAGREE") -- surface this rather than treating every date as equally solid.
+  dateAgreement: text("date_agreement"),
+  contractor: text("contractor"),
+  location: text("location_"),
+  inspector: text("inspector"),
+  // Plain integer headcount parsed from the source's free-text crew_roster field; null when
+  // that field was absent/empty/non-numeric for this report.
+  crewCount: integer("crew_count"),
+  contractWorkPerformed: text("contract_work_performed"),
+  delaysAndReason: text("delays_and_reason"),
+  extraWorkForceAccount: text("extra_work_force_account"),
+  equipmentTable: text("equipment_table"),
+  sourceFile: text("source_file"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  projectIdx: index("inspector_daily_reports_project_idx").on(table.projectId),
+  reportDateIdx: index("inspector_daily_reports_report_date_idx").on(table.reportDate),
+  projectDrIdx: index("inspector_daily_reports_project_dr_idx").on(table.projectId, table.azureDrId),
+}));
+
+export type InspectorDailyReportRow = typeof inspectorDailyReports.$inferSelect;
+export type InsertInspectorDailyReportRow = typeof inspectorDailyReports.$inferInsert;
