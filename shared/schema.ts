@@ -663,3 +663,47 @@ export const bidItemCostEstimateLines = pgTable("bid_item_cost_estimate_lines", 
 
 export type BidItemCostEstimateLineRow = typeof bidItemCostEstimateLines.$inferSelect;
 export type InsertBidItemCostEstimateLineRow = typeof bidItemCostEstimateLines.$inferInsert;
+
+// Progress Estimate (pay estimate) line items: one row per (pay-estimate period, bid item),
+// parsed from the 57 SDOT "Progress Estimate Detail" documents (Template C-20D). Unlike
+// bidItemCostEstimateLines/bidItemLaborEstimates (single point-in-time bid estimates), this
+// carries a real, approved, dated time series of actual installed quantity and actual $ paid
+// per bid item -- the "actual production over time" axis for Measured Mile.
+//
+// itemNo uses the same crosswalk key as bidItemLaborEstimates.itemNo /
+// bidItemCostEstimateLines.bidItemNo (verified to match across sample item numbers).
+//
+// previousAmount/quantityThisEstimate/amountDueThisEstimate are nullable: the PDF-format
+// estimates (56 of 57) carry them directly, but the one xlsx-format estimate (PE47) only
+// exposes quantityToDate/totalAmountToDate -- period deltas for that row can be derived later
+// from the surrounding PEs' cumulative values.
+export const bidItemProgressEstimates = pgTable("bid_item_progress_estimates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  peNumber: integer("pe_number").notNull(),
+  cutoffDate: text("cutoff_date"),
+  periodStart: text("period_start"),
+  periodEnd: text("period_end"),
+  itemNo: integer("item_no"),
+  bidCode: text("bid_code"),
+  description: text("description"),
+  units: text("units"),
+  unitPrice: numeric("unit_price"),
+  contractQuantity: numeric("contract_quantity"),
+  quantityToDate: numeric("quantity_to_date"),
+  percentComplete: numeric("percent_complete"),
+  totalAmountToDate: numeric("total_amount_to_date"),
+  previousAmount: numeric("previous_amount"),
+  quantityThisEstimate: numeric("quantity_this_estimate"),
+  amountDueThisEstimate: numeric("amount_due_this_estimate"),
+  sourceFile: text("source_file").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  projectIdx: index("bid_item_progress_estimates_project_idx").on(table.projectId),
+  itemNoIdx: index("bid_item_progress_estimates_item_no_idx").on(table.itemNo),
+  peNumberIdx: index("bid_item_progress_estimates_pe_number_idx").on(table.peNumber),
+}));
+
+export type BidItemProgressEstimateRow = typeof bidItemProgressEstimates.$inferSelect;
+export type InsertBidItemProgressEstimateRow = typeof bidItemProgressEstimates.$inferInsert;
