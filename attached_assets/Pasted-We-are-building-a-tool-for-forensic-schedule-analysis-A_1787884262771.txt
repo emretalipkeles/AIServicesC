@@ -1,0 +1,36 @@
+We are building a tool for forensic schedule analysis (AACE 29R-03 MIP 3.5 recreated updates). 
+This phase ONLY builds and validates a null-test round-trip for a Primavera XER file. 
+Do not build document parsing, activity matching, or progress-writing logic yet — that comes later.
+
+HARD CONSTRAINTS (apply to all code in this phase and every phase after):
+- Never infer, estimate, or auto-correct a data value. If something is missing or ambiguous, the tool must flag it and stop — it must never guess.
+- Never modify CALENDAR, PROJECT settings, activity logic (TASKPRED), or planned durations for unstarted work. This phase writes zero data changes — it only reads and re-writes the file to test fidelity.
+- All output must be deterministic — same input always produces byte-identical output.
+
+WHAT THIS PHASE DOES:
+1. Parse the uploaded XER file (v.135) as tab-separated text. Structure: 
+   %T <table name>
+   %F <tab-separated field names>
+   %R <tab-separated values, matching %F order positionally>
+   %E marks end of file.
+   Build an in-memory representation preserving table order, field order, and row order exactly as read.
+
+2. Write the parsed representation back out to a new XER file with no modifications.
+
+3. Build a diff tool that compares the original file to the round-tripped file:
+   - Byte-for-byte diff first — report if they are identical.
+   - If not identical, report every table, row, and field where a difference exists, plus the exact original and new value.
+   - The diff tool is the deliverable of this phase — it needs to be reusable for every future phase, not a one-off script.
+
+4. Do NOT attempt to fix any differences found. Report them. A human will decide whether a difference is acceptable (e.g., trailing whitespace) or a bug in the parser.
+
+ACCEPTANCE CRITERIA:
+- Round-tripped file imports into P6 without warnings (I will test this manually).
+- Diff tool reports zero differences, or clearly itemizes every difference for review.
+
+Before writing any code, tell me back in plain language:
+- Your understanding of the XER structure above
+- What you'll build in this phase
+- Anything in this prompt that's ambiguous to you
+
+Wait for my confirmation before generating code.

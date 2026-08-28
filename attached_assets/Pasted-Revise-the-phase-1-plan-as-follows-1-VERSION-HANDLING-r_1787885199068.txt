@@ -1,0 +1,55 @@
+Revise the phase-1 plan as follows.
+
+1. VERSION HANDLING (replaces the current v.135-only restriction):
+This tool will receive schedules spanning multiple export versions over 
+time (v.124 through v.135 currently, more in future months). Do not 
+hard-code a single accepted version.
+
+Maintain an explicit allow-list of supported ERMHDR versions, seeded with 
+the versions currently in hand (v.124–v.135). Parse the version from the 
+ERMHDR line and check it against the allow-list:
+- Version on the allow-list → proceed normally.
+- Version not on the allow-list → flag-and-stop, reporting the exact 
+  version string found and that it is outside the currently supported 
+  set. Do not attempt to parse it "optimistically."
+
+Record the detected version on every upload and every run, so results are 
+traceable to the version that produced them. Adding a new version to the 
+allow-list later should be a one-line config change, not a code change to 
+the parser or writer. XML (.xml) P6 exports remain out of scope.
+
+2. DIFF ENGINE — ORDERING AS ITS OWN CATEGORY:
+In addition to the existing diff categories (missing tables, field-list 
+differences, row-count differences, per-cell differences), treat ordering 
+as its own dimension, distinct from presence/absence or count 
+differences. A file can have the same tables, same fields, and same rows, 
+just reordered — the report must say that specifically, not surface it 
+only as a generic byte-level mismatch:
+- Table order changed: same set of tables in both files, sequence 
+  differs. Report original order and new order.
+- Field order changed within a table: same %F field set, different 
+  order. Report per table.
+- Row order changed within a table: same rows present by identity, 
+  different sequence. Report per table.
+These are itemized like every other diff category — never auto-corrected 
+or treated as equivalent to "no difference."
+
+For row-identity per table (needed to tell "row moved" from "row added + 
+row removed"), use each table's natural key rather than guessing: 
+task_id for TASK, the pred/succ pair for TASKPRED, proj_id for PROJECT, 
+clndr_id for CALENDAR. Before writing this part, tell me back what 
+identity key you plan to use for every other table in the fixture files, 
+so we agree on it before it's built.
+
+3. MISSING/MALFORMED ERMHDR AS ITS OWN FLAG-AND-STOP CONDITION:
+Treat "ERMHDR line missing entirely" and "ERMHDR line present but doesn't 
+match the expected header shape" as a distinct flag-and-stop condition 
+from "version not on the allow-list." A missing/malformed header means 
+the file couldn't be identified as a valid XER at all — report that 
+explicitly (e.g. "no ERMHDR line found at start of file" or "ERMHDR line 
+does not match expected field structure") rather than falling through to 
+a version-check error that implies the header parsed fine but had an 
+unexpected value.
+
+As before: tell me your understanding of these three changes and flag 
+anything ambiguous before writing any code.
