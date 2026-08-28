@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, real, jsonb, boolean, index, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, real, numeric, jsonb, boolean, index, customType } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -592,3 +592,64 @@ export const insertAITokenUsageSchema = createInsertSchema(aiTokenUsage).omit({
 
 export type InsertAITokenUsage = z.infer<typeof insertAITokenUsageSchema>;
 export type AITokenUsageRecord = typeof aiTokenUsage.$inferSelect;
+
+// Measured Mile feasibility staging: two contractor-provided bid estimate workbooks, staged
+// read-only for cross-referencing against POD/corridor/pay-estimate data (see migrations/0007).
+//
+// bid_item_labor_estimates.itemNo matches the external Azure progress_estimate_item.item_no
+// key, not that table's bid_code column (which is inconsistent across pay-estimate revisions).
+export const bidItemLaborEstimates = pgTable("bid_item_labor_estimates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  itemNo: integer("item_no").notNull(),
+  description: text("description"),
+  quantity: numeric("quantity"),
+  estimatedManHours: numeric("estimated_man_hours"),
+  sourceFile: text("source_file").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  projectIdx: index("bid_item_labor_estimates_project_idx").on(table.projectId),
+  itemNoIdx: index("bid_item_labor_estimates_item_no_idx").on(table.itemNo),
+}));
+
+export type BidItemLaborEstimateRow = typeof bidItemLaborEstimates.$inferSelect;
+export type InsertBidItemLaborEstimateRow = typeof bidItemLaborEstimates.$inferInsert;
+
+// Flattened rows from the contractor's original HeavyBid "Direct Cost Report" (HCSS) estimate
+// export. subActivityCode (e.g. "14.01") uses the same decimal cost-code scheme already seen in
+// podTaskLines.costCode -- verified against real data -- and is the crosswalk key connecting POD
+// crew/location/date rows to bid items. The source report's merged-cell layout is inconsistent
+// row-to-row, so per-resource cost bucket (labor vs material vs equipment vs subcontract) is not
+// reliably separable; only unitCost and a single lineTotal are parsed with confidence. rawText
+// preserves the full row for any future re-parse attempt.
+export const bidItemCostEstimateLines = pgTable("bid_item_cost_estimate_lines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  bidItemNo: integer("bid_item_no"),
+  bidItemDescription: text("bid_item_description"),
+  subActivityCode: text("sub_activity_code"),
+  subActivityDescription: text("sub_activity_description"),
+  subActivityQuantity: numeric("sub_activity_quantity"),
+  subActivityUnit: text("sub_activity_unit"),
+  resourceCode: text("resource_code"),
+  resourceDescription: text("resource_description"),
+  pieces: numeric("pieces"),
+  quantity: numeric("quantity"),
+  unit: text("unit"),
+  unitCost: numeric("unit_cost"),
+  lineTotal: numeric("line_total"),
+  lineKind: varchar("line_kind").notNull(),
+  rowIndex: integer("row_index").notNull(),
+  rawText: text("raw_text").notNull(),
+  sourceFile: text("source_file").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  projectIdx: index("bid_item_cost_estimate_lines_project_idx").on(table.projectId),
+  bidItemIdx: index("bid_item_cost_estimate_lines_bid_item_idx").on(table.bidItemNo),
+  subActivityIdx: index("bid_item_cost_estimate_lines_sub_activity_idx").on(table.subActivityCode),
+}));
+
+export type BidItemCostEstimateLineRow = typeof bidItemCostEstimateLines.$inferSelect;
+export type InsertBidItemCostEstimateLineRow = typeof bidItemCostEstimateLines.$inferInsert;
