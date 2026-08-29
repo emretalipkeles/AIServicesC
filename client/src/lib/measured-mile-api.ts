@@ -173,6 +173,104 @@ export interface MeasuredMilePeriodDetailResponse {
   citations: Array<{ documentName: string; note: string }>;
 }
 
+// -- Street/distance (corridor location) view --------------------------------------------------
+
+export interface CorridorLocationDto {
+  key: string;
+  label: string;
+  defaultStationOrder: number;
+  approxDistanceFt: number;
+}
+
+export interface CorridorLocationOverrideDto {
+  rawText: string;
+  locationKey: string;
+  createdBy: string | null;
+  createdAt: string | null;
+}
+
+export interface CorridorLocationsResponse {
+  locations: CorridorLocationDto[];
+  overrides: CorridorLocationOverrideDto[];
+}
+
+export type LocationMatchConfidence = 'high' | 'medium' | 'low' | 'forced_override';
+
+export interface LocationEvidenceItemDto {
+  rawText: string;
+  sourceType: 'pod_task_line' | 'schedule_activity';
+  documentName: string | null;
+  matchConfidence: LocationMatchConfidence;
+  matchType: 'single' | 'range' | 'override';
+}
+
+export interface LocationPeriodContributionDto {
+  peNumber: number;
+  allocatedQuantity: number;
+  weightShare: number;
+  allocatedWorkingDays: number | null;
+  sourceTypeUsed: 'pod_task_line' | 'schedule_activity';
+  periodClass: PeriodClass;
+  forcedImpactByLocationEvent: boolean;
+  evidence: LocationEvidenceItemDto[];
+}
+
+export interface OverlaidDelayEventDto {
+  eventId: string;
+  wbs: string;
+  eventDescription: string;
+  eventStartDate: string | null;
+  eventFinishDate: string | null;
+  impactDurationHours: number | null;
+  overlapsProductionPeriod: boolean;
+}
+
+export type LocationConfidenceTier = 'measured' | 'estimated' | 'thin' | 'no_data';
+
+export interface LocationSeriesPointDto {
+  key: string;
+  label: string;
+  stationOrder: number;
+  approxDistanceFt: number;
+  totalAllocatedQuantity: number | null;
+  totalAllocatedEarnedManHours: number | null;
+  totalAllocatedWorkingDays: number | null;
+  productionRatePerDay: number | null;
+  dominantPeriodClass: PeriodClass | 'no_data';
+  confidenceTier: LocationConfidenceTier;
+  contributingPeriods: LocationPeriodContributionDto[];
+  overlaidDelayEvents: OverlaidDelayEventDto[];
+}
+
+export interface UnallocatedPeriodDto {
+  peNumber: number;
+  installedQuantity: number;
+  reason: string;
+}
+
+export interface LocationSeriesResultDto {
+  itemNo: number;
+  locations: LocationSeriesPointDto[];
+  unallocatedPeriods: UnallocatedPeriodDto[];
+  unmatchedEvidenceSamples: string[];
+}
+
+export interface LocationSeriesProvenanceDto {
+  itemNo: number;
+  tablesRead: Array<{ table: string; rowCount: number; note?: string }>;
+  allocationRule: string;
+  classificationRule: string;
+  confidenceTierMeaning: Record<string, string>;
+  activeFilters: { verifiedOnly: boolean; wbsCodes: string[]; shiftHours: number };
+  corridorLocationCount: number;
+  hasCrosswalkCostCodes: boolean;
+}
+
+export interface MeasuredMileLocationSeriesResponse {
+  locationSeries: LocationSeriesResultDto;
+  provenance: LocationSeriesProvenanceDto;
+}
+
 async function unwrap<T>(response: Response, fallback: string): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: fallback }));
@@ -253,6 +351,10 @@ export function useSetAccelerationTag(projectId: string) {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["measured-mile-series", projectId, variables.itemNo] });
+      // The location series derives its period classification (measured mile / impact / etc.)
+      // from the same acceleration-tag and window-override state, so it must be invalidated
+      // alongside the time series or the street/distance view can show stale colors/classes.
+      queryClient.invalidateQueries({ queryKey: ["measured-mile-location-series", projectId, variables.itemNo] });
     },
   });
 }
@@ -266,6 +368,7 @@ export function useClearAccelerationTag(projectId: string) {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["measured-mile-series", projectId, variables.itemNo] });
+      queryClient.invalidateQueries({ queryKey: ["measured-mile-location-series", projectId, variables.itemNo] });
     },
   });
 }
@@ -291,6 +394,7 @@ export function useSetMeasuredMileOverride(projectId: string) {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["measured-mile-series", projectId, variables.itemNo] });
+      queryClient.invalidateQueries({ queryKey: ["measured-mile-location-series", projectId, variables.itemNo] });
     },
   });
 }
@@ -304,6 +408,95 @@ export function useClearMeasuredMileOverride(projectId: string) {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["measured-mile-series", projectId, variables.itemNo] });
+      queryClient.invalidateQueries({ queryKey: ["measured-mile-location-series", projectId, variables.itemNo] });
+    },
+  });
+}
+
+export function useMeasuredMileLocationSeries(projectId: string, itemNo: number | null, filters: MeasuredMileSeriesFilters) {
+  return useQuery({
+    queryKey: ["measured-mile-location-series", projectId, itemNo, filters.verifiedOnly, filters.wbsCodes, filters.shiftHours],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('verifiedOnly', String(filters.verifiedOnly));
+      params.set('shiftHours', String(filters.shiftHours));
+      if (filters.wbsCodes && filters.wbsCodes.length > 0) params.set('wbsCodes', filters.wbsCodes.join(','));
+      return unwrap<MeasuredMileLocationSeriesResponse>(
+        await fetch(`${base(projectId)}/items/${itemNo}/location-series?${params.toString()}`),
+        "Failed to compute measured mile location series"
+      );
+    },
+    enabled: !!projectId && itemNo !== null,
+  });
+}
+
+export function useCorridorLocations(projectId: string) {
+  return useQuery({
+    queryKey: ["measured-mile-corridor-locations", projectId],
+    queryFn: async () =>
+      unwrap<CorridorLocationsResponse>(await fetch(`${base(projectId)}/corridor-locations`), "Failed to load corridor locations"),
+    enabled: !!projectId,
+  });
+}
+
+export function useUpdateCorridorLocation(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      locationKey,
+      label,
+      stationOrder,
+    }: {
+      locationKey: string;
+      label?: string;
+      stationOrder?: number;
+    }) => {
+      const response = await fetch(`${base(projectId)}/corridor-locations/${encodeURIComponent(locationKey)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label, stationOrder }),
+      });
+      return unwrap<CorridorLocationDto>(response, "Failed to update corridor location");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["measured-mile-corridor-locations", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["measured-mile-location-series", projectId] });
+    },
+  });
+}
+
+export function useSetLocationOverride(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rawText, locationKey }: { rawText: string; locationKey: string }) => {
+      const response = await fetch(`${base(projectId)}/location-overrides`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rawText, locationKey }),
+      });
+      return unwrap<void>(response, "Failed to set location override");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["measured-mile-corridor-locations", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["measured-mile-location-series", projectId] });
+    },
+  });
+}
+
+export function useClearLocationOverride(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ rawText }: { rawText: string }) => {
+      const response = await fetch(`${base(projectId)}/location-overrides`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rawText }),
+      });
+      return unwrap<void>(response, "Failed to clear location override");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["measured-mile-corridor-locations", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["measured-mile-location-series", projectId] });
     },
   });
 }

@@ -7,6 +7,11 @@ import type { SetAccelerationTagCommandHandler } from '../../application/delay-a
 import type { ClearAccelerationTagCommandHandler } from '../../application/delay-analysis/commands/handlers/ClearAccelerationTagCommandHandler';
 import type { SetMeasuredMileOverrideCommandHandler } from '../../application/delay-analysis/commands/handlers/SetMeasuredMileOverrideCommandHandler';
 import type { ClearMeasuredMileOverrideCommandHandler } from '../../application/delay-analysis/commands/handlers/ClearMeasuredMileOverrideCommandHandler';
+import type { GetMeasuredMileLocationSeriesQueryHandler } from '../../application/delay-analysis/queries/handlers/GetMeasuredMileLocationSeriesQueryHandler';
+import type { GetCorridorLocationsQueryHandler } from '../../application/delay-analysis/queries/handlers/GetCorridorLocationsQueryHandler';
+import type { UpdateCorridorLocationCommandHandler } from '../../application/delay-analysis/commands/handlers/UpdateCorridorLocationCommandHandler';
+import type { SetLocationOverrideCommandHandler } from '../../application/delay-analysis/commands/handlers/SetLocationOverrideCommandHandler';
+import type { ClearLocationOverrideCommandHandler } from '../../application/delay-analysis/commands/handlers/ClearLocationOverrideCommandHandler';
 import {
   measuredMileProjectParamsSchema,
   measuredMileItemParamsSchema,
@@ -16,6 +21,10 @@ import {
   measuredMilePeriodDetailQuerySchema,
   setAccelerationTagBodySchema,
   setMeasuredMileOverrideBodySchema,
+  measuredMileLocationParamsSchema,
+  updateCorridorLocationBodySchema,
+  setLocationOverrideBodySchema,
+  clearLocationOverrideBodySchema,
 } from '../validators/measuredMileValidators';
 
 const DEFAULT_TENANT_ID = 'default';
@@ -29,7 +38,12 @@ export class MeasuredMileController {
     private readonly setAccelerationTagHandler: SetAccelerationTagCommandHandler,
     private readonly clearAccelerationTagHandler: ClearAccelerationTagCommandHandler,
     private readonly setOverrideHandler: SetMeasuredMileOverrideCommandHandler,
-    private readonly clearOverrideHandler: ClearMeasuredMileOverrideCommandHandler
+    private readonly clearOverrideHandler: ClearMeasuredMileOverrideCommandHandler,
+    private readonly getLocationSeriesHandler: GetMeasuredMileLocationSeriesQueryHandler,
+    private readonly getCorridorLocationsHandler: GetCorridorLocationsQueryHandler,
+    private readonly updateCorridorLocationHandler: UpdateCorridorLocationCommandHandler,
+    private readonly setLocationOverrideHandler: SetLocationOverrideCommandHandler,
+    private readonly clearLocationOverrideHandler: ClearLocationOverrideCommandHandler
   ) {}
 
   async listEligibleItems(req: Request, res: Response): Promise<void> {
@@ -156,6 +170,86 @@ export class MeasuredMileController {
       res.json({ success: true });
     } catch (error) {
       this.handleError(res, error, 'Failed to clear measured mile override');
+    }
+  }
+
+  async getLocationSeries(req: Request, res: Response): Promise<void> {
+    try {
+      const params = measuredMileItemParamsSchema.parse(req.params);
+      const query = measuredMileSeriesQuerySchema.parse(req.query);
+      const result = await this.getLocationSeriesHandler.execute({
+        projectId: params.projectId,
+        tenantId: DEFAULT_TENANT_ID,
+        itemNo: params.itemNo,
+        verifiedOnly: query.verifiedOnly ?? false,
+        wbsCodes: query.wbsCodes,
+        shiftHours: query.shiftHours,
+      });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      this.handleError(res, error, 'Failed to compute measured mile location series');
+    }
+  }
+
+  async getCorridorLocations(req: Request, res: Response): Promise<void> {
+    try {
+      const params = measuredMileProjectParamsSchema.parse(req.params);
+      const result = await this.getCorridorLocationsHandler.execute({ projectId: params.projectId, tenantId: DEFAULT_TENANT_ID });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      this.handleError(res, error, 'Failed to load corridor locations');
+    }
+  }
+
+  async updateCorridorLocation(req: Request, res: Response): Promise<void> {
+    try {
+      const params = measuredMileLocationParamsSchema.parse(req.params);
+      const body = updateCorridorLocationBodySchema.parse(req.body ?? {});
+      const result = await this.updateCorridorLocationHandler.handle({
+        type: 'UpdateCorridorLocationCommand',
+        projectId: params.projectId,
+        tenantId: DEFAULT_TENANT_ID,
+        locationKey: params.locationKey,
+        label: body.label,
+        stationOrder: body.stationOrder,
+      });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      this.handleError(res, error, 'Failed to update corridor location');
+    }
+  }
+
+  async setLocationOverride(req: Request, res: Response): Promise<void> {
+    try {
+      const params = measuredMileProjectParamsSchema.parse(req.params);
+      const body = setLocationOverrideBodySchema.parse(req.body ?? {});
+      await this.setLocationOverrideHandler.handle({
+        type: 'SetLocationOverrideCommand',
+        projectId: params.projectId,
+        tenantId: DEFAULT_TENANT_ID,
+        rawText: body.rawText,
+        locationKey: body.locationKey,
+        createdBy: body.createdBy,
+      });
+      res.json({ success: true });
+    } catch (error) {
+      this.handleError(res, error, 'Failed to set location override');
+    }
+  }
+
+  async clearLocationOverride(req: Request, res: Response): Promise<void> {
+    try {
+      const params = measuredMileProjectParamsSchema.parse(req.params);
+      const body = clearLocationOverrideBodySchema.parse(req.body ?? {});
+      await this.clearLocationOverrideHandler.handle({
+        type: 'ClearLocationOverrideCommand',
+        projectId: params.projectId,
+        tenantId: DEFAULT_TENANT_ID,
+        rawText: body.rawText,
+      });
+      res.json({ success: true });
+    } catch (error) {
+      this.handleError(res, error, 'Failed to clear location override');
     }
   }
 

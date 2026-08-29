@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Loader2, AlertTriangle, Download, Image as ImageIcon, TrendingUp, TrendingDown, Ruler, ListChecks } from "lucide-react";
+import { Loader2, AlertTriangle, Download, Image as ImageIcon, TrendingUp, TrendingDown, Ruler, ListChecks, Clock, MapPin } from "lucide-react";
 import { GlassCard, SectionHeader, StatCard, selectTriggerStyles } from "../ui/premium-components";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useEligibleMeasuredMileItems,
   useMeasuredMileSeries,
+  useMeasuredMileLocationSeries,
   useSetAccelerationTag,
   useClearAccelerationTag,
   useSetMeasuredMileOverride,
@@ -18,8 +19,19 @@ import {
 import { MeasuredMileChart, type ChartMetric } from "./measured-mile-chart";
 import { MeasuredMileEvidencePanel } from "./measured-mile-evidence-panel";
 import { MeasuredMilePeriodDetail } from "./measured-mile-period-detail";
+import { MeasuredMileLocationChart, type LocationChartMetric, type LocationAxisLabelMode } from "./measured-mile-location-chart";
+import { MeasuredMileLocationDetail } from "./measured-mile-location-detail";
+import { CorridorLocationManager } from "./corridor-location-manager";
 import { JobWideProductivityCard } from "./job-wide-productivity-card";
 import { exportMeasuredMileCsv, exportChartPng } from "./measured-mile-export";
+
+type XAxisMode = "time" | "location";
+
+const LOCATION_METRIC_OPTIONS: Array<{ value: LocationChartMetric; label: string }> = [
+  { value: "productionRatePerDay", label: "Production rate (units/day)" },
+  { value: "totalAllocatedEarnedManHours", label: "Allocated earned man-hours" },
+  { value: "totalAllocatedQuantity", label: "Allocated installed quantity" },
+];
 
 interface MeasuredMileTabProps {
   projectId: string;
@@ -36,10 +48,14 @@ const METRIC_OPTIONS: Array<{ value: ChartMetric; label: string }> = [
 export function MeasuredMileTab({ projectId }: MeasuredMileTabProps) {
   const { data: items = [], isLoading: itemsLoading } = useEligibleMeasuredMileItems(projectId);
   const [selectedItemNo, setSelectedItemNo] = useState<number | null>(null);
+  const [xAxisMode, setXAxisMode] = useState<XAxisMode>("time");
   const [metric, setMetric] = useState<ChartMetric>("productionRatePerDay");
+  const [locationMetric, setLocationMetric] = useState<LocationChartMetric>("productionRatePerDay");
+  const [locationAxisLabelMode, setLocationAxisLabelMode] = useState<LocationAxisLabelMode>("streetName");
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [shiftHours, setShiftHours] = useState(8);
   const [detailPeNumber, setDetailPeNumber] = useState<number | null>(null);
+  const [detailLocationKey, setDetailLocationKey] = useState<string | null>(null);
   const [overrideStart, setOverrideStart] = useState("");
   const [overrideEnd, setOverrideEnd] = useState("");
   const { toast } = useToast();
@@ -47,6 +63,15 @@ export function MeasuredMileTab({ projectId }: MeasuredMileTabProps) {
   const activeItemNo = selectedItemNo ?? (items.length > 0 ? items[0].itemNo : null);
 
   const { data: seriesData, isLoading: seriesLoading, error: seriesError } = useMeasuredMileSeries(projectId, activeItemNo, {
+    verifiedOnly,
+    shiftHours,
+  });
+
+  const {
+    data: locationSeriesData,
+    isLoading: locationSeriesLoading,
+    error: locationSeriesError,
+  } = useMeasuredMileLocationSeries(projectId, xAxisMode === "location" ? activeItemNo : null, {
     verifiedOnly,
     shiftHours,
   });
@@ -164,21 +189,75 @@ export function MeasuredMileTab({ projectId }: MeasuredMileTabProps) {
               </Select>
             </div>
 
-            <div className="min-w-[220px]">
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Chart metric</Label>
-              <Select value={metric} onValueChange={(v) => setMetric(v as ChartMetric)}>
-                <SelectTrigger className={selectTriggerStyles}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {METRIC_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">X-axis</Label>
+              <div className="flex rounded-lg border border-border/50 overflow-hidden">
+                <button
+                  onClick={() => setXAxisMode("time")}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${
+                    xAxisMode === "time" ? "bg-primary text-primary-foreground" : "bg-background/50 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" /> Time (PE)
+                </button>
+                <button
+                  onClick={() => setXAxisMode("location")}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${
+                    xAxisMode === "location" ? "bg-primary text-primary-foreground" : "bg-background/50 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <MapPin className="w-3.5 h-3.5" /> Street / distance
+                </button>
+              </div>
             </div>
+
+            {xAxisMode === "time" ? (
+              <div className="min-w-[220px]">
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Chart metric</Label>
+                <Select value={metric} onValueChange={(v) => setMetric(v as ChartMetric)}>
+                  <SelectTrigger className={selectTriggerStyles}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {METRIC_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <>
+                <div className="min-w-[220px]">
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Chart metric</Label>
+                  <Select value={locationMetric} onValueChange={(v) => setLocationMetric(v as LocationChartMetric)}>
+                    <SelectTrigger className={selectTriggerStyles}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LOCATION_METRIC_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="min-w-[160px]">
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Location label</Label>
+                  <Select value={locationAxisLabelMode} onValueChange={(v) => setLocationAxisLabelMode(v as LocationAxisLabelMode)}>
+                    <SelectTrigger className={selectTriggerStyles}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="streetName">Street name</SelectItem>
+                      <SelectItem value="distance">Distance (ft)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
 
             <div className="flex items-center gap-2 pb-2">
               <Switch id="verified-only" checked={verifiedOnly} onCheckedChange={setVerifiedOnly} />
@@ -198,85 +277,135 @@ export function MeasuredMileTab({ projectId }: MeasuredMileTabProps) {
               />
             </div>
 
-            <div className="flex-1" />
-            <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={!series} className="gap-1.5">
-              <Download className="w-4 h-4" /> CSV
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExportPng} disabled={!series} className="gap-1.5">
-              <ImageIcon className="w-4 h-4" /> PNG
-            </Button>
+            {xAxisMode === "time" && (
+              <>
+                <div className="flex-1" />
+                <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={!series} className="gap-1.5">
+                  <Download className="w-4 h-4" /> CSV
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportPng} disabled={!series} className="gap-1.5">
+                  <ImageIcon className="w-4 h-4" /> PNG
+                </Button>
+              </>
+            )}
           </div>
 
-          {seriesLoading && (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          )}
-
-          {seriesError && (
-            <div className="flex items-center gap-2 text-sm text-destructive p-4">
-              <AlertTriangle className="w-4 h-4" /> Failed to compute measured mile series for this item.
-            </div>
-          )}
-
-          {series && !seriesLoading && (
+          {xAxisMode === "time" && (
             <>
-              <DataQualityBanner points={series.points} />
+              {seriesLoading && (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              )}
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <StatCard
-                  label="Measured mile window"
-                  value={series.measuredMileWindow ? `PE${series.measuredMileWindow.startPeNumber}–${series.measuredMileWindow.endPeNumber}` : "Not found"}
-                  icon={Ruler}
-                  color="success"
-                />
-                <StatCard
-                  label="Baseline rate/day"
-                  value={series.lossStatistics.measuredMileBaselineRatePerDay?.toFixed(2) ?? "—"}
-                  icon={TrendingUp}
-                />
-                <StatCard
-                  label="Impacted rate/day"
-                  value={series.lossStatistics.impactedAverageRatePerDay?.toFixed(2) ?? "—"}
-                  icon={TrendingDown}
-                  color={series.lossStatistics.impactedAverageRatePerDay !== null ? "danger" : "default"}
-                />
-                <StatCard
-                  label="Est. lost man-hours (proxy)"
-                  value={series.lossStatistics.hasProxyData && series.lossStatistics.estimatedLostManHours !== null
-                    ? series.lossStatistics.estimatedLostManHours.toFixed(0)
-                    : "No proxy data"}
-                  icon={ListChecks}
-                  color="warning"
-                />
-              </div>
+              {seriesError && (
+                <div className="flex items-center gap-2 text-sm text-destructive p-4">
+                  <AlertTriangle className="w-4 h-4" /> Failed to compute measured mile series for this item.
+                </div>
+              )}
 
-              <MeasuredMileChart
-                points={series.points}
-                metric={metric}
-                windowRange={series.measuredMileWindow}
-                onPointClick={setDetailPeNumber}
-                chartId={CHART_ID}
-                citations={seriesData?.pointCitations}
-              />
+              {series && !seriesLoading && (
+                <>
+                  <DataQualityBanner points={series.points} />
 
-              <WindowAndAccelerationControls
-                overrideStart={overrideStart}
-                overrideEnd={overrideEnd}
-                onOverrideStartChange={setOverrideStart}
-                onOverrideEndChange={setOverrideEnd}
-                onSetOverride={handleSetOverride}
-                onClearOverride={handleClearOverride}
-                hasOverride={series.measuredMileWindow ? !series.measuredMileWindow.isAutoSelected : false}
-                points={series.points}
-                onToggleAcceleration={handleToggleAcceleration}
-              />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <StatCard
+                      label="Measured mile window"
+                      value={series.measuredMileWindow ? `PE${series.measuredMileWindow.startPeNumber}–${series.measuredMileWindow.endPeNumber}` : "Not found"}
+                      icon={Ruler}
+                      color="success"
+                    />
+                    <StatCard
+                      label="Baseline rate/day"
+                      value={series.lossStatistics.measuredMileBaselineRatePerDay?.toFixed(2) ?? "—"}
+                      icon={TrendingUp}
+                    />
+                    <StatCard
+                      label="Impacted rate/day"
+                      value={series.lossStatistics.impactedAverageRatePerDay?.toFixed(2) ?? "—"}
+                      icon={TrendingDown}
+                      color={series.lossStatistics.impactedAverageRatePerDay !== null ? "danger" : "default"}
+                    />
+                    <StatCard
+                      label="Est. lost man-hours (proxy)"
+                      value={series.lossStatistics.hasProxyData && series.lossStatistics.estimatedLostManHours !== null
+                        ? series.lossStatistics.estimatedLostManHours.toFixed(0)
+                        : "No proxy data"}
+                      icon={ListChecks}
+                      color="warning"
+                    />
+                  </div>
+
+                  <MeasuredMileChart
+                    points={series.points}
+                    metric={metric}
+                    windowRange={series.measuredMileWindow}
+                    onPointClick={setDetailPeNumber}
+                    chartId={CHART_ID}
+                    citations={seriesData?.pointCitations}
+                  />
+
+                  <WindowAndAccelerationControls
+                    overrideStart={overrideStart}
+                    overrideEnd={overrideEnd}
+                    onOverrideStartChange={setOverrideStart}
+                    onOverrideEndChange={setOverrideEnd}
+                    onSetOverride={handleSetOverride}
+                    onClearOverride={handleClearOverride}
+                    hasOverride={series.measuredMileWindow ? !series.measuredMileWindow.isAutoSelected : false}
+                    points={series.points}
+                    onToggleAcceleration={handleToggleAcceleration}
+                  />
+                </>
+              )}
+            </>
+          )}
+
+          {xAxisMode === "location" && (
+            <>
+              {locationSeriesLoading && (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              )}
+
+              {locationSeriesError && (
+                <div className="flex items-center gap-2 text-sm text-destructive p-4">
+                  <AlertTriangle className="w-4 h-4" /> Failed to compute measured mile location series for this item.
+                </div>
+              )}
+
+              {locationSeriesData && !locationSeriesLoading && (
+                <>
+                  {locationSeriesData.locationSeries.unallocatedPeriods.length > 0 && (
+                    <div className="flex items-start gap-2 text-sm rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300 px-4 py-3">
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <div>
+                        {locationSeriesData.locationSeries.unallocatedPeriods.length} period(s) had no resolvable location
+                        evidence and were left unallocated (quantity not fabricated): PE
+                        {locationSeriesData.locationSeries.unallocatedPeriods.map((p) => p.peNumber).join(", PE")}.
+                      </div>
+                    </div>
+                  )}
+
+                  <MeasuredMileLocationChart
+                    locations={locationSeriesData.locationSeries.locations}
+                    metric={locationMetric}
+                    axisLabelMode={locationAxisLabelMode}
+                    onPointClick={setDetailLocationKey}
+                  />
+                </>
+              )}
             </>
           )}
         </div>
       </GlassCard>
 
-      {series && provenance && <MeasuredMileEvidencePanel provenance={provenance} />}
+      {xAxisMode === "time" && series && provenance && <MeasuredMileEvidencePanel provenance={provenance} />}
+
+      {xAxisMode === "location" && locationSeriesData && (
+        <CorridorLocationManager projectId={projectId} unmatchedEvidenceSamples={locationSeriesData.locationSeries.unmatchedEvidenceSamples} />
+      )}
 
       <JobWideProductivityCard projectId={projectId} />
 
@@ -286,6 +415,15 @@ export function MeasuredMileTab({ projectId }: MeasuredMileTabProps) {
         onClose={() => setDetailPeNumber(null)}
         verifiedOnly={verifiedOnly}
         citation={detailPeNumber !== null ? seriesData?.pointCitations.find((c) => c.peNumber === detailPeNumber) ?? null : null}
+      />
+
+      <MeasuredMileLocationDetail
+        location={
+          detailLocationKey !== null
+            ? locationSeriesData?.locationSeries.locations.find((l) => l.key === detailLocationKey) ?? null
+            : null
+        }
+        onClose={() => setDetailLocationKey(null)}
       />
     </div>
   );

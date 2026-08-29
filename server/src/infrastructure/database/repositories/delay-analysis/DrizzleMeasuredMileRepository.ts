@@ -18,6 +18,8 @@ import {
   measuredMilePeriodTags,
   measuredMileWindowOverrides,
   projectDocuments,
+  corridorLocations,
+  corridorLocationOverrides,
 } from '@shared/schema';
 import type {
   IMeasuredMileRepository,
@@ -28,6 +30,9 @@ import type {
   ScheduleActivitySummaryForPeriod,
   DiaryContextForPeriod,
   PodContextForPeriod,
+  CorridorLocationOverrideSummary,
+  LocationOverrideLookup,
+  LocationAllocationInputs,
 } from '../../../../domain/delay-analysis/repositories/IMeasuredMileRepository';
 import type {
   PeriodQuality,
@@ -38,6 +43,8 @@ import type {
   PeriodQualityStatus,
 } from '../../../../domain/measured-mile/MeasuredMileCalculator';
 import type { JobWidePeriodInput } from '../../../../domain/measured-mile/JobWideProductivityCalculator';
+import type { LocationEvidenceCandidate, DelayEventLocationCandidate } from '../../../../domain/measured-mile/CorridorLocationAllocationCalculator';
+import { DEFAULT_CORRIDOR_LOCATIONS, type CanonicalCorridorLocation } from '../../../../domain/measured-mile/CorridorLocationModel';
 
 // Units that never represent measurable per-unit direct-work production.
 const EXCLUDED_UNITS = new Set(['LS', 'FA']);
@@ -96,6 +103,16 @@ function overlapsRange(
   if (!itemStart || !rangeStart || !rangeEnd) return false;
   const effectiveEnd = itemEnd || itemStart;
   return itemStart <= rangeEnd && effectiveEnd >= rangeStart;
+}
+
+/** Inclusive day-count of the intersection of [itemStart, itemEnd] and [rangeStart, rangeEnd]. Callers must already know the two ranges overlap. */
+function overlapDayCount(itemStart: string, itemEnd: string, rangeStart: string, rangeEnd: string): number {
+  const clampedStart = itemStart > rangeStart ? itemStart : rangeStart;
+  const clampedEnd = itemEnd < rangeEnd ? itemEnd : rangeEnd;
+  const startMs = new Date(`${clampedStart}T00:00:00Z`).getTime();
+  const endMs = new Date(`${clampedEnd}T00:00:00Z`).getTime();
+  const days = Math.round((endMs - startMs) / 86_400_000) + 1;
+  return Math.max(1, days);
 }
 
 export class DrizzleMeasuredMileRepository implements IMeasuredMileRepository {
@@ -766,5 +783,283 @@ export class DrizzleMeasuredMileRepository implements IMeasuredMileRepository {
       documentName: r.filename,
       crewSectionCount: countByReport.get(r.reportId) ?? 0,
     }));
+  }
+
+  async getCorridorLocations(projectId: string, tenantId: string): Promise<CanonicalCorridorLocation[]> {
+    const existing = await db
+      .select()
+      .from(corridorLocations)
+      .where(and(eq(corridorLocations.projectId, projectId), eq(corridorLocations.tenantId, tenantId)));
+
+    if (existing.length === 0) {
+      // First read for this project: seed the editable default ordering. onConflictDoNothing
+      // guards against a concurrent seed race between two simultaneous first reads.
+      await db
+        .insert(corridorLocations)
+        .values(
+          DEFAULT_CORRIDOR_LOCATIONS.map((loc) => ({
+            projectId,
+            tenantId,
+            locationKey: loc.key,
+            label: loc.label,
+            stationOrder: loc.defaultStationOrder,
+          }))
+        )
+        .onConflictDoNothing();
+
+      const seeded = await db
+        .select()
+        .from(corridorLocations)
+        .where(and(eq(corridorLocations.projectId, projectId), eq(corridorLocations.tenantId, tenantId)));
+      return seeded
+        .map((r) => ({ key: r.locationKey, label: r.label, defaultStationOrder: r.stationOrder }))
+        .sort((a, b) => a.defaultStationOrder - b.defaultStationOrder);
+    }
+
+    return existing
+      .map((r) => ({ key: r.locationKey, label: r.label, defaultStationOrder: r.stationOrder }))
+      .sort((a, b) => a.defaultStationOrder - b.defaultStationOrder);
+  }
+
+  async updateCorridorLocation(
+    projectId: string,
+    tenantId: string,
+    locationKey: string,
+    updates: { label?: string; stationOrder?: number }
+  ): Promise<CanonicalCorridorLocation> {
+    // Ensure the row exists (first-write-wins seeding), then apply the patch.
+    await this.getCorridorLocations(projectId, tenantId);
+
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (updates.label !== undefined) patch.label = updates.label;
+    if (updates.stationOrder !== undefined) patch.stationOrder = updates.stationOrder;
+
+    const [row] = await db
+      .update(corridorLocations)
+      .set(patch)
+      .where(
+        and(
+          eq(corridorLocations.projectId, projectId),
+          eq(corridorLocations.tenantId, tenantId),
+          eq(corridorLocations.locationKey, locationKey)
+        )
+      )
+      .returning();
+
+    if (!row) {
+      throw new Error(`Unknown corridor location "${locationKey}" for this project`);
+    }
+    return { key: row.locationKey, label: row.label, defaultStationOrder: row.stationOrder };
+  }
+
+  async getLocationOverrides(projectId: string, tenantId: string): Promise<CorridorLocationOverrideSummary[]> {
+    const rows = await db
+      .select()
+      .from(corridorLocationOverrides)
+      .where(and(eq(corridorLocationOverrides.projectId, projectId), eq(corridorLocationOverrides.tenantId, tenantId)));
+
+    return rows
+      .map((r) => ({
+        rawText: r.rawText,
+        locationKey: r.locationKey,
+        createdBy: r.createdBy,
+        createdAt: r.createdAt ? r.createdAt.toISOString() : null,
+      }))
+      .sort((a, b) => a.rawText.localeCompare(b.rawText));
+  }
+
+  async getLocationOverrideLookup(projectId: string, tenantId: string): Promise<LocationOverrideLookup> {
+    const rows = await this.getLocationOverrides(projectId, tenantId);
+    const map = new Map<string, string[]>();
+    for (const r of rows) map.set(r.rawText.trim().toLowerCase(), [r.locationKey]);
+    return { get: (key: string) => map.get(key) };
+  }
+
+  async setLocationOverride(
+    projectId: string,
+    tenantId: string,
+    rawText: string,
+    locationKey: string,
+    createdBy?: string
+  ): Promise<void> {
+    const normalized = rawText.trim().toLowerCase();
+    await db
+      .insert(corridorLocationOverrides)
+      .values({ projectId, tenantId, rawText, rawTextNormalized: normalized, locationKey, createdBy: createdBy ?? null })
+      .onConflictDoUpdate({
+        target: [corridorLocationOverrides.projectId, corridorLocationOverrides.rawTextNormalized],
+        set: { locationKey, rawText, createdBy: createdBy ?? null },
+      });
+  }
+
+  async clearLocationOverride(projectId: string, tenantId: string, rawText: string): Promise<void> {
+    const normalized = rawText.trim().toLowerCase();
+    await db
+      .delete(corridorLocationOverrides)
+      .where(
+        and(
+          eq(corridorLocationOverrides.projectId, projectId),
+          eq(corridorLocationOverrides.tenantId, tenantId),
+          eq(corridorLocationOverrides.rawTextNormalized, normalized)
+        )
+      );
+  }
+
+  async getLocationAllocationInputs(
+    projectId: string,
+    tenantId: string,
+    itemNo: number,
+    periods: PeriodQuality[],
+    delayEventOptions: DelayEventFilterOptions
+  ): Promise<LocationAllocationInputs> {
+    const [itemDescRows, costCodes] = await Promise.all([
+      db
+        .select({ description: bidItemProgressEstimates.description })
+        .from(bidItemProgressEstimates)
+        .where(
+          and(
+            eq(bidItemProgressEstimates.projectId, projectId),
+            eq(bidItemProgressEstimates.tenantId, tenantId),
+            eq(bidItemProgressEstimates.itemNo, itemNo),
+            isNotNull(bidItemProgressEstimates.description)
+          )
+        )
+        .limit(1),
+      this.getCrosswalkCostCodes(projectId, tenantId, itemNo),
+    ]);
+    const itemDescription = itemDescRows[0]?.description ?? null;
+
+    const recoverablePeriods = periods.filter((p) => p.status !== 'unrecoverable' && p.periodStart && p.periodEnd);
+    const peForDate = (dateStr: string | null): number | null => {
+      if (!dateStr) return null;
+      const period = recoverablePeriods.find((p) => dateStr >= p.periodStart! && dateStr <= p.periodEnd!);
+      return period?.peNumber ?? null;
+    };
+
+    const evidence: LocationEvidenceCandidate[] = [];
+
+    // POD evidence: task-line descriptions from sections whose cost code crosswalks to this item,
+    // weighted by that section's crew count (same crosswalk join as getLaborProxyByPeriod).
+    if (costCodes.length > 0) {
+      const codeSet = new Set(costCodes);
+      const taskRows = await db
+        .select({
+          sectionId: podTaskLines.sectionId,
+          description: podTaskLines.description,
+          costCode: podTaskLines.costCode,
+          reportDate: podReports.reportDate,
+          documentName: projectDocuments.filename,
+        })
+        .from(podTaskLines)
+        .innerJoin(podSections, eq(podTaskLines.sectionId, podSections.id))
+        .innerJoin(podReports, eq(podSections.reportId, podReports.id))
+        .innerJoin(projectDocuments, eq(podReports.sourceDocumentId, projectDocuments.id))
+        .where(and(eq(podReports.projectId, projectId), eq(podReports.tenantId, tenantId), isNotNull(podTaskLines.costCode)));
+
+      const matchingSectionIds = new Set(
+        taskRows.filter((r) => r.costCode && codeSet.has(normalizeCostCode(r.costCode))).map((r) => r.sectionId)
+      );
+
+      if (matchingSectionIds.size > 0) {
+        const crewRows = await db
+          .select({ sectionId: podCrewMembers.sectionId, cnt: sql<number>`count(*)`.as('cnt') })
+          .from(podCrewMembers)
+          .where(inArray(podCrewMembers.sectionId, Array.from(matchingSectionIds)))
+          .groupBy(podCrewMembers.sectionId);
+        const crewCountBySection = new Map<string, number>();
+        for (const row of crewRows) crewCountBySection.set(row.sectionId, Number(row.cnt));
+
+        for (const row of taskRows) {
+          if (!matchingSectionIds.has(row.sectionId)) continue;
+          const peNumber = peForDate(toIsoDate(row.reportDate));
+          if (peNumber === null) continue;
+          const weight = crewCountBySection.get(row.sectionId) ?? 0;
+          if (weight <= 0) continue;
+          evidence.push({ peNumber, sourceType: 'pod_task_line', rawText: row.description, weight, documentName: row.documentName });
+        }
+      }
+    }
+
+    // Schedule-activity fallback evidence: any activity active during the period, regardless of
+    // cost-code crosswalk (there is none for schedule activities) -- the allocation calculator
+    // only uses this group for a period when POD evidence resolved to nothing.
+    const activityRows = await db
+      .select({
+        wbs: scheduleActivities.wbs,
+        activityDescription: scheduleActivities.activityDescription,
+        actualStartDate: scheduleActivities.actualStartDate,
+        actualFinishDate: scheduleActivities.actualFinishDate,
+      })
+      .from(scheduleActivities)
+      .where(and(eq(scheduleActivities.projectId, projectId), eq(scheduleActivities.tenantId, tenantId)));
+
+    for (const row of activityRows) {
+      const start = toIsoDate(row.actualStartDate);
+      const end = toIsoDate(row.actualFinishDate) ?? start;
+      if (!start) continue;
+      for (const period of recoverablePeriods) {
+        if (overlapsRange(start, end, period.periodStart, period.periodEnd)) {
+          // Prefer the WBS for location matching (it's usually pure location text, e.g.
+          // "11TH TO 12TH"), but never let a generic/non-location WBS ("MOBILIZATION") silently
+          // discard an activity whose free-text description actually names a corridor location --
+          // the description is tried as a fallback. Relevance filtering always reads the
+          // description, since a WBS carries no work-type keywords to match against.
+          const rawText = row.wbs || row.activityDescription;
+          const secondaryLocationText = row.wbs && row.activityDescription !== row.wbs ? row.activityDescription : null;
+          // Weight by how many days of this period the activity actually covers, not a flat "1"
+          // per overlapping period -- a one-day activity and a month-long activity should not
+          // contribute equally to a location's share of the period's installed quantity.
+          const weight = overlapDayCount(start, end!, period.periodStart!, period.periodEnd!);
+          evidence.push({
+            peNumber: period.peNumber,
+            sourceType: 'schedule_activity',
+            rawText,
+            secondaryLocationText,
+            itemRelevanceText: row.activityDescription,
+            weight,
+            documentName: row.activityDescription,
+          });
+        }
+      }
+    }
+
+    // Same verified/WBS predicate as getImpactByPeriod -- an event excluded from the time-axis
+    // view by these filters must never overlay or force 'impact' in the location view either.
+    const delayEventConditions = [
+      eq(contractorDelayEvents.projectId, projectId),
+      eq(contractorDelayEvents.tenantId, tenantId),
+      isNotNull(contractorDelayEvents.wbs),
+    ];
+    if (delayEventOptions.verifiedOnly) {
+      delayEventConditions.push(eq(contractorDelayEvents.verificationStatus, 'verified'));
+    }
+    if (delayEventOptions.wbsCodes && delayEventOptions.wbsCodes.length > 0) {
+      delayEventConditions.push(inArray(contractorDelayEvents.wbs, delayEventOptions.wbsCodes));
+    }
+
+    const delayEventRows = await db
+      .select({
+        id: contractorDelayEvents.id,
+        wbs: contractorDelayEvents.wbs,
+        eventDescription: contractorDelayEvents.eventDescription,
+        eventStartDate: contractorDelayEvents.eventStartDate,
+        eventFinishDate: contractorDelayEvents.eventFinishDate,
+        impactDurationHours: contractorDelayEvents.impactDurationHours,
+      })
+      .from(contractorDelayEvents)
+      .where(and(...delayEventConditions));
+
+    const delayEvents: DelayEventLocationCandidate[] = delayEventRows
+      .filter((r) => r.wbs)
+      .map((r) => ({
+        eventId: r.id,
+        wbs: r.wbs as string,
+        eventDescription: r.eventDescription,
+        eventStartDate: toIsoDate(r.eventStartDate),
+        eventFinishDate: toIsoDate(r.eventFinishDate),
+        impactDurationHours: r.impactDurationHours,
+      }));
+
+    return { itemDescription, evidence, delayEvents };
   }
 }

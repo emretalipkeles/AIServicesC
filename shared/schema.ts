@@ -936,3 +936,39 @@ export const measuredMileWindowOverrides = pgTable("measured_mile_window_overrid
 
 export type MeasuredMileWindowOverrideRow = typeof measuredMileWindowOverrides.$inferSelect;
 export type InsertMeasuredMileWindowOverrideRow = typeof measuredMileWindowOverrides.$inferInsert;
+
+// Measured Mile street/distance view: corridor ordering + free-text correction overlays -- see
+// migration 0014 and server/src/domain/measured-mile/CorridorLocationModel.ts. Pure UI/config
+// state, auto-seeded from DEFAULT_CORRIDOR_LOCATIONS on first read, then user-editable.
+export const corridorLocations = pgTable("corridor_locations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  locationKey: text("location_key").notNull(),
+  label: text("label").notNull(),
+  stationOrder: real("station_order").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  projectIdx: index("corridor_locations_project_idx").on(table.projectId),
+}));
+
+export type CorridorLocationRow = typeof corridorLocations.$inferSelect;
+export type InsertCorridorLocationRow = typeof corridorLocations.$inferInsert;
+
+// Exact raw-text -> forced location key correction, consulted before the regex matcher.
+export const corridorLocationOverrides = pgTable("corridor_location_overrides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  rawText: text("raw_text").notNull(),
+  rawTextNormalized: text("raw_text_normalized").notNull(),
+  locationKey: text("location_key").notNull(),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  projectIdx: index("corridor_location_overrides_project_idx").on(table.projectId),
+}));
+
+export type CorridorLocationOverrideRow = typeof corridorLocationOverrides.$inferSelect;
+export type InsertCorridorLocationOverrideRow = typeof corridorLocationOverrides.$inferInsert;

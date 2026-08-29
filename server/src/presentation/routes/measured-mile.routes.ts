@@ -9,6 +9,11 @@ import { SetAccelerationTagCommandHandler } from '../../application/delay-analys
 import { ClearAccelerationTagCommandHandler } from '../../application/delay-analysis/commands/handlers/ClearAccelerationTagCommandHandler';
 import { SetMeasuredMileOverrideCommandHandler } from '../../application/delay-analysis/commands/handlers/SetMeasuredMileOverrideCommandHandler';
 import { ClearMeasuredMileOverrideCommandHandler } from '../../application/delay-analysis/commands/handlers/ClearMeasuredMileOverrideCommandHandler';
+import { GetMeasuredMileLocationSeriesQueryHandler } from '../../application/delay-analysis/queries/handlers/GetMeasuredMileLocationSeriesQueryHandler';
+import { GetCorridorLocationsQueryHandler } from '../../application/delay-analysis/queries/handlers/GetCorridorLocationsQueryHandler';
+import { UpdateCorridorLocationCommandHandler } from '../../application/delay-analysis/commands/handlers/UpdateCorridorLocationCommandHandler';
+import { SetLocationOverrideCommandHandler } from '../../application/delay-analysis/commands/handlers/SetLocationOverrideCommandHandler';
+import { ClearLocationOverrideCommandHandler } from '../../application/delay-analysis/commands/handlers/ClearLocationOverrideCommandHandler';
 
 export function registerMeasuredMileRoutes(app: Express, container: AppContainer): void {
   const repo = container.repositories.measuredMile;
@@ -21,7 +26,12 @@ export function registerMeasuredMileRoutes(app: Express, container: AppContainer
     new SetAccelerationTagCommandHandler(repo),
     new ClearAccelerationTagCommandHandler(repo),
     new SetMeasuredMileOverrideCommandHandler(repo),
-    new ClearMeasuredMileOverrideCommandHandler(repo)
+    new ClearMeasuredMileOverrideCommandHandler(repo),
+    new GetMeasuredMileLocationSeriesQueryHandler(repo),
+    new GetCorridorLocationsQueryHandler(repo),
+    new UpdateCorridorLocationCommandHandler(repo),
+    new SetLocationOverrideCommandHandler(repo),
+    new ClearLocationOverrideCommandHandler(repo)
   );
 
   const base = '/api/delay-analysis/projects/:projectId/measured-mile';
@@ -34,4 +44,10 @@ export function registerMeasuredMileRoutes(app: Express, container: AppContainer
   app.delete(`${base}/items/:itemNo/acceleration/:peNumber`, (req, res) => controller.clearAccelerationTag(req, res));
   app.put(`${base}/items/:itemNo/window-override`, (req, res) => controller.setMeasuredMileOverride(req, res));
   app.delete(`${base}/items/:itemNo/window-override`, (req, res) => controller.clearMeasuredMileOverride(req, res));
+
+  app.get(`${base}/items/:itemNo/location-series`, (req, res) => controller.getLocationSeries(req, res));
+  app.get(`${base}/corridor-locations`, (req, res) => controller.getCorridorLocations(req, res));
+  app.patch(`${base}/corridor-locations/:locationKey`, (req, res) => controller.updateCorridorLocation(req, res));
+  app.post(`${base}/location-overrides`, (req, res) => controller.setLocationOverride(req, res));
+  app.delete(`${base}/location-overrides`, (req, res) => controller.clearLocationOverride(req, res));
 }

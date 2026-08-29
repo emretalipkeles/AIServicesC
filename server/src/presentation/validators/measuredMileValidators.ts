@@ -52,3 +52,23 @@ export const setMeasuredMileOverrideBodySchema = z.object({
   endPeNumber: z.coerce.number().int().positive(),
   createdBy: z.string().max(200).optional(),
 });
+
+export const measuredMileLocationParamsSchema = z.object({
+  projectId: z.string().uuid('Invalid project ID'),
+  locationKey: z.string().min(1).max(50),
+});
+
+export const updateCorridorLocationBodySchema = z.object({
+  label: z.string().min(1).max(200).optional(),
+  stationOrder: z.coerce.number().optional(),
+});
+
+export const setLocationOverrideBodySchema = z.object({
+  rawText: z.string().min(1).max(500),
+  locationKey: z.string().min(1).max(50),
+  createdBy: z.string().max(200).optional(),
+});
+
+export const clearLocationOverrideBodySchema = z.object({
+  rawText: z.string().min(1).max(500),
+});

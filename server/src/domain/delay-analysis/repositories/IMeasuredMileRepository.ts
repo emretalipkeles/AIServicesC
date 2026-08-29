@@ -6,6 +6,11 @@ import type {
   MeasuredMileWindowRange,
 } from '../../measured-mile/MeasuredMileCalculator';
 import type { JobWidePeriodInput } from '../../measured-mile/JobWideProductivityCalculator';
+import type {
+  LocationEvidenceCandidate,
+  DelayEventLocationCandidate,
+} from '../../measured-mile/CorridorLocationAllocationCalculator';
+import type { CanonicalCorridorLocation } from '../../measured-mile/CorridorLocationModel';
 
 export interface EligibleBidItem {
   itemNo: number;
@@ -69,6 +74,24 @@ export interface PodContextForPeriod {
   reportDate: string;
   documentName: string | null;
   crewSectionCount: number;
+}
+
+export interface CorridorLocationOverrideSummary {
+  rawText: string;
+  locationKey: string;
+  createdBy: string | null;
+  createdAt: string | null;
+}
+
+/** Read-only lookup passed into CorridorLocationAllocationCalculator; keyed by lowercased/trimmed raw text. */
+export interface LocationOverrideLookup {
+  get(rawTextLower: string): string[] | undefined;
+}
+
+export interface LocationAllocationInputs {
+  itemDescription: string | null;
+  evidence: LocationEvidenceCandidate[];
+  delayEvents: DelayEventLocationCandidate[];
 }
 
 /**
@@ -174,4 +197,43 @@ export interface IMeasuredMileRepository {
     periodStart: string | null,
     periodEnd: string | null
   ): Promise<PodContextForPeriod[]>;
+
+  /** Corridor location list for the project, auto-seeded from DEFAULT_CORRIDOR_LOCATIONS on first read. */
+  getCorridorLocations(projectId: string, tenantId: string): Promise<CanonicalCorridorLocation[]>;
+
+  updateCorridorLocation(
+    projectId: string,
+    tenantId: string,
+    locationKey: string,
+    updates: { label?: string; stationOrder?: number }
+  ): Promise<CanonicalCorridorLocation>;
+
+  getLocationOverrides(projectId: string, tenantId: string): Promise<CorridorLocationOverrideSummary[]>;
+
+  /** Read-only lookup for the allocation calculator; keyed by lowercased/trimmed raw text. */
+  getLocationOverrideLookup(projectId: string, tenantId: string): Promise<LocationOverrideLookup>;
+
+  setLocationOverride(
+    projectId: string,
+    tenantId: string,
+    rawText: string,
+    locationKey: string,
+    createdBy?: string
+  ): Promise<void>;
+
+  clearLocationOverride(projectId: string, tenantId: string, rawText: string): Promise<void>;
+
+  /**
+   * Free-text location evidence for one item's periods: POD task-line descriptions (weighted by
+   * crew-day count, crosswalked via cost code same as getLaborProxyByPeriod) plus schedule-activity
+   * descriptions/WBS for the fallback source. Also returns the item's own description, used to
+   * heuristically match it to schedule activities (see activityMatchesItemDescription).
+   */
+  getLocationAllocationInputs(
+    projectId: string,
+    tenantId: string,
+    itemNo: number,
+    periods: PeriodQuality[],
+    delayEventOptions: DelayEventFilterOptions
+  ): Promise<LocationAllocationInputs>;
 }
