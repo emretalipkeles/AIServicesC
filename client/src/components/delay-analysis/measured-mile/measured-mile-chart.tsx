@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceArea,
+  ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
 import { format } from "date-fns";
@@ -49,6 +50,9 @@ interface MeasuredMileChartProps {
   onPointClick?: (peNumber: number) => void;
   chartId?: string;
   citations?: PointCitationDto[];
+  /** Same units as `productionRatePerDay` -- only meaningful (and only drawn) on that metric. */
+  baselineRatePerDay?: number | null;
+  impactedRatePerDay?: number | null;
 }
 
 export function MeasuredMileChart({
@@ -59,6 +63,8 @@ export function MeasuredMileChart({
   onPointClick,
   chartId,
   citations,
+  baselineRatePerDay = null,
+  impactedRatePerDay = null,
 }: MeasuredMileChartProps) {
   const { rows: chartData, allRows, excludedPointCount } = buildChartRows(points, metric, timeAxisMode, citations);
   const isTimeline = timeAxisMode === "timeline";
@@ -104,6 +110,14 @@ export function MeasuredMileChart({
               angle={timeAxisMode === "date" ? -40 : 0}
               textAnchor={timeAxisMode === "date" ? "end" : "middle"}
               height={timeAxisMode === "date" ? 60 : 30}
+              // Date-label mode has one slot per pay estimate, and Recharts' default tick-thinning
+              // picks slots by even pixel spacing, not by which slots actually have a bar/point --
+              // a dense run of real periods can lose its dates while a sparse run of data gaps
+              // keeps its own. Force every slot to be considered (interval=0) and only print the
+              // date where this row actually has a plotted value; a value-less slot (data gap,
+              // or a real period with no recoverable date) draws no label rather than a stray one.
+              interval={timeAxisMode === "date" ? 0 : undefined}
+              tickFormatter={timeAxisMode === "date" ? (value: string, index: number) => (chartData[index]?.value != null ? value : "") : undefined}
             />
           )}
           <YAxis
@@ -121,6 +135,38 @@ export function MeasuredMileChart({
               stroke="#059669"
               strokeOpacity={0.3}
               strokeDasharray="4 2"
+            />
+          )}
+          {/* Baseline/impacted averages are computed from productionRatePerDay -- drawing them on
+              any other metric's scale (dollars, man-hours, an index) would be a unit mismatch. */}
+          {metric === "productionRatePerDay" && baselineRatePerDay != null && (
+            <ReferenceLine
+              y={baselineRatePerDay}
+              stroke="#059669"
+              strokeWidth={1.5}
+              strokeDasharray="6 3"
+              ifOverflow="extendDomain"
+              label={{
+                value: `Baseline avg ${baselineRatePerDay.toFixed(2)}`,
+                position: "insideTopRight",
+                fill: "#059669",
+                fontSize: 11,
+              }}
+            />
+          )}
+          {metric === "productionRatePerDay" && impactedRatePerDay != null && (
+            <ReferenceLine
+              y={impactedRatePerDay}
+              stroke="#dc2626"
+              strokeWidth={1.5}
+              strokeDasharray="6 3"
+              ifOverflow="extendDomain"
+              label={{
+                value: `Impacted avg ${impactedRatePerDay.toFixed(2)}`,
+                position: "insideBottomRight",
+                fill: "#dc2626",
+                fontSize: 11,
+              }}
             />
           )}
           {renderAsLine ? (

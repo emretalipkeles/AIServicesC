@@ -367,6 +367,8 @@ export function MeasuredMileTab({ projectId }: MeasuredMileTabProps) {
                     onPointClick={setDetailPeNumber}
                     chartId={CHART_ID}
                     citations={seriesData?.pointCitations}
+                    baselineRatePerDay={series.lossStatistics.measuredMileBaselineRatePerDay}
+                    impactedRatePerDay={series.lossStatistics.impactedAverageRatePerDay}
                   />
 
                   <WindowAndAccelerationControls
