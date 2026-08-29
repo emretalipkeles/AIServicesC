@@ -38,7 +38,7 @@ const CLASS_LABELS: Record<PeriodClass, string> = {
   measured_mile: "Measured mile",
   impact: "Impacted",
   acceleration: "Directed acceleration",
-  neutral: "Neutral",
+  neutral: "Unimpacted",
   gap: "Data gap",
 };
 
