@@ -13,12 +13,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useTabContext } from "@/contexts/tab-context";
 import { 
   ArrowLeft, Save, Calendar, Upload, BarChart3, Activity, 
-  AlertCircle, Loader2, CheckCircle2, FolderOpen, Building2
+  AlertCircle, Loader2, CheckCircle2, FolderOpen, Building2, Ruler
 } from "lucide-react";
 import { DocumentUpload } from "./document-upload";
 import { ScheduleUpload } from "./schedule-upload";
 import { DelayEvents } from "./delay-events";
 import { AnalysisResults } from "./analysis-results";
+import { MeasuredMileTab } from "./measured-mile/measured-mile-tab";
 import { HeroHeader, GlassCard, PremiumTabs } from "./ui/premium-components";
 
 interface DelayAnalysisProjectDetailProps {
@@ -31,6 +32,7 @@ const baseTabs = [
   { value: "documents", label: "Documents", icon: Upload },
   { value: "delays", label: "Delay Events", icon: Activity },
   { value: "results", label: "Results", icon: BarChart3 },
+  { value: "measured-mile", label: "Measured Mile", icon: Ruler },
 ];
 
 export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisProjectDetailProps) {
@@ -283,6 +285,9 @@ export function DelayAnalysisProjectDetail({ projectId, onBack }: DelayAnalysisP
                 )}
                 {activeTab === "results" && (
                   <AnalysisResults projectId={projectId} />
+                )}
+                {activeTab === "measured-mile" && (
+                  <MeasuredMileTab projectId={projectId} />
                 )}
               </motion.div>
             </AnimatePresence>

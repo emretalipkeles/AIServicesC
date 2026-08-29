@@ -902,3 +902,37 @@ export const payrollReconciliation = pgTable("payroll_reconciliation", {
 
 export type PayrollReconciliationRow = typeof payrollReconciliation.$inferSelect;
 export type InsertPayrollReconciliationRow = typeof payrollReconciliation.$inferInsert;
+
+// Measured Mile page: pure UI state layered on top of the deterministic calculator (see
+// server/src/domain/measured-mile/MeasuredMileCalculator.ts). Neither table stores a computed
+// figure -- they only tell the calculator which periods the user has manually flagged.
+export const measuredMilePeriodTags = pgTable("measured_mile_period_tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  itemNo: integer("item_no").notNull(),
+  peNumber: integer("pe_number").notNull(),
+  tag: text("tag").notNull().default("acceleration"), // only 'acceleration' for now
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  projectItemIdx: index("measured_mile_period_tags_project_item_idx").on(table.projectId, table.itemNo),
+}));
+
+export type MeasuredMilePeriodTagRow = typeof measuredMilePeriodTags.$inferSelect;
+export type InsertMeasuredMilePeriodTagRow = typeof measuredMilePeriodTags.$inferInsert;
+
+export const measuredMileWindowOverrides = pgTable("measured_mile_window_overrides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => delayAnalysisProjects.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().default("default"),
+  itemNo: integer("item_no").notNull(),
+  startPeNumber: integer("start_pe_number").notNull(),
+  endPeNumber: integer("end_pe_number").notNull(),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type MeasuredMileWindowOverrideRow = typeof measuredMileWindowOverrides.$inferSelect;
+export type InsertMeasuredMileWindowOverrideRow = typeof measuredMileWindowOverrides.$inferInsert;

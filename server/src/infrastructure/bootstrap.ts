@@ -134,6 +134,8 @@ import { StartupReconciliationService } from "./delay-analysis/StartupReconcilia
 import { DrizzleXerRepository } from "./database/repositories/delay-analysis/DrizzleXerRepository";
 import type { IXerRepository } from "../domain/delay-analysis/repositories/IXerRepository";
 import { XerRoundTripService } from "../application/delay-analysis/xer/XerRoundTripService";
+import { DrizzleMeasuredMileRepository } from "./database/repositories/delay-analysis/DrizzleMeasuredMileRepository";
+import type { IMeasuredMileRepository } from "../domain/delay-analysis/repositories/IMeasuredMileRepository";
 
 export interface AppContainer {
   commandBus: ICommandBus;
@@ -155,6 +157,7 @@ export interface AppContainer {
     podReport: IPodReportRepository;
     diaryReport: IDiaryReportRepository;
     xer: IXerRepository;
+    measuredMile: IMeasuredMileRepository;
   };
   
   services: {
@@ -507,6 +510,7 @@ export function createAppContainer(): AppContainer {
       podReport: podReportRepository,
       diaryReport: diaryReportRepository,
       xer: xerRepository,
+      measuredMile: new DrizzleMeasuredMileRepository(),
     },
     services: {
       isAIConfigured: bedrockClientProvider.isConfigured(),
