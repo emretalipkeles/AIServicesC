@@ -1,5 +1,6 @@
 import { saveAs } from "file-saver";
 import type { MeasuredMileResultDto, MeasuredMileProvenanceDto, EligibleBidItemDto, PointCitationDto } from "@/lib/measured-mile-api";
+import { pointTimestamp } from "./measured-mile-chart-data";
 
 /**
  * Exports the currently displayed series as CSV. Every row carries its own per-figure citation
@@ -19,14 +20,21 @@ export function exportMeasuredMileCsv(
     "PE",
     "Period Start",
     "Period End",
+    "Cutoff Date",
+    "Chart Date",
+    "Chart Date Source",
     "Period Class",
     "Data Quality",
     "Installed Quantity",
     "Quantity Source",
     "Earned Man-Hours",
+    "Cumulative Earned Man-Hours",
+    "Earned Dollars",
+    "Cumulative Earned Dollars",
     "Production Rate/Day",
     "Actual Proxy Hours",
     "Productivity Index (proxy)",
+    "Cumulative Completeness",
     "Impact Hours",
     "Gap Reason",
     "Citation: Installed Quantity",
@@ -37,20 +45,47 @@ export function exportMeasuredMileCsv(
     "Citation: Data Quality",
   ];
 
+  // Cumulative columns mirror the chart's cumulative curves exactly: they run across the whole
+  // series in PE order, are not reset by a data gap, and never count an unreported (null) amount
+  // as zero -- a period with an unknown contribution is skipped and every later cumulative figure
+  // is marked as a lower bound in the "Cumulative Completeness" column.
+  let cumulativeManHours = 0;
+  let cumulativeDollars = 0;
+  let unknownManHourPeriods = 0;
+  let unknownDollarPeriods = 0;
+
   const rows = result.points.map((p) => {
     const c = citationByPe.get(p.peNumber);
+    if (!p.isGap) {
+      if (p.earnedManHours === null) unknownManHourPeriods += 1;
+      else cumulativeManHours += p.earnedManHours;
+      if (p.earnedDollars === null) unknownDollarPeriods += 1;
+      else cumulativeDollars += p.earnedDollars;
+    }
+    const { dateSource, isoDate } = pointTimestamp(p);
+    const completeness =
+      unknownManHourPeriods === 0 && unknownDollarPeriods === 0
+        ? "complete"
+        : `lower bound (${unknownManHourPeriods} period(s) with unreported man-hours, ${unknownDollarPeriods} with unreported dollars)`;
     return [
       p.peNumber,
       p.periodStart ?? "",
       p.periodEnd ?? "",
+      p.cutoffDate ?? "",
+      isoDate ?? "",
+      dateSource,
       p.periodClass,
       p.dataQualityStatus,
       p.isGap ? "" : p.installedQuantity ?? "",
       p.isGap ? "" : p.quantityDeltaSource,
       p.isGap ? "" : p.earnedManHours ?? "",
+      p.isGap || p.earnedManHours === null ? "" : cumulativeManHours,
+      p.isGap ? "" : p.earnedDollars ?? "",
+      p.isGap || p.earnedDollars === null ? "" : cumulativeDollars,
       p.isGap ? "" : p.productionRatePerDay ?? "",
       p.isGap ? "" : p.actualProxyHours ?? "",
       p.isGap ? "" : p.productivityIndex ?? "",
+      completeness,
       p.impactHours,
       p.gapReason ?? "",
       c?.installedQuantity ?? "",

@@ -16,7 +16,7 @@ import {
   useSetMeasuredMileOverride,
   useClearMeasuredMileOverride,
 } from "@/lib/measured-mile-api";
-import { MeasuredMileChart, type ChartMetric } from "./measured-mile-chart";
+import { MeasuredMileChart, type ChartMetric, type TimeAxisMode } from "./measured-mile-chart";
 import { MeasuredMileEvidencePanel } from "./measured-mile-evidence-panel";
 import { MeasuredMilePeriodDetail } from "./measured-mile-period-detail";
 import { MeasuredMileLocationChart, type LocationChartMetric, type LocationAxisLabelMode } from "./measured-mile-location-chart";
@@ -40,9 +40,18 @@ interface MeasuredMileTabProps {
 const CHART_ID = "measured-mile-chart-svg-container";
 
 const METRIC_OPTIONS: Array<{ value: ChartMetric; label: string }> = [
-  { value: "productionRatePerDay", label: "Production rate (units/day)" },
+  { value: "productionRatePerDay", label: "Daily productivity (units/day)" },
   { value: "earnedManHoursPerDay", label: "Earned man-hours/day" },
+  { value: "cumulativeEarnedManHours", label: "Cumulative earned man-hours" },
+  { value: "earnedDollars", label: "Earned dollars (period)" },
+  { value: "cumulativeEarnedDollars", label: "Cumulative earned dollars" },
   { value: "productivityIndex", label: "Productivity index (proxy)" },
+];
+
+const TIME_AXIS_OPTIONS: Array<{ value: TimeAxisMode; label: string }> = [
+  { value: "date", label: "Date labels" },
+  { value: "timeline", label: "Timeline (to scale)" },
+  { value: "pe", label: "PE number" },
 ];
 
 export function MeasuredMileTab({ projectId }: MeasuredMileTabProps) {
@@ -50,6 +59,7 @@ export function MeasuredMileTab({ projectId }: MeasuredMileTabProps) {
   const [selectedItemNo, setSelectedItemNo] = useState<number | null>(null);
   const [xAxisMode, setXAxisMode] = useState<XAxisMode>("time");
   const [metric, setMetric] = useState<ChartMetric>("productionRatePerDay");
+  const [timeAxisMode, setTimeAxisMode] = useState<TimeAxisMode>("date");
   const [locationMetric, setLocationMetric] = useState<LocationChartMetric>("productionRatePerDay");
   const [locationAxisLabelMode, setLocationAxisLabelMode] = useState<LocationAxisLabelMode>("streetName");
   const [verifiedOnly, setVerifiedOnly] = useState(false);
@@ -212,21 +222,38 @@ export function MeasuredMileTab({ projectId }: MeasuredMileTabProps) {
             </div>
 
             {xAxisMode === "time" ? (
-              <div className="min-w-[220px]">
-                <Label className="text-xs text-muted-foreground mb-1.5 block">Chart metric</Label>
-                <Select value={metric} onValueChange={(v) => setMetric(v as ChartMetric)}>
-                  <SelectTrigger className={selectTriggerStyles}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {METRIC_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <>
+                <div className="min-w-[240px]">
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Chart metric (y-axis)</Label>
+                  <Select value={metric} onValueChange={(v) => setMetric(v as ChartMetric)}>
+                    <SelectTrigger className={selectTriggerStyles}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {METRIC_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="min-w-[180px]">
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Time axis</Label>
+                  <Select value={timeAxisMode} onValueChange={(v) => setTimeAxisMode(v as TimeAxisMode)}>
+                    <SelectTrigger className={selectTriggerStyles}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIME_AXIS_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
             ) : (
               <>
                 <div className="min-w-[220px]">
@@ -340,6 +367,7 @@ export function MeasuredMileTab({ projectId }: MeasuredMileTabProps) {
                     points={series.points}
                     metric={metric}
                     windowRange={series.measuredMileWindow}
+                    timeAxisMode={timeAxisMode}
                     onPointClick={setDetailPeNumber}
                     chartId={CHART_ID}
                     citations={seriesData?.pointCitations}
