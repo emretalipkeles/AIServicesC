@@ -46,6 +46,12 @@ import type { JobWidePeriodInput } from '../../../../domain/measured-mile/JobWid
 import type { LocationEvidenceCandidate, DelayEventLocationCandidate } from '../../../../domain/measured-mile/CorridorLocationAllocationCalculator';
 import { DEFAULT_CORRIDOR_LOCATIONS, type CanonicalCorridorLocation } from '../../../../domain/measured-mile/CorridorLocationModel';
 
+// Directed-acceleration tagging (manual, no data source) is parked for now -- the tagging UI is
+// hidden in measured-mile-tab.tsx, and this flag stops previously-stored tags from silently
+// pulling periods out of the auto-selected window / classification while the feature is off.
+// Flip back to true (and the client flag) together to restore it; stored tags are untouched.
+const DIRECTED_ACCELERATION_ENABLED = false;
+
 // Units that never represent measurable per-unit direct-work production.
 const EXCLUDED_UNITS = new Set(['LS', 'FA']);
 
@@ -419,6 +425,11 @@ export class DrizzleMeasuredMileRepository implements IMeasuredMileRepository {
     return map;
   }
 
+  /**
+   * Returns tags actually stored in measured_mile_period_tags -- callers deciding whether the
+   * feature is live right now should go through getMeasuredMileInputBundle instead, which applies
+   * the DIRECTED_ACCELERATION_ENABLED gate below.
+   */
   async getManualAccelerationPeNumbers(projectId: string, tenantId: string, itemNo: number): Promise<Set<number>> {
     const rows = await db
       .select({ peNumber: measuredMilePeriodTags.peNumber })
@@ -527,7 +538,7 @@ export class DrizzleMeasuredMileRepository implements IMeasuredMileRepository {
     options: DelayEventFilterOptions,
     shiftHours: number
   ): Promise<MeasuredMileInputBundle> {
-    const [manHoursPerUnit, periodQualities, progressRows, manualAccelerationPeNumbers, measuredMileOverride] =
+    const [manHoursPerUnit, periodQualities, progressRows, storedAccelerationPeNumbers, measuredMileOverride] =
       await Promise.all([
         this.getManHoursPerUnit(projectId, tenantId, itemNo),
         this.getPeriodQualities(projectId, tenantId),
@@ -535,6 +546,10 @@ export class DrizzleMeasuredMileRepository implements IMeasuredMileRepository {
         this.getManualAccelerationPeNumbers(projectId, tenantId, itemNo),
         this.getMeasuredMileOverride(projectId, tenantId, itemNo),
       ]);
+    // Directed-acceleration tagging is parked for now (matches the hidden UI in
+    // measured-mile-tab.tsx) -- previously-set tags stay in the table untouched so the feature
+    // can come back later, but every report load treats the series as if none were set.
+    const manualAccelerationPeNumbers = DIRECTED_ACCELERATION_ENABLED ? storedAccelerationPeNumbers : new Set<number>();
 
     const [impactByPeriod, laborProxyByPeriod, crosswalkCostCodes] = await Promise.all([
       this.getImpactByPeriod(projectId, tenantId, periodQualities, options),

@@ -62,11 +62,11 @@ describe('buildChartRows', () => {
     expect(rows.map((r) => r.value)).toEqual([1000, null, 1500]);
   });
 
-  it('labels by PE number, by date, and keeps a PE fallback for dateless periods', () => {
+  it('labels by PE number, by date, and leaves a blank tick for dateless periods', () => {
     expect(buildChartRows(points, 'productionRatePerDay', 'pe').rows.map((r) => r.label)).toEqual(['PE1', 'PE2', 'PE3']);
     expect(buildChartRows(points, 'productionRatePerDay', 'date').rows.map((r) => r.label)).toEqual([
       '30-Oct-21',
-      'PE2', // no recoverable date -- must not invent one
+      '', // no recoverable date -- must not invent one, and must not show a bare "PE2" among dates
       '30-Dec-21',
     ]);
   });

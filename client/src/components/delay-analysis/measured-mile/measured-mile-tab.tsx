@@ -17,6 +17,7 @@ import {
   useClearMeasuredMileOverride,
 } from "@/lib/measured-mile-api";
 import { MeasuredMileChart, type ChartMetric, type TimeAxisMode } from "./measured-mile-chart";
+import { BidItemCombobox } from "./bid-item-combobox";
 import { MeasuredMileEvidencePanel } from "./measured-mile-evidence-panel";
 import { MeasuredMilePeriodDetail } from "./measured-mile-period-detail";
 import { MeasuredMileLocationChart, type LocationChartMetric, type LocationAxisLabelMode } from "./measured-mile-location-chart";
@@ -38,6 +39,12 @@ interface MeasuredMileTabProps {
 }
 
 const CHART_ID = "measured-mile-chart-svg-container";
+
+// Directed-acceleration tagging is parked for now (not in active use) but kept wired up so it can
+// be turned back on later without rebuilding it: flip this back to true to restore the UI. The
+// matching effect on the calculated series is disabled server-side for the same reason -- see
+// DrizzleMeasuredMileRepository.getMeasuredMileInputBundle.
+const DIRECTED_ACCELERATION_UI_ENABLED = false;
 
 const METRIC_OPTIONS: Array<{ value: ChartMetric; label: string }> = [
   { value: "productionRatePerDay", label: "Daily productivity (units/day)" },
@@ -185,18 +192,7 @@ export function MeasuredMileTab({ projectId }: MeasuredMileTabProps) {
           <div className="flex flex-wrap items-end gap-4">
             <div className="min-w-[280px]">
               <Label className="text-xs text-muted-foreground mb-1.5 block">Bid item</Label>
-              <Select value={activeItemNo?.toString() ?? ""} onValueChange={(v) => setSelectedItemNo(Number(v))}>
-                <SelectTrigger className={selectTriggerStyles}>
-                  <SelectValue placeholder="Select a bid item" />
-                </SelectTrigger>
-                <SelectContent>
-                  {items.map((item) => (
-                    <SelectItem key={item.itemNo} value={item.itemNo.toString()}>
-                      {item.itemNo} — {item.description ?? "Unnamed item"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <BidItemCombobox items={items} value={activeItemNo} onChange={setSelectedItemNo} />
             </div>
 
             <div>
@@ -498,7 +494,7 @@ function WindowAndAccelerationControls({
   onToggleAcceleration: (peNumber: number, isCurrentlyTagged: boolean) => void;
 }) {
   return (
-    <div className="grid md:grid-cols-2 gap-4 pt-2 border-t border-border/50">
+    <div className={`grid gap-4 pt-2 border-t border-border/50 ${DIRECTED_ACCELERATION_UI_ENABLED ? "md:grid-cols-2" : ""}`}>
       <div>
         <Label className="text-xs text-muted-foreground mb-1.5 block">Override measured-mile window (PE range)</Label>
         <div className="flex items-center gap-2">
@@ -512,24 +508,26 @@ function WindowAndAccelerationControls({
         </div>
       </div>
 
-      <div>
-        <Label className="text-xs text-muted-foreground mb-1.5 block">Tag directed acceleration (no data source — manual)</Label>
-        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-          {points.filter((p) => !p.isGap).map((p) => (
-            <button
-              key={p.peNumber}
-              onClick={() => onToggleAcceleration(p.peNumber, p.isManualAcceleration)}
-              className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${
-                p.isManualAcceleration
-                  ? "bg-amber-500/20 border-amber-500/50 text-amber-700 dark:text-amber-400"
-                  : "bg-muted border-border/50 text-muted-foreground hover:border-amber-500/40"
-              }`}
-            >
-              PE{p.peNumber}
-            </button>
-          ))}
+      {DIRECTED_ACCELERATION_UI_ENABLED && (
+        <div>
+          <Label className="text-xs text-muted-foreground mb-1.5 block">Tag directed acceleration (no data source — manual)</Label>
+          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+            {points.filter((p) => !p.isGap).map((p) => (
+              <button
+                key={p.peNumber}
+                onClick={() => onToggleAcceleration(p.peNumber, p.isManualAcceleration)}
+                className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${
+                  p.isManualAcceleration
+                    ? "bg-amber-500/20 border-amber-500/50 text-amber-700 dark:text-amber-400"
+                    : "bg-muted border-border/50 text-muted-foreground hover:border-amber-500/40"
+                }`}
+              >
+                PE{p.peNumber}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

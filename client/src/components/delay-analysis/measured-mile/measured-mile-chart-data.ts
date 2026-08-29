@@ -133,7 +133,11 @@ export function buildChartRows(
           : 0;
     return {
       peNumber: p.peNumber,
-      label: timeAxisMode === "date" ? dateLabel ?? `PE${p.peNumber}` : `PE${p.peNumber}`,
+      // In date mode, a period with no recoverable date (a gap like an unreadable source PDF)
+      // gets a blank tick rather than falling back to "PE47" text -- mixing a PE-number label
+      // into a row of real dates reads as a stray date and breaks the axis's date scan. The bar
+      // itself (colored gray for a gap) and its tooltip still identify which period it is.
+      label: timeAxisMode === "date" ? (dateLabel ?? "") : `PE${p.peNumber}`,
       dateLabel,
       dateSource,
       periodRangeLabel: p.periodStart && p.periodEnd ? `${p.periodStart} → ${p.periodEnd}` : p.cutoffDate,
