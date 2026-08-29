@@ -8,7 +8,10 @@
  * parsing -- that report's rows were far denser/more irregular than this one's clean per-item
  * table). One document (PE47) is an xlsx export instead; its item table lives on the "C@C"
  * sheet under different column headers (no previous-amount/this-period columns -- only
- * cumulative quantity-to-date/amount-to-date, which is what we store as canonical anyway).
+ * cumulative quantity-to-date/amount-to-date). That document's item-level figures don't
+ * reconcile with the rest of the series (see UNRECOVERABLE_FILES below) and are excluded
+ * entirely -- PE47 gets a period record (status='unrecoverable', rendered as a data gap
+ * downstream) but no item rows, same treatment as PE33's unreadable PDF.
  *
  * Item table columns (verified against printed row math, e.g. 1587.00 HR * $159.00 =
  * $252,333.00): Item No, Bid Code, Description, Contract (Taxable Estimate) Quantity, Units,
@@ -46,7 +49,13 @@ const PAY_ESTIMATES_DIR = 'attached_assets/pay_estimiates';
 // - PE33: rasterized/flattened PDF with no recoverable text layer at all (confirmed via both
 //   pdftotext and pdfjs-dist -- fewer than 25 characters extractable across 48 pages). No OCR
 //   is attempted: financial figures are too risky to guess at from OCR.
-const UNRECOVERABLE_FILES = new Set(['2019-069_PE33_Fully signed_rev.pdf']);
+// - PE47: the one xlsx-format estimate in the series (see parseXlsxPe). Its "C@C" sheet parse
+//   already showed unit-price/contract-quantity mismatches against every PDF-sourced period for
+//   the same item (see buildItemCatalog), and its summed item total was off from the printed
+//   cover-sheet total by 3.82%. Excluded outright at the user's direction rather than kept as a
+//   discrepancy-flagged period: this file's structure was different enough from the rest of the
+//   series that its figures aren't trustworthy for Measured Mile and were skewing it.
+const UNRECOVERABLE_FILES = new Set(['2019-069_PE33_Fully signed_rev.pdf', '2019-069_PE47_final.xlsx']);
 
 // PE05, PE06, PE08, PE13: early-project documents whose item table is "Template C-20L", a wide
 // per-Field-Change-Request (FCR) quantity matrix (Bid Item / Description / GRAND TOTAL / one
@@ -526,7 +535,10 @@ async function parsePdfPe(filePath: string, catalog: Map<number, CatalogEntry>):
     contractBidItemWorkToDate: bidItemWorkMatch ? parseNumber(bidItemWorkMatch[1]) : null,
     contractBidItemWorkThisPeriod: bidItemWorkMatch ? parseNumber(bidItemWorkMatch[3]) : null,
     items,
-    sourceFile: filePath,
+    // Store just the filename, not the local staging directory it happened to be read from --
+    // that directory (attached_assets/pay_estimiates) is a temporary upload location, not a
+    // durable citation, and shouldn't leak into evidence shown to users.
+    sourceFile: filename,
   };
 }
 
@@ -575,7 +587,10 @@ function parseXlsxPe(filePath: string): ParsedPe {
     : [];
   let headerRowIdx = ccRows.findIndex((row) => String(row[0]).trim() === 'Item No.');
   const items: ParsedItem[] = [];
-  if (headerRowIdx >= 0) {
+  // See UNRECOVERABLE_FILES: this file's item-level detail is excluded outright, so the "C@C"
+  // sheet is left unparsed for item rows even though it's readable -- only the period metadata
+  // (cutoff date, pay period, cover-sheet totals) above is kept.
+  if (headerRowIdx >= 0 && !UNRECOVERABLE_FILES.has(filename)) {
     for (let r = headerRowIdx + 1; r < ccRows.length; r++) {
       const row = ccRows[r];
       // Mirrors the PDF path's "Change Orders" cutoff: this sheet has its own "Change Orders"
@@ -612,7 +627,8 @@ function parseXlsxPe(filePath: string): ParsedPe {
     contractBidItemWorkToDate: bidItemWorkToDate,
     contractBidItemWorkThisPeriod: bidItemWorkThisPeriod,
     items,
-    sourceFile: filePath,
+    // Store just the filename -- see the matching comment in parsePdfPe.
+    sourceFile: filename,
   };
 }
 
@@ -686,7 +702,10 @@ async function stagePayEstimates(projectId: string, dryRun: boolean) {
 
     if (UNRECOVERABLE_FILES.has(filename)) {
       status = 'unrecoverable';
-      notes = 'Rasterized/flattened PDF with no recoverable text layer; item detail could not be extracted.';
+      notes =
+        filename === '2019-069_PE47_final.xlsx'
+          ? 'Excluded: this xlsx-format estimate\'s figures did not reconcile with the rest of the series (unit-price/contract-quantity mismatches, printed total off by 3.82%) and were skewing Measured Mile; item-level detail is not used.'
+          : 'Rasterized/flattened PDF with no recoverable text layer; item detail could not be extracted.';
     } else if (pe.contractBidItemWorkToDate === null) {
       status = 'unvalidated';
       notes = 'No printed cover-sheet total found in this document to validate against.';
